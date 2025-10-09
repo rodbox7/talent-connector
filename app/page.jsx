@@ -1,7 +1,6 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
+import { supabase as sb } from '../lib/supabaseClient';
 /*********************************
  * Talent Connector – Stable Build (fixed)
  * - Auth with Admin / Recruiter / Client (invitation-only)
