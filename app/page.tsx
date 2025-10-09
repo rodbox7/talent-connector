@@ -23,7 +23,9 @@ const SUPABASE_URL = 'https://kuzgeknopaguewhpvuvq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1emdla25vcGFndWV3aHB2dXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTc5NDEsImV4cCI6MjA3NTUzMzk0MX0.BVMezuwR-UEUnhay03wA49Q37xuxX5eRc1vKzuttALY';
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Build a mailto link to the assigned salesperson for a client
+function buildContactMailto(c: any, user: any) {
+  // ...existing code...
+}
 function buildContactMailto(c, user){
   const to = user?.amEmail || 'info@youragency.com';
   const subj = `Talent Connector Candidate – ${c?.name || ''}`;
