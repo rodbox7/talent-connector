@@ -16,11 +16,6 @@ const APP_NAME = 'Talent Connector - Powered by Beacon Hill Legal';
 const RECRUITER_CODE = ''; // invitation-only (no self-join)
 const NYC_URL = 'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
 
-// ==== Supabase config (browser-safe) ====
-const SUPABASE_URL = 'https://kuzgeknopaguewhpvuvq.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1emdla25vcGFndWV3aHB2dXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTc5NDEsImV4cCI6MjA3NTUzMzk0MX0.BVMezuwR-UEUnhay03wA49Q37xuxX5eRc1vKzuttALY';
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 function buildContactMailto(c, user) {
   const to = user?.amEmail || 'info@youragency.com';
   const subj = `Talent Connector Candidate – ${c?.name || ''}`;
