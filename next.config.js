@@ -5,3 +5,4 @@ const nextConfig = {
   pageExtensions: ['js', 'jsx'], // build only JS/JSX pages
 };
 module.exports = nextConfig;
+
