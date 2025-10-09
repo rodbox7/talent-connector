@@ -21,29 +21,26 @@ const SUPABASE_URL = 'https://kuzgeknopaguewhpvuvq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1emdla25vcGFndWV3aHB2dXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTc5NDEsImV4cCI6MjA3NTUzMzk0MX0.BVMezuwR-UEUnhay03wA49Q37xuxX5eRc1vKzuttALY';
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function buildContactMailto(c: any, user: any) {
-  // ...existing code...
-}
-function buildContactMailto(c, user){
+function buildContactMailto(c, user) {
   const to = user?.amEmail || 'info@youragency.com';
   const subj = `Talent Connector Candidate – ${c?.name || ''}`;
   const body = [
     `Hello,`,
-    '',
+    ``,
     `I'm interested in this candidate:`,
     `• Name: ${c?.name || ''}`,
-    `• Title(s): ${(c?.roles||[]).join(', ')}`,
-    `• Practice Areas: ${(c?.practice_areas||c?.practiceAreas||[]).join(', ')}`,
-    `• Location: ${[c?.city,c?.state].filter(Boolean).join(', ')}`,
+    `• Title(s): ${(c?.roles || []).join(', ')}`,
+    `• Practice Areas: ${(c?.practice_areas || c?.practiceAreas || []).join(', ')}`,
+    `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
     `• Years: ${c?.years ?? ''}`,
-    '',
+    ``,
     `My email: ${user?.email || ''}`,
-    '',
+    ``,
     `Sent from Talent Connector`
   ].join('\n');
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-} // CC BY 4.0
 
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
 // ========= Demo seed data =========
 const seedCandidates = [
   { id: '1', name: 'Alexis Chen', roles: ['Attorney', 'Contract Attorney'], practiceAreas: ['Securities Litigation', 'Internal Investigations'], city: 'New York', state: 'NY', years: 6, contract: true, hourly: 95, salary: 175000, notes: 'Strong writer. Securities litigation focus. Immediate.' },
