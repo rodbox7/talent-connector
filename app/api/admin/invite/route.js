@@ -11,10 +11,10 @@ export async function POST(req) {
 
     const admin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY // SERVER-ONLY
+      process.env.SUPABASE_SERVICE_ROLE_KEY // SERVER-ONLY (never NEXT_PUBLIC)
     );
 
-    // 1) Create Auth user (auto-confirm to avoid SMTP)
+    // 1) Create Auth user (auto-confirm, so no SMTP needed)
     const { data, error } = await admin.auth.admin.createUser({
       email: String(email).toLowerCase(),
       password,
@@ -22,7 +22,7 @@ export async function POST(req) {
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    // 2) Upsert profile (role/org/sales contact)
+    // 2) Upsert profile with role/org/sales contact
     const { error: upErr } = await admin.from('profiles').upsert({
       id: data.user.id,
       email: String(email).toLowerCase(),
@@ -37,4 +37,3 @@ export async function POST(req) {
     return NextResponse.json({ error: e?.message || 'unknown error' }, { status: 500 });
   }
 }
-
