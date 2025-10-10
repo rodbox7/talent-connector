@@ -61,9 +61,9 @@ export default function AdminPage() {
 
   return (
     <div className="container" style={{paddingTop:24}}>
-      <div className="card" style={{marginBottom:20}}>
-        <h1 style={{fontSize:24, fontWeight:800, marginBottom:8}}>Admin · Users (invitation only)</h1>
-        <div className="muted" style={{marginBottom:16}}>
+      <div className="panel" style={{marginBottom:20}}>
+        <h1 className="panel-title" style={{fontSize:24, marginBottom:8}}>Admin · Users (invitation only)</h1>
+        <div className="panel-sub" style={{marginBottom:16}}>
           Create users with one click. This creates a Supabase Auth account and a matching profile with role & optional salesperson email.
         </div>
 
@@ -84,16 +84,16 @@ export default function AdminPage() {
           </div>
           {(err || flash) && (
             <div style={{gridColumn:'1 / -1', marginTop:10}}>
-              {err && <div style={{color:'var(--danger)'}}>{err}</div>}
-              {flash && <div style={{color:'var(--success)'}}>{flash}</div>}
+              {err && <div style={{color:'#ef4444'}}>{err}</div>}
+              {flash && <div style={{color:'#22c55e'}}>{flash}</div>}
             </div>
           )}
         </form>
       </div>
 
-      <div className="card">
+      <div className="panel">
         <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
-          <div style={{fontWeight:700}}>Registered users</div>
+          <div className="panel-title" style={{fontSize:18}}>Registered users</div>
           <span className="badge">{users?.length || 0} total</span>
         </div>
         {header}
@@ -119,7 +119,7 @@ export default function AdminPage() {
             </div>
           </div>
         ))}
-        {(!users || users.length===0) && <div className="muted" style={{padding:'16px 0'}}>No users yet.</div>}
+        {(!users || users.length===0) && <div className="panel-sub" style={{padding:'16px 0'}}>No users yet.</div>}
       </div>
     </div>
   );
