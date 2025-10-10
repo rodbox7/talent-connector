@@ -1,26 +1,4 @@
-/* KILL SWITCH: hide any lingering header/branding + borders globally */
-.app-header,
-header.app-header,
-.app-header-inner,
-.brand {
-  display: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-/* If something still renders a top header element, hide the first header */
-body > header { display: none !important; }
-
-/* In case a generic wrapper (not named) is the first child and contains branding */
-@supports (selector(:has(*))) {
-  body > div:has(.brand) { display: none !important; }
-}
-
-/* Remove any top border some themes add */
-body { border-top: 0 !important; }
-/* === Hard reset so no white border ever shows === */
+/* app/globals.css */
 html, body { margin: 0; padding: 0; background: #0a0a0a; }
-img { border: 0; display: block; }
+img { display: block; border: 0; }
 
-/* Hide any leftover branding/header classes if they exist anywhere */
-.app-header, header.app-header, .app-header-inner, .brand { display: none !important; border: 0 !important; box-shadow: none !important; }
