@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { supabase as sb } from '../lib/supabaseClient';
 
 // --------------------------------------------
 // 1) Fallback users so you can always log in
@@ -26,8 +27,7 @@ function localFindUser(users, email, pwd) {
 
 export default function Page() {
   // --------------------------------------------
-  // 2) Users state: load from localStorage,
-  //    fall back to seedUsers
+  // Users state (local mirror) + persistence
   // --------------------------------------------
   const [users, setUsers] = useState(() => {
     try {
@@ -36,8 +36,6 @@ export default function Page() {
     } catch {}
     return seedUsers;
   });
-
-  // 3) Persist any changes to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('tc_users', JSON.stringify(users));
@@ -53,22 +51,64 @@ export default function Page() {
   const [err, setErr] = useState('');
   const [user, setUser] = useState(null);
 
-  function login() {
-    setErr('');
-    const e = String(email).trim().toLowerCase();
-    if (!e.includes('@')) { setErr('Enter a valid email'); return; }
+  // Supabase-first login; fallback to local seed
+  async function login() {
+    try {
+      setErr('');
+      const e = String(email).trim().toLowerCase();
+      if (!e.includes('@')) { setErr('Enter a valid email'); return; }
 
-    // local fallback auth
-    const u = localFindUser(users, e, pwd);
-    if (!u) { setErr('Invalid credentials'); return; }
-    if (u.role !== mode) {
-      setErr(`This account is a ${u.role}. Switch to the ${u.role} tab.`);
-      return;
+      // 1) Try Supabase Auth
+      const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
+        email: e,
+        password: pwd
+      });
+
+      if (!authErr && auth?.user) {
+        // Fetch profile by auth user id
+        const { data: prof, error: profErr } = await sb
+          .from('profiles')
+          .select('id,email,role,org,account_manager_email')
+          .eq('id', auth.user.id)
+          .single();
+
+        if (profErr || !prof) {
+          setErr('Login succeeded, but profile not found. Ask Admin to create/repair your profile.');
+          return;
+        }
+
+        // Enforce role matches selected tab
+        if (mode !== prof.role) {
+          setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab or ask Admin to change the role.`);
+          return;
+        }
+
+        setUser({
+          id: prof.id,
+          email: prof.email,
+          role: prof.role,
+          org: prof.org || '',
+          amEmail: prof.account_manager_email || ''
+        });
+        return;
+      }
+
+      // 2) Fallback: local seed users (so you're never locked out)
+      const u = localFindUser(users, e, pwd);
+      if (!u) { setErr('Invalid credentials'); return; }
+      if (u.role !== mode) {
+        setErr(`This account is a ${u.role}. Switch to the ${u.role} tab.`);
+        return;
+      }
+      setUser({ id: u.id, email: u.email, role: u.role, org: u.org || '' });
+    } catch (ex) {
+      console.error(ex);
+      setErr('Login error. Please try again.');
     }
-    setUser({ id: u.id, email: u.email, role: u.role, org: u.org || '' });
   }
 
-  function logout() {
+  async function logout() {
+    try { await sb.auth.signOut(); } catch {}
     setUser(null);
     setEmail('');
     setPwd('');
@@ -79,9 +119,9 @@ export default function Page() {
   // Admin: invite (creates user in Supabase via API)
   // --------------------------------------------
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole]   = useState('client'); // 'client' | 'recruiter' | 'admin'
+  const [newRole, setNewRole]   = useState('client');
   const [newOrg, setNewOrg]     = useState('');
-  const [newAm, setNewAm]       = useState('');       // salesperson email for clients
+  const [newAm, setNewAm]       = useState('');
   const [newPw, setNewPw]       = useState('');
   const [inviteErr, setInviteErr] = useState('');
   const [inviteFlash, setInviteFlash] = useState('');
@@ -110,7 +150,7 @@ export default function Page() {
         setInviteErr(data?.error || 'Invite failed');
         return;
       }
-      // reflect immediately in local list so you see it without reload
+      // Add to local mirror so you see it immediately
       setUsers(prev => [
         ...prev,
         {
@@ -119,7 +159,7 @@ export default function Page() {
           role: newRole,
           org: newOrg.trim(),
           amEmail: newAm.trim(),
-          password: newPw, // so local login works if you test immediately
+          password: newPw,
           loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: []
         }
       ]);
@@ -135,7 +175,7 @@ export default function Page() {
   // Simple UI
   // --------------------------------------------
   const pageStyle = { minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#0a0a0a', color: '#e5e5e5', fontFamily: 'system-ui, Arial' };
-  const card = { width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid #1f2937', borderRadius: 12, padding: 16 };
+  const card = { width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid '#1f2937', borderRadius: 12, padding: 16 };
 
   // Admin screen (full)
   if (user && user.role === 'admin') {
@@ -243,7 +283,7 @@ export default function Page() {
   // Login screen
   return (
     <div style={pageStyle}>
-      <div style={card}>
+      <div style={{ width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid #1f2937', borderRadius: 12, padding: 16 }}>
         <div style={{ textAlign: 'center', fontWeight: 700 }}>Talent Connector</div>
         <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Invitation-only access</div>
 
