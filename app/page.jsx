@@ -2,38 +2,29 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
 
-/*********************************
- * Talent Connector – Date & Recent Position Years
- * - Supabase-first auth + local fallback
- * - Recruiter: add/edit/delete candidates
- *   • NEW field: yearsInMostRecent (years in most recent position)
- *   • Has “Date Entered” (yyyy-mm-dd)
- * - Client: read-only with keyword + filters
- * - Filters:
- *   • Keyword (notes, name, roles, law, location, date)
- *   • Date Entered: From / To (inclusive)
- *   • Years in Most Recent Position: Min / Max
- * - Sorted by Date Entered (newest first)
- *********************************/
-
-// ========= Config =========
+// ---------- Config ----------
 const APP_NAME = 'Talent Connector';
-const NYC_URL =
-  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
+const NYC_URL = 'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
-// ========= Utilities =========
-function parseCSV(s) { return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
-function yyyymmdd(str){
-  // normalize yyyy-mm-dd to number yyyymmdd for comparisons (handles missing)
-  if (!str) return null;
-  const d = String(str).trim();
-  // accept yyyy-mm-dd only
-  const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  return Number(m[1] + m[2] + m[3]);
+// ---------- Local fallback users so you’re never locked out ----------
+const seedUsers = [
+  { id: 'u1', email: 'admin@youragency.com', role: 'admin', org: 'Your Agency', password: 'admin' },
+  { id: 'u2', email: 'recruiter@youragency.com', role: 'recruiter', org: 'Your Agency', password: 'recruit' },
+  { id: 'u3', email: 'client@samplefirm.com', role: 'client', org: 'Sample Firm', password: 'client' },
+];
+function localFindUser(users, email, pwd){
+  const e = String(email||'').toLowerCase();
+  return users.find(u => String(u.email||'').toLowerCase() === e && String(u.password||'') === String(pwd||'')) || null;
 }
 
-function buildContactMailto(c, user) {
+// ---------- Helpers ----------
+function parseCSV(s){ return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
+function yyyymmdd(str){
+  if (!str) return null;
+  const m = String(str).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? Number(m[1]+m[2]+m[3]) : null;
+}
+function buildContactMailto(c, user){
   const to = user?.amEmail || 'info@youragency.com';
   const subj = `Talent Connector Candidate – ${c?.name || ''}`;
   const body = [
@@ -42,137 +33,87 @@ function buildContactMailto(c, user) {
     `I'm interested in this candidate:`,
     `• Name: ${c?.name || ''}`,
     `• Title(s): ${(c?.roles || []).join(', ')}`,
-    `• Practice Areas: ${(c?.practiceAreas || []).join(', ')}`,
+    `• Practice Areas: ${(c?.practice_areas || c?.practiceAreas || []).join(', ')}`,
     `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
     `• Years: ${c?.years ?? ''}`,
-    `• Years in Most Recent Position: ${c?.yearsInMostRecent ?? ''}`,
-    `• Date Entered: ${c?.dateEntered || ''}`,
+    `• Years in Most Recent Position: ${c?.years_in_most_recent ?? c?.yearsInMostRecent ?? ''}`,
+    `• Date Entered: ${c?.date_entered || c?.dateEntered || ''}`,
     ``,
     `My email: ${user?.email || ''}`,
     ``,
-    `Sent from Talent Connector`
+    `Sent from Talent Connector`,
   ].join('\n');
-
   return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
 
-function filterAndSortCandidates(cands, params){
-  const {
-    q, dateFrom, dateTo, minRecentYears, maxRecentYears
-  } = params;
-
-  const s = String(q||'').trim().toLowerCase();
-  const fromNum = yyyymmdd(dateFrom);
-  const toNum   = yyyymmdd(dateTo);
-  const minRY   = Number(minRecentYears || 0);
-  const maxRY   = Number(maxRecentYears || 0);
-
-  const filtered = cands.filter(c => {
-    // keyword across multiple fields
-    if (s){
-      const blob = (
-        (c.name||'') + ' ' +
-        (c.roles||[]).join(' ') + ' ' +
-        (c.practiceAreas||[]).join(' ') + ' ' +
-        (c.city||'') + ' ' + (c.state||'') + ' ' +
-        (c.notes||'') + ' ' + (c.dateEntered||'') + ' ' +
-        String(c.yearsInMostRecent ?? '')
-      ).toLowerCase();
-      if (!blob.includes(s)) return false;
-    }
-
-    // Date Entered range (inclusive)
-    if (fromNum || toNum){
-      const n = yyyymmdd(c.dateEntered);
-      if (!n) return false;
-      if (fromNum && n < fromNum) return false;
-      if (toNum && n > toNum) return false;
-    }
-
-    // Years in most recent position range
-    const yrs = Number(c.yearsInMostRecent || 0);
-    if (minRY && yrs < minRY) return false;
-    if (maxRY && yrs > maxRY) return false;
-
-    return true;
-  });
-
-  // sort newest Date Entered first; if no date, send to bottom
-  return filtered.sort((a,b) => {
-    const an = yyyymmdd(a.dateEntered) ?? 0;
-    const bn = yyyymmdd(b.dateEntered) ?? 0;
-    return bn - an;
-  });
+function SkylineBG(){
+  const [failed, setFailed] = useState(false);
+  const style = { position:'fixed', inset:0, pointerEvents:'none', overflow:'hidden', zIndex:0, opacity:0.25 };
+  if (failed || !NYC_URL) return <div aria-hidden style={{ ...style, background:'radial-gradient(ellipse at top, #101827, #07070b 60%)' }} />;
+  return (
+    <div aria-hidden style={style}>
+      <img alt="" src={NYC_URL} onError={()=>setFailed(true)} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'grayscale(.18) contrast(1.08) brightness(.95)' }} />
+    </div>
+  );
 }
 
-// ========= Demo seed data =========
-const seedCandidates = [
-  {
-    id: '1',
-    name: 'Alexis Chen',
-    roles: ['Attorney', 'Contract Attorney'],
-    practiceAreas: ['Securities Litigation', 'Internal Investigations'],
-    city: 'New York',
-    state: 'NY',
-    years: 6,
-    yearsInMostRecent: 2,
-    contract: true,
-    hourly: 95,
-    salary: 175000,
-    notes: 'Strong writer. Securities litigation focus. Immediate.',
-    dateEntered: '2025-10-01'
-  },
-  {
-    id: '2',
-    name: 'Diego Martinez',
-    roles: ['Paralegal'],
-    practiceAreas: ['Immigration', 'Global Mobility'],
-    city: 'Miami',
-    state: 'FL',
-    years: 8,
-    yearsInMostRecent: 4,
-    contract: true,
-    hourly: 48,
-    salary: 92000,
-    notes: 'Immigration paralegal, Spanish bilingual. Remote ready.',
-    dateEntered: '2025-09-28'
-  }
-];
-
-const seedUsers = [
-  { id: 'u1', email: 'admin@youragency.com', role: 'admin', org: 'Your Agency', password: 'admin', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] },
-  { id: 'u2', email: 'recruiter@youragency.com', role: 'recruiter', org: 'Your Agency', password: 'recruit', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] },
-  { id: 'u3', email: 'client@samplefirm.com', role: 'client', org: 'Sample Firm', password: 'client', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] },
-];
-
-// ========= Local auth fallback =========
-function localFindUser(users, email, pwd){
-  const e = String(email||'').toLowerCase();
-  return users.find(u => String(u.email||'').toLowerCase() === e && String(u.password||'') === String(pwd||'')) || null;
+// ---------- Data access (Supabase) ----------
+async function fetchCandidates(){
+  return sb.from('candidates')
+    .select('*')
+    .order('date_entered', { ascending: false })
+    .order('created_at', { ascending: false });
+}
+async function insertCandidate(rec){
+  return sb.from('candidates').insert(rec).select('*').single();
+}
+async function updateCandidateRow(id, patch){
+  return sb.from('candidates').update(patch).eq('id', id).select('*').single();
+}
+async function deleteCandidateRow(id){
+  return sb.from('candidates').delete().eq('id', id);
 }
 
-// ========= Page =========
+// ---------- Page ----------
 export default function Page(){
-  // Users (local mirror)
+  // users mirror for local fallback login
   const [users, setUsers] = useState(() => {
-    try { const s = localStorage.getItem('tc_users'); if (s) return JSON.parse(s); } catch {}
+    try{ const s = localStorage.getItem('tc_users'); if (s) return JSON.parse(s); }catch{}
     return seedUsers;
   });
-  useEffect(() => { try { localStorage.setItem('tc_users', JSON.stringify(users)); } catch {} }, [users]);
+  useEffect(()=>{ try{ localStorage.setItem('tc_users', JSON.stringify(users)); }catch{} }, [users]);
 
-  // Candidates
-  const [cands, setCands] = useState(() => {
-    try { const s = localStorage.getItem('tc_cands'); if (s) return JSON.parse(s); } catch {}
-    return seedCandidates;
-  });
-  useEffect(() => { try { localStorage.setItem('tc_cands', JSON.stringify(cands)); } catch {} }, [cands]);
-
-  // Login state
+  // auth
   const [mode, setMode] = useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   const [err, setErr] = useState('');
   const [user, setUser] = useState(null);
+
+  // candidates
+  const [cands, setCands] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [dataErr, setDataErr] = useState('');
+
+  // filters
+  const [q, setQ] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minRecentYears, setMinRecentYears] = useState('');
+  const [maxRecentYears, setMaxRecentYears] = useState('');
+
+  // load candidates from supabase after login (client/recruiter/admin)
+  useEffect(()=>{
+    async function go(){
+      if (!user) return;
+      setLoading(true); setDataErr('');
+      const { data, error } = await fetchCandidates();
+      if (error){ setDataErr(error.message || 'Load error'); setLoading(false); return; }
+      setCands(data || []);
+      setLoading(false);
+    }
+    go();
+  }, [user]);
 
   async function login(){
     try{
@@ -181,165 +122,210 @@ export default function Page(){
       if (!e.includes('@')){ setErr('Enter a valid email'); return; }
 
       // Supabase-first
-      try {
-        const { data: auth, error: authErr } = await sb.auth.signInWithPassword({ email: e, password: pwd });
-        if (!authErr && auth?.user){
-          const { data: prof, error: profErr } = await sb
-            .from('profiles')
-            .select('id,email,role,org,account_manager_email')
-            .eq('id', auth.user.id)
-            .single();
-          if (!profErr && prof){
-            if (mode !== prof.role){ setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`); return; }
-            setUser({ id: prof.id, email: prof.email, role: prof.role, org: prof.org || '', amEmail: prof.account_manager_email || '' });
-            return;
-          }
-        }
-      } catch {}
+      const { data: auth, error: authErr } = await sb.auth.signInWithPassword({ email: e, password: pwd });
+      if (!authErr && auth?.user){
+        const { data: prof, error: profErr } = await sb
+          .from('profiles')
+          .select('id,email,role,org,account_manager_email')
+          .eq('id', auth.user.id)
+          .single();
 
-      // Fallback: local
+        if (profErr || !prof){ setErr('Login ok, but profile missing. Ask Admin to add your profile.'); return; }
+        if (mode !== prof.role){ setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`); return; }
+
+        setUser({ id: prof.id, email: prof.email, role: prof.role, org: prof.org || '', amEmail: prof.account_manager_email || '' });
+        return;
+      }
+
+      // fallback local
       const u = localFindUser(users, e, pwd);
       if (!u){ setErr('Invalid credentials'); return; }
       if (u.role !== mode){ setErr(`This account is a ${u.role}. Switch to the ${u.role} tab.`); return; }
       setUser({ id: u.id, email: u.email, role: u.role, org: u.org || '' });
-    } catch(ex){
+    }catch(ex){
       console.error(ex);
       setErr('Login error. Please try again.');
     }
   }
-  async function logout(){ try{ await sb.auth.signOut(); }catch{} setUser(null); setEmail(''); setPwd(''); setMode('recruiter'); }
+  async function logout(){
+    try{ await sb.auth.signOut(); }catch{}
+    setUser(null); setEmail(''); setPwd(''); setMode('recruiter'); setCands([]);
+  }
 
-  // Styles
+  // filter & sort (server already sorts by date, but we keep client safety)
+  const filtered = useMemo(()=>{
+    const s = String(q||'').toLowerCase().trim();
+    const fromN = yyyymmdd(dateFrom);
+    const toN   = yyyymmdd(dateTo);
+    const minRY = Number(minRecentYears||0);
+    const maxRY = Number(maxRecentYears||0);
+
+    const out = (cands||[]).filter(c=>{
+      if (s){
+        const blob = (
+          (c.name||'') + ' ' +
+          (c.roles||[]).join(' ') + ' ' +
+          (c.practice_areas||[]).join(' ') + ' ' +
+          (c.city||'') + ' ' + (c.state||'') + ' ' +
+          (c.notes||'') + ' ' +
+          (c.date_entered||'') + ' ' +
+          String(c.years_in_most_recent ?? '')
+        ).toLowerCase();
+        if (!blob.includes(s)) return false;
+      }
+      if (fromN || toN){
+        const n = yyyymmdd(c.date_entered);
+        if (!n) return false;
+        if (fromN && n < fromN) return false;
+        if (toN && n > toN) return false;
+      }
+      const yrs = Number(c.years_in_most_recent || 0);
+      if (minRY && yrs < minRY) return false;
+      if (maxRY && yrs > maxRY) return false;
+      return true;
+    });
+
+    return out.sort((a,b)=> (yyyymmdd(b.date_entered)||0) - (yyyymmdd(a.date_entered)||0));
+  }, [cands, q, dateFrom, dateTo, minRecentYears, maxRecentYears]);
+
+  // recruiter actions
+  async function addCandidate(rec){
+    // ensure date format yyyy-mm-dd
+    const toInsert = {
+      name: rec.name,
+      roles: rec.roles || [],
+      practice_areas: rec.practiceAreas || [],
+      city: rec.city || null,
+      state: rec.state || null,
+      years: Number(rec.years)||0,
+      years_in_most_recent: Number(rec.yearsInMostRecent)||0,
+      salary: Number(rec.salary)||0,
+      contract: !!rec.contract,
+      hourly: Number(rec.hourly)||0,
+      notes: rec.notes || '',
+      date_entered: rec.dateEntered || null,
+      created_by: (await sb.auth.getUser()).data.user?.id || null,
+    };
+
+    const { data, error } = await insertCandidate(toInsert);
+    if (error){ alert('Add failed: ' + error.message); return; }
+    setCands(prev => [data, ...prev]);
+  }
+
+  async function updateCandidate(id, patch){
+    const p = {
+      name: patch.name,
+      roles: patch.roles,
+      practice_areas: patch.practiceAreas,
+      city: patch.city, state: patch.state,
+      years: Number(patch.years)||0,
+      years_in_most_recent: Number(patch.yearsInMostRecent)||0,
+      salary: Number(patch.salary)||0,
+      contract: !!patch.contract,
+      hourly: Number(patch.hourly)||0,
+      notes: patch.notes,
+      date_entered: patch.dateEntered || null
+    };
+    const { data, error } = await updateCandidateRow(id, p);
+    if (error){ alert('Update failed: ' + error.message); return; }
+    setCands(prev => prev.map(x => x.id===id ? data : x));
+  }
+
+  async function removeCandidate(id){
+    const { error } = await deleteCandidateRow(id);
+    if (error){ alert('Delete failed: ' + error.message); return; }
+    setCands(prev => prev.filter(x => x.id !== id));
+  }
+
+  // ---------- Screens ----------
   const pageStyle = { minHeight:'100vh', display:'grid', placeItems:'center', background:'#0a0a0a', color:'#e5e5e5', fontFamily:'system-ui, Arial' };
   const card = { width:'100%', maxWidth: 380, background:'#0b0b0b', border:'1px solid #1f2937', borderRadius:12, padding:16 };
-  const bodyStyle = { fontFamily:'system-ui, Arial', background:'#0a0a0a', color:'#e5e5e5', minHeight:'100vh', padding:16 };
+  const bodyStyle = { fontFamily:'system-ui, Arial', background:'#0a0a0a', color:'#e5e5e5', minHeight:'100vh', padding:16, position:'relative', zIndex:1 };
 
-  // ===== Admin: placeholder =====
+  // Admin placeholder (users managed in Supabase)
   if (user && user.role === 'admin'){
     return (
       <div style={{ ...pageStyle, alignItems:'start' }}>
+        <SkylineBG />
         <div style={{ ...card, marginTop:40 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div>Admin (signed in as {user.email})</div>
             <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
           </div>
           <div style={{ fontSize:12, color:'#9ca3af', marginTop:8 }}>
-            Admin placeholder. Add real users in <strong>Supabase → Auth → Users</strong> and matching row in <strong>public.profiles</strong>.
+            Manage users in <strong>Supabase → Auth → Users</strong> and matching rows in <strong>public.profiles</strong>.
           </div>
         </div>
       </div>
     );
   }
 
-  // ===== Client screen (read-only + filters) =====
+  // Client (read-only)
   if (user && user.role === 'client'){
-    const [q, setQ] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [minRecentYears, setMinRecentYears] = useState('');
-    const [maxRecentYears, setMaxRecentYears] = useState('');
-
-    const filtered = useMemo(() => filterAndSortCandidates(cands, {
-      q, dateFrom, dateTo, minRecentYears, maxRecentYears
-    }), [cands, q, dateFrom, dateTo, minRecentYears, maxRecentYears]);
-
     return (
       <div style={bodyStyle}>
         <SkylineBG />
         <div style={{ width:'100%', maxWidth:1000, margin:'0 auto' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ fontWeight:700, fontSize:18 }}>Client</div>
-            <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
-          </div>
-
+          <Header title="Client" onLogout={logout} />
           <Filters
             q={q} setQ={setQ}
             dateFrom={dateFrom} setDateFrom={setDateFrom}
             dateTo={dateTo} setDateTo={setDateTo}
             minRecentYears={minRecentYears} setMinRecentYears={setMinRecentYears}
             maxRecentYears={maxRecentYears} setMaxRecentYears={setMaxRecentYears}
-            onClear={() => { setQ(''); setDateFrom(''); setDateTo(''); setMinRecentYears(''); setMaxRecentYears(''); }}
+            onClear={()=>{ setQ(''); setDateFrom(''); setDateTo(''); setMinRecentYears(''); setMaxRecentYears(''); }}
           />
-
-          <div style={{ marginTop:8 }}>
-            {filtered.map(c => (
-              <Card
-                key={c.id}
-                c={c}
-                canEdit={false}
-                onDelete={()=>{}}
-                onUpdate={()=>{}}
-                userRole={user.role}
-                clientInfo={{ email: user.email, amEmail: user.amEmail || '' }}
-              />
-            ))}
-            {filtered.length===0 ? <div style={{ color:'#9ca3af', fontSize:12, marginTop:8 }}>No results.</div> : null}
-          </div>
+          {loading ? <Hint>Loading…</Hint> : null}
+          {dataErr ? <ErrorHint>{dataErr}</ErrorHint> : null}
+          <List
+            items={filtered}
+            canEdit={false}
+            onDelete={()=>{}}
+            onUpdate={()=>{}}
+            userRole={user.role}
+            clientInfo={{ email: user.email, amEmail: user.amEmail || '' }}
+          />
         </div>
       </div>
     );
   }
 
-  // ===== Recruiter screen (add/edit/delete + filters) =====
+  // Recruiter (full CRUD)
   if (user && user.role === 'recruiter'){
-    const [q, setQ] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [minRecentYears, setMinRecentYears] = useState('');
-    const [maxRecentYears, setMaxRecentYears] = useState('');
-
-    const filtered = useMemo(() => filterAndSortCandidates(cands, {
-      q, dateFrom, dateTo, minRecentYears, maxRecentYears
-    }), [cands, q, dateFrom, dateTo, minRecentYears, maxRecentYears]);
-
-    function addCandidate(rec){ setCands(prev => [...prev, rec]); }
-    function updateCandidate(id, patch){ setCands(prev => prev.map(x => x.id===id ? { ...x, ...patch } : x)); }
-    function removeCandidate(id){ setCands(prev => prev.filter(x => x.id!==id)); }
-
     return (
       <div style={bodyStyle}>
         <SkylineBG />
         <div style={{ width:'100%', maxWidth:1000, margin:'0 auto' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div style={{ fontWeight:700, fontSize:18 }}>Recruiter</div>
-            <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
-          </div>
-
+          <Header title="Recruiter" onLogout={logout} />
           <RecruiterAddForm onAdd={addCandidate} />
-
           <Filters
             q={q} setQ={setQ}
             dateFrom={dateFrom} setDateFrom={setDateFrom}
             dateTo={dateTo} setDateTo={setDateTo}
             minRecentYears={minRecentYears} setMinRecentYears={setMinRecentYears}
             maxRecentYears={maxRecentYears} setMaxRecentYears={setMaxRecentYears}
-            onClear={() => { setQ(''); setDateFrom(''); setDateTo(''); setMinRecentYears(''); setMaxRecentYears(''); }}
+            onClear={()=>{ setQ(''); setDateFrom(''); setDateTo(''); setMinRecentYears(''); setMaxRecentYears(''); }}
           />
-
-          <div style={{ marginTop:8 }}>
-            {filtered.map(c => (
-              <Card
-                key={c.id}
-                c={c}
-                canEdit={true}
-                onDelete={removeCandidate}
-                onUpdate={updateCandidate}
-                userRole={user.role}
-                clientInfo={{ email: user.email, amEmail: user.amEmail || '' }}
-              />
-            ))}
-            {filtered.length===0 ? <div style={{ color:'#9ca3af', fontSize:12, marginTop:8 }}>No results.</div> : null}
-          </div>
+          {loading ? <Hint>Loading…</Hint> : null}
+          {dataErr ? <ErrorHint>{dataErr}</ErrorHint> : null}
+          <List
+            items={filtered}
+            canEdit={true}
+            onDelete={removeCandidate}
+            onUpdate={updateCandidate}
+            userRole={user.role}
+            clientInfo={{ email: user.email, amEmail: user.amEmail || '' }}
+          />
         </div>
       </div>
     );
   }
 
-  // ===== Login screen =====
+  // Login
   return (
     <div style={pageStyle}>
       <SkylineBG />
-      <div style={{ ...card }}>
+      <div style={card}>
         <div style={{ textAlign:'center', fontWeight:700 }}>{APP_NAME}</div>
         <div style={{ textAlign:'center', fontSize:12, color:'#9ca3af', marginBottom:8 }}>Invitation-only access</div>
 
@@ -363,7 +349,18 @@ export default function Page(){
   );
 }
 
-// ========= Inputs =========
+// ---------- UI bits ----------
+function Header({ title, onLogout }){
+  return (
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+      <div style={{ fontWeight:700, fontSize:18 }}>{title}</div>
+      <button onClick={onLogout} style={{ fontSize:12 }}>Log out</button>
+    </div>
+  );
+}
+function Hint({ children }){ return <div style={{ fontSize:12, color:'#9ca3af', marginTop:8 }}>{children}</div>; }
+function ErrorHint({ children }){ return <div style={{ fontSize:12, color:'#f87171', marginTop:8 }}>{children}</div>; }
+
 function Field({ label, value, onChange, placeholder, type='text' }){
   return (
     <label style={{ display:'block', fontSize:12, marginTop:6 }}>
@@ -389,7 +386,6 @@ function Area({ label, value, onChange, placeholder }){
   );
 }
 
-// ========= Filters Block =========
 function Filters({
   q, setQ,
   dateFrom, setDateFrom,
@@ -421,7 +417,6 @@ function Filters({
   );
 }
 
-// ========= Recruiter Add Form (includes Date Entered + Years in Most Recent) =========
 function RecruiterAddForm({ onAdd }){
   const [name, setName] = useState('');
   const [roles, setRoles] = useState('');
@@ -434,36 +429,34 @@ function RecruiterAddForm({ onAdd }){
   const [contract, setContract] = useState(false);
   const [hourly, setHourly] = useState('');
   const [notes, setNotes] = useState('');
-  const [dateEntered, setDateEntered] = useState(() => {
-    const d = new Date();
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    const dd = String(d.getDate()).padStart(2,'0');
+  const [dateEntered, setDateEntered] = useState(()=>{
+    const d = new Date(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
     return `${d.getFullYear()}-${mm}-${dd}`;
   });
 
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
 
-  function submit(){
+  async function submit(){
     setErr(''); setOk('');
     if (!name.trim()){ setErr('Name is required'); return; }
     const rec = {
-      id: 'c'+Math.random().toString(36).slice(2,8),
       name: name.trim(),
-      roles: (roles ? parseCSV(roles) : ['Attorney']),
-      practiceAreas: (practice ? parseCSV(practice) : []),
+      roles: roles ? parseCSV(roles) : ['Attorney'],
+      practiceAreas: practice ? parseCSV(practice) : [],
       years: Number(years)||0,
       yearsInMostRecent: Number(yearsInMostRecent)||0,
-      city: city.trim(),
-      state: state.trim(),
+      city: city.trim() || null,
+      state: state.trim() || null,
       salary: Number(salary)||0,
       contract: !!contract,
       hourly: contract ? (Number(hourly)||0) : 0,
       notes: String(notes||''),
       dateEntered: dateEntered || null
     };
-    onAdd(rec);
+    await onAdd(rec);
     setOk('Candidate added');
+
     setName(''); setRoles(''); setPractice(''); setYears(''); setYearsInMostRecent('');
     setCity(''); setState(''); setSalary(''); setContract(false); setHourly(''); setNotes('');
     const d = new Date(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
@@ -502,24 +495,41 @@ function RecruiterAddForm({ onAdd }){
   );
 }
 
-// ========= Candidate Card (shows & edits both new fields) =========
+function List({ items, canEdit, onDelete, onUpdate, userRole, clientInfo }){
+  return (
+    <div style={{ marginTop:8 }}>
+      {items.map(c => (
+        <Card
+          key={c.id}
+          c={c}
+          canEdit={canEdit}
+          onDelete={onDelete}
+          onUpdate={onUpdate}
+          userRole={userRole}
+          clientInfo={clientInfo}
+        />
+      ))}
+      {items.length===0 ? <div style={{ color:'#9ca3af', fontSize:12, marginTop:8 }}>No results.</div> : null}
+    </div>
+  );
+}
+
 function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(c.name);
   const [rolesCSV, setRolesCSV] = useState((c.roles||[]).join(', '));
-  const [lawCSV, setLawCSV] = useState((c.practiceAreas||[]).join(', '));
+  const [lawCSV, setLawCSV] = useState((c.practice_areas||[]).join(', '));
   const [salary, setSalary] = useState(String(c.salary||''));
   const [contract, setContract] = useState(!!c.contract);
   const [hourly, setHourly] = useState(String(c.hourly||''));
   const [notes, setNotes] = useState(c.notes||'');
-  const [dateEntered, setDateEntered] = useState(c.dateEntered || '');
-  const [yearsInMostRecent, setYearsInMostRecent] = useState(String(c.yearsInMostRecent || ''));
+  const [dateEntered, setDateEntered] = useState(c.date_entered || '');
+  const [yearsInMostRecent, setYearsInMostRecent] = useState(String(c.years_in_most_recent || ''));
 
-  function save(){
-    if (contract && (!hourly || Number(hourly) <= 0)) return;
+  async function save(){
     const rolesArr = parseCSV(rolesCSV).length ? parseCSV(rolesCSV) : ['Attorney'];
     const lawArr = parseCSV(lawCSV);
-    onUpdate(c.id, {
+    await onUpdate(c.id, {
       name: String(name||''),
       roles: rolesArr,
       practiceAreas: lawArr,
@@ -527,9 +537,7 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
       contract: !!contract,
       hourly: contract ? Number(hourly)||0 : 0,
       notes: String(notes||''),
-      city: c.city,
-      state: c.state,
-      years: c.years,
+      city: c.city, state: c.state, years: c.years,
       yearsInMostRecent: Number(yearsInMostRecent)||0,
       dateEntered: dateEntered || null
     });
@@ -547,15 +555,11 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
               <div style={{ fontSize:12, color:'#9ca3af' }}>
                 {(c.city||'') + (c.state ? ', ' + c.state : '')} - {c.years} yrs
               </div>
-              {typeof c.yearsInMostRecent === 'number' || c.yearsInMostRecent ? (
-                <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
-                  Most Recent Position: {c.yearsInMostRecent} yrs
-                </div>
+              {(c.years_in_most_recent !== undefined) ? (
+                <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>Most Recent Position: {c.years_in_most_recent} yrs</div>
               ) : null}
-              {c.dateEntered ? (
-                <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
-                  Date Entered: {c.dateEntered}
-                </div>
+              {c.date_entered ? (
+                <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>Date Entered: {c.date_entered}</div>
               ) : null}
             </div>
             {canEdit ? (
@@ -567,10 +571,10 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
           </div>
 
           {(c.roles&&c.roles.length) ? (<div style={{ marginTop:6 }}>{(c.roles||[]).map(r=>badge(r))}</div>) : null}
-          {(c.practiceAreas&&c.practiceAreas.length) ? (
+          {(c.practice_areas&&c.practice_areas.length) ? (
             <div style={{ marginTop:6 }}>
               <div style={{ fontSize:12, color:'#9ca3af', marginBottom:4 }}>Type of law</div>
-              {(c.practiceAreas||[]).map(p=>badge(p))}
+              {(c.practice_areas||[]).map(p=>badge(p))}
             </div>
           ) : null}
 
@@ -586,10 +590,7 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
 
           {userRole === 'client' && (
             <div style={{ marginTop:8 }}>
-              <a
-                href={buildContactMailto(c, clientInfo)}
-                style={{ display:'inline-block', padding:'8px 12px', borderRadius:8, background:'#2563eb', color:'#fff', textDecoration:'none', boxShadow:'0 2px 4px rgba(0,0,0,.25)' }}
-              >
+              <a href={buildContactMailto(c, clientInfo)} style={{ display:'inline-block', padding:'8px 12px', borderRadius:8, background:'#2563eb', color:'#fff', textDecoration:'none' }}>
                 Contact
               </a>
               <span style={{ marginLeft:8, fontSize:12, color:'#9ca3af' }}>
@@ -610,18 +611,10 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
           </label>
           {contract ? <Field label='Hourly rate' value={hourly} onChange={setHourly} /> : null}
 
-          {/* Editable Date Entered */}
           <label style={{ display:'block', fontSize:12, marginTop:6 }}>
             <div style={{ color:'#9ca3af', marginBottom:4 }}>Date Entered</div>
-            <input
-              type='date'
-              value={dateEntered || ''}
-              onChange={e=>setDateEntered(e.target.value)}
-              style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }}
-            />
+            <input type='date' value={dateEntered || ''} onChange={e=>setDateEntered(e.target.value)} style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }} />
           </label>
-
-          {/* Editable Years in Most Recent */}
           <Num label='Years in Most Recent Position' value={yearsInMostRecent} onChange={setYearsInMostRecent} />
 
           <Area label='Candidate Notes' value={notes} onChange={setNotes} placeholder='Short summary: strengths, availability, fit notes.' />
@@ -631,20 +624,6 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ========= Background (single-root, safe) =========
-function SkylineBG(){
-  const [failed, setFailed] = useState(false);
-  const style = { position:'fixed', inset:0, pointerEvents:'none', overflow:'hidden', zIndex:0, opacity:0.25 };
-  if (failed || !NYC_URL){
-    return (<div aria-hidden='true' style={{ ...style, background:'radial-gradient(ellipse at top, #101827, #07070b 60%)' }} />);
-  }
-  return (
-    <div aria-hidden='true' style={style}>
-      <img alt='' src={NYC_URL} onError={()=>setFailed(true)} style={{ width:'100%', height:'100%', objectFit:'cover', filter:'grayscale(0.18) contrast(1.08) brightness(0.95)' }} />
     </div>
   );
 }
