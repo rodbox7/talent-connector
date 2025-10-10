@@ -1,8 +1,9 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
+
 /*********************************
- * Talent Connector – Stable Build (fixed)
+ * Talent Connector – Stable Build (cleaned login)
  * - Auth with Admin / Recruiter / Client (invitation-only)
  * - Admin: add/delete users, set/generate passwords, basic activity
  * - Recruiter: add/edit/delete candidates + Candidate Notes
@@ -12,7 +13,7 @@ import { supabase as sb } from '../lib/supabaseClient';
  *********************************/
 
 // ========= Config =========
-const APP_NAME = 'Talent Connector - Powered by Beacon Hill Legal';
+const APP_NAME = 'Talent Connector - Powered by Beacon Hill Legal'; // not displayed anymore
 const RECRUITER_CODE = ''; // invitation-only (no self-join)
 const NYC_URL = 'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
 
@@ -36,6 +37,7 @@ function buildContactMailto(c, user) {
 
   return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
+
 // ========= Demo seed data =========
 const seedCandidates = [
   { id: '1', name: 'Alexis Chen', roles: ['Attorney', 'Contract Attorney'], practiceAreas: ['Securities Litigation', 'Internal Investigations'], city: 'New York', state: 'NY', years: 6, contract: true, hourly: 95, salary: 175000, notes: 'Strong writer. Securities litigation focus. Immediate.' },
@@ -211,8 +213,10 @@ function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, up
 
   const bodyStyle = { fontFamily: 'system-ui, Arial', background: '#0a0a0a', color: '#e5e5e5', minHeight: '100vh', padding: 16 };
   const styles = (<RangeStyles/>);
- // Replace your existing header const with this:
-const header = null;
+
+  // Remove branded header entirely
+  const header = null;
+
   if (user.role === 'admin'){
     return (
       <div style={bodyStyle}>
@@ -305,11 +309,11 @@ function AdminPanel({ users, meId, addUser, deleteUser, updateUser }){
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('client');
   const [org, setOrg] = useState('');
-  const [am, setAm] = useState(''); // NEW: salesperson email (account manager)
+  const [am, setAm] = useState(''); // salesperson email (account manager)
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [passEdits, setPassEdits] = useState({});
-  const [amEdits, setAmEdits] = useState({}); // NEW: per-row AM edits
+  const [amEdits, setAmEdits] = useState({});
   const [flash, setFlash] = useState('');
 
   function add(){
@@ -394,6 +398,8 @@ function AdminPanel({ users, meId, addUser, deleteUser, updateUser }){
       </div>
     </div>
   );
+
+  function fmtTime(ts){ if (!ts) return '-'; const d = new Date(ts); return d.toLocaleString(); }
 }
 
 // ========= Recruiter Add Form =========
@@ -651,7 +657,6 @@ function YearsRange({ min, max, low, high, onChange }){
   );
 }
 
-
 // ========= Auth (invitation only) =========
 function Auth({ users, onLogin, onAddRecruiterViaCode }){
   const [mode, setMode] = useState('recruiter');
@@ -691,17 +696,19 @@ function Auth({ users, onLogin, onAddRecruiterViaCode }){
     }
   }
 
+  // LOGIN: no card border, no title text, pure inputs over the background
   return (
     <div style={{ fontFamily: 'system-ui, Arial', background: '#0a0a0a', color: '#e5e5e5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative', overflow: 'hidden' }}>
       <SkylineBG />
-      <div style={{ width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid #1f2937', borderRadius: 12, padding: 16, position: 'relative' }}>
-        <div style={{ textAlign: 'center', fontWeight: 700 }}>{APP_NAME}</div>
-        <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Invitation-only access</div>
+      <div style={{ width: '100%', maxWidth: 380, background: 'transparent', border: 'none', borderRadius: 0, padding: 0, position: 'relative' }}>
+        {/* Tabs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           <button onClick={() => setMode('recruiter')} style={{ padding: 8, background: mode==='recruiter' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}>Recruiter</button>
           <button onClick={() => setMode('client')} style={{ padding: 8, background: mode==='client' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}>Client</button>
           <button onClick={() => setMode('admin')} style={{ padding: 8, background: mode==='admin' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}>Admin</button>
         </div>
+
+        {/* Form */}
         <div style={{ marginTop: 12 }}>
           <Field label='Email' value={email} onChange={setEmail} placeholder='name@company.com' type='email' />
           <Field label='Password' value={pwd} onChange={setPwd} placeholder='your password' type='password' />
@@ -725,7 +732,12 @@ function SkylineBG(){
   }
   return (
     <div aria-hidden='true' style={style}>
-      <img alt='' src={NYC_URL} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(0.15) contrast(1.1) brightness(0.95)', opacity: 0.95 }} />
+      <img
+        alt=''
+        src={NYC_URL}
+        onError={() => setFailed(true)}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(0.15) contrast(1.1) brightness(0.95)', opacity: 0.95, display:'block', border:'none' }}
+      />
     </div>
   );
 }
