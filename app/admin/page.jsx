@@ -3,12 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase as sb } from '../../lib/supabaseClient';
 
-const box = { border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, background: '#fff' };
-const input = { border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', width: '100%' };
-const btn = { padding: '10px 14px', borderRadius: 10, border: '1px solid #111', background: '#111', color: '#fff', cursor: 'pointer' };
-const btnGhost = { padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' };
-const row = { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1.4fr 1fr', gap: 12, alignItems: 'center' };
-
 export default function AdminPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('client');
@@ -21,28 +15,25 @@ export default function AdminPage() {
   const [users, setUsers] = useState([]);
 
   async function fetchUsers() {
-    setLoading(true);
-    setErr('');
+    setLoading(true); setErr('');
     const { data, error } = await sb
       .from('profiles')
       .select('id, email, role, org, account_manager_email')
       .order('email', { ascending: true });
-    if (error) setErr(error.message);
-    else setUsers(data || []);
+    if (error) setErr(error.message); else setUsers(data || []);
     setLoading(false);
   }
   useEffect(() => { fetchUsers(); }, []);
 
   async function handleAddUser(e) {
-    e.preventDefault();
-    setErr(''); setFlash('');
+    e.preventDefault(); setErr(''); setFlash('');
     const res = await fetch('/api/admin/invite', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, role, org, password, amEmail })
     });
     const j = await res.json();
-    if (!res.ok) { setErr(j.error || 'Failed to add user'); return; }
+    if (!res.ok) { setErr(j.error || 'Database error creating new user'); return; }
     setFlash(`Added ${email} as ${role}`);
     setEmail(''); setOrg(''); setPassword(''); setAmEmail(''); setRole('client');
     await fetchUsers();
@@ -56,75 +47,79 @@ export default function AdminPage() {
   }
 
   async function removeUser(u) {
-    if (!confirm(`Delete user ${u.email}? This removes their profile (not Auth account).`)) return;
+    if (!confirm(`Delete profile for ${u.email}?`)) return;
     const { error } = await sb.from('profiles').delete().eq('id', u.id);
     if (error) { setErr(error.message); return; }
-    setFlash('Deleted profile'); await fetchUsers();
+    setFlash('Deleted'); await fetchUsers();
   }
 
   const header = useMemo(() => (
-    <div style={{ ...row, fontWeight: 600, color: '#111' }}>
+    <div className="table-row header grid-5">
       <div>Email</div><div>Role</div><div>Org</div><div>Sales contact (clients)</div><div>Actions</div>
     </div>
   ), []);
 
   return (
-    <div style={{ maxWidth: 1100, margin: '40px auto', padding: '0 16px', fontFamily: 'Inter, system-ui, Arial' }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Admin · Users (invitation only)</h1>
-      <p style={{ color: '#6b7280', marginBottom: 24 }}>
-        Create users with one click. This creates a Supabase Auth account and a matching profile with role & optional salesperson email.
-      </p>
+    <div className="container" style={{paddingTop:24}}>
+      <div className="card" style={{marginBottom:20}}>
+        <h1 style={{fontSize:24, fontWeight:800, marginBottom:8}}>Admin · Users (invitation only)</h1>
+        <div className="muted" style={{marginBottom:16}}>
+          Create users with one click. This creates a Supabase Auth account and a matching profile with role & optional salesperson email.
+        </div>
 
-      <form onSubmit={handleAddUser} style={{ ...box, marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1.4fr 1fr', gap: 12 }}>
-          <input style={input} placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-          <select style={input} value={role} onChange={e => setRole(e.target.value)}>
+        <form onSubmit={handleAddUser} className="grid grid-5" style={{alignItems:'center'}}>
+          <input className="input" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+          <select className="input" value={role} onChange={e => setRole(e.target.value)}>
             <option value="client">Client</option>
             <option value="recruiter">Recruiter</option>
             <option value="admin">Admin</option>
           </select>
-          <input style={input} placeholder="Organization (optional)" value={org} onChange={e => setOrg(e.target.value)} />
-          <input style={input} placeholder="Sales contact email (clients)" value={amEmail} onChange={e => setAmEmail(e.target.value)} />
-          <input style={input} placeholder="Temp password" value={password} onChange={e => setPassword(e.target.value)} required />
-        </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-          <button type="submit" style={btn}>Add user</button>
-          <button type="button" style={btnGhost} onClick={fetchUsers}>Refresh</button>
-        </div>
-        {err && <div style={{ color: '#dc2626', marginTop: 10 }}>{err}</div>}
-        {flash && <div style={{ color: '#16a34a', marginTop: 10 }}>{flash}</div>}
-      </form>
+          <input className="input" placeholder="Organization (optional)" value={org} onChange={e => setOrg(e.target.value)} />
+          <input className="input" placeholder="Sales contact email (clients)" value={amEmail} onChange={e => setAmEmail(e.target.value)} />
+          <input className="input" placeholder="Temp password" value={password} onChange={e => setPassword(e.target.value)} required />
+          <div style={{gridColumn:'1 / -1', display:'flex', gap:10, marginTop:12}}>
+            <button type="submit" className="btn btn-primary">Add user</button>
+            <button type="button" className="btn" onClick={fetchUsers}>Refresh</button>
+            {loading && <span className="badge">Loading…</span>}
+          </div>
+          {(err || flash) && (
+            <div style={{gridColumn:'1 / -1', marginTop:10}}>
+              {err && <div style={{color:'var(--danger)'}}>{err}</div>}
+              {flash && <div style={{color:'var(--success)'}}>{flash}</div>}
+            </div>
+          )}
+        </form>
+      </div>
 
-      <div style={{ ...box }}>
-        <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
-          <div style={{ fontWeight: 700 }}>Registered users</div>
-          {loading && <div style={{ color: '#6b7280' }}>Loading…</div>}
+      <div className="card">
+        <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
+          <div style={{fontWeight:700}}>Registered users</div>
+          <span className="badge">{users?.length || 0} total</span>
         </div>
         {header}
-        <div style={{ height: 8 }} />
         {(users || []).map(u => (
-          <div key={u.id} style={row}>
+          <div key={u.id} className="table-row grid-5">
             <div>{u.email}</div>
             <div>
-              <select value={u.role} onChange={(e) => updateUser(u, { role: e.target.value })} style={input}>
+              <select className="input" value={u.role} onChange={(e)=>updateUser(u,{role:e.target.value})}>
                 <option value="client">Client</option>
                 <option value="recruiter">Recruiter</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
             <div>
-              <input style={input} defaultValue={u.org || ''} onBlur={(e) => (e.target.value !== (u.org || '')) && updateUser(u, { org: e.target.value || null })} placeholder="Org" />
+              <input className="input" defaultValue={u.org || ''} onBlur={(e)=> (e.target.value !== (u.org||'')) && updateUser(u,{org:e.target.value||null})}/>
             </div>
             <div>
-              <input style={input} defaultValue={u.account_manager_email || ''} onBlur={(e) => (e.target.value !== (u.account_manager_email || '')) && updateUser(u, { account_manager_email: e.target.value || null })} placeholder="Sales contact (clients)" />
+              <input className="input" defaultValue={u.account_manager_email || ''} onBlur={(e)=> (e.target.value !== (u.account_manager_email||'')) && updateUser(u,{account_manager_email:e.target.value||null})}/>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={btnGhost} onClick={() => updateUser(u, { role: u.role, org: u.org || null, account_manager_email: u.account_manager_email || null })}>Save</button>
-              <button style={{ ...btnGhost, borderColor: '#ef4444', color: '#ef4444' }} onClick={() => removeUser(u)}>Delete</button>
+            <div style={{display:'flex', gap:8}}>
+              <button className="btn" onClick={()=>updateUser(u,{role:u.role, org:u.org||null, account_manager_email:u.account_manager_email||null})}>Save</button>
+              <button className="btn btn-danger" onClick={()=>removeUser(u)}>Delete</button>
             </div>
           </div>
         ))}
-        {(!users || users.length === 0) && !loading && <div style={{ color: '#6b7280', padding: '16px 0' }}>No users yet.</div>}
+        {(!users || users.length===0) && <div className="muted" style={{padding:'16px 0'}}>No users yet.</div>}
       </div>
     </div>
   );
