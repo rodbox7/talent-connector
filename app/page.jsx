@@ -3,12 +3,17 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
 
 /*********************************
- * Talent Connector – minimal app w/ Date Entered
- * - Auth with Admin / Recruiter / Client (Supabase-first + local fallback)
- * - Recruiter: add/edit/delete candidates + Candidate Notes + Date Entered
- * - Client: read-only list + keyword filter
- * - Admin: simple placeholder (kept minimal per your request)
- * - No top header or white borders
+ * Talent Connector – Date & Recent Position Years
+ * - Supabase-first auth + local fallback
+ * - Recruiter: add/edit/delete candidates
+ *   • NEW field: yearsInMostRecent (years in most recent position)
+ *   • Has “Date Entered” (yyyy-mm-dd)
+ * - Client: read-only with keyword + filters
+ * - Filters:
+ *   • Keyword (notes, name, roles, law, location, date)
+ *   • Date Entered: From / To (inclusive)
+ *   • Years in Most Recent Position: Min / Max
+ * - Sorted by Date Entered (newest first)
  *********************************/
 
 // ========= Config =========
@@ -18,7 +23,15 @@ const NYC_URL =
 
 // ========= Utilities =========
 function parseCSV(s) { return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
-function parseCSVLower(s){ return String(s||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean); }
+function yyyymmdd(str){
+  // normalize yyyy-mm-dd to number yyyymmdd for comparisons (handles missing)
+  if (!str) return null;
+  const d = String(str).trim();
+  // accept yyyy-mm-dd only
+  const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return Number(m[1] + m[2] + m[3]);
+}
 
 function buildContactMailto(c, user) {
   const to = user?.amEmail || 'info@youragency.com';
@@ -32,6 +45,7 @@ function buildContactMailto(c, user) {
     `• Practice Areas: ${(c?.practiceAreas || []).join(', ')}`,
     `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
     `• Years: ${c?.years ?? ''}`,
+    `• Years in Most Recent Position: ${c?.yearsInMostRecent ?? ''}`,
     `• Date Entered: ${c?.dateEntered || ''}`,
     ``,
     `My email: ${user?.email || ''}`,
@@ -42,18 +56,52 @@ function buildContactMailto(c, user) {
   return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
 
-function filterCandidates(cands, q){
+function filterAndSortCandidates(cands, params){
+  const {
+    q, dateFrom, dateTo, minRecentYears, maxRecentYears
+  } = params;
+
   const s = String(q||'').trim().toLowerCase();
-  if (!s) return cands;
-  return cands.filter(c => {
-    const blob = (
-      (c.name||'') + ' ' +
-      (c.roles||[]).join(' ') + ' ' +
-      (c.practiceAreas||[]).join(' ') + ' ' +
-      (c.city||'') + ' ' + (c.state||'') + ' ' +
-      (c.notes||'') + ' ' + (c.dateEntered||'')
-    ).toLowerCase();
-    return blob.includes(s);
+  const fromNum = yyyymmdd(dateFrom);
+  const toNum   = yyyymmdd(dateTo);
+  const minRY   = Number(minRecentYears || 0);
+  const maxRY   = Number(maxRecentYears || 0);
+
+  const filtered = cands.filter(c => {
+    // keyword across multiple fields
+    if (s){
+      const blob = (
+        (c.name||'') + ' ' +
+        (c.roles||[]).join(' ') + ' ' +
+        (c.practiceAreas||[]).join(' ') + ' ' +
+        (c.city||'') + ' ' + (c.state||'') + ' ' +
+        (c.notes||'') + ' ' + (c.dateEntered||'') + ' ' +
+        String(c.yearsInMostRecent ?? '')
+      ).toLowerCase();
+      if (!blob.includes(s)) return false;
+    }
+
+    // Date Entered range (inclusive)
+    if (fromNum || toNum){
+      const n = yyyymmdd(c.dateEntered);
+      if (!n) return false;
+      if (fromNum && n < fromNum) return false;
+      if (toNum && n > toNum) return false;
+    }
+
+    // Years in most recent position range
+    const yrs = Number(c.yearsInMostRecent || 0);
+    if (minRY && yrs < minRY) return false;
+    if (maxRY && yrs > maxRY) return false;
+
+    return true;
+  });
+
+  // sort newest Date Entered first; if no date, send to bottom
+  return filtered.sort((a,b) => {
+    const an = yyyymmdd(a.dateEntered) ?? 0;
+    const bn = yyyymmdd(b.dateEntered) ?? 0;
+    return bn - an;
   });
 }
 
@@ -67,6 +115,7 @@ const seedCandidates = [
     city: 'New York',
     state: 'NY',
     years: 6,
+    yearsInMostRecent: 2,
     contract: true,
     hourly: 95,
     salary: 175000,
@@ -81,6 +130,7 @@ const seedCandidates = [
     city: 'Miami',
     state: 'FL',
     years: 8,
+    yearsInMostRecent: 4,
     contract: true,
     hourly: 48,
     salary: 92000,
@@ -103,7 +153,7 @@ function localFindUser(users, email, pwd){
 
 // ========= Page =========
 export default function Page(){
-  // Users (local mirror to ensure you’re never locked out)
+  // Users (local mirror)
   const [users, setUsers] = useState(() => {
     try { const s = localStorage.getItem('tc_users'); if (s) return JSON.parse(s); } catch {}
     return seedUsers;
@@ -164,7 +214,7 @@ export default function Page(){
   const card = { width:'100%', maxWidth: 380, background:'#0b0b0b', border:'1px solid #1f2937', borderRadius:12, padding:16 };
   const bodyStyle = { fontFamily:'system-ui, Arial', background:'#0a0a0a', color:'#e5e5e5', minHeight:'100vh', padding:16 };
 
-  // ===== Admin: simple placeholder (no API invite) =====
+  // ===== Admin: placeholder =====
   if (user && user.role === 'admin'){
     return (
       <div style={{ ...pageStyle, alignItems:'start' }}>
@@ -174,29 +224,43 @@ export default function Page(){
             <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
           </div>
           <div style={{ fontSize:12, color:'#9ca3af', marginTop:8 }}>
-            Admin placeholder. You can add real users in <strong>Supabase → Auth → Users</strong> + matching row in <strong>public.profiles</strong>.
+            Admin placeholder. Add real users in <strong>Supabase → Auth → Users</strong> and matching row in <strong>public.profiles</strong>.
           </div>
         </div>
       </div>
     );
   }
 
-  // ===== Client screen (read-only list + keyword) =====
+  // ===== Client screen (read-only + filters) =====
   if (user && user.role === 'client'){
     const [q, setQ] = useState('');
-    const filtered = useMemo(() => filterCandidates(cands, q), [cands, q]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [minRecentYears, setMinRecentYears] = useState('');
+    const [maxRecentYears, setMaxRecentYears] = useState('');
+
+    const filtered = useMemo(() => filterAndSortCandidates(cands, {
+      q, dateFrom, dateTo, minRecentYears, maxRecentYears
+    }), [cands, q, dateFrom, dateTo, minRecentYears, maxRecentYears]);
+
     return (
       <div style={bodyStyle}>
         <SkylineBG />
-        <div style={{ width:'100%', maxWidth:900, margin:'0 auto' }}>
+        <div style={{ width:'100%', maxWidth:1000, margin:'0 auto' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div style={{ fontWeight:700, fontSize:18 }}>Client</div>
             <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
           </div>
-          <div style={{ marginTop:12 }}>
-            <label style={{ fontSize:12, color:'#9ca3af' }}>Keyword (name, title, law, location, notes, date)</label>
-            <input value={q} onChange={e=>setQ(e.target.value)} style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }} />
-          </div>
+
+          <Filters
+            q={q} setQ={setQ}
+            dateFrom={dateFrom} setDateFrom={setDateFrom}
+            dateTo={dateTo} setDateTo={setDateTo}
+            minRecentYears={minRecentYears} setMinRecentYears={setMinRecentYears}
+            maxRecentYears={maxRecentYears} setMaxRecentYears={setMaxRecentYears}
+            onClear={() => { setQ(''); setDateFrom(''); setDateTo(''); setMinRecentYears(''); setMaxRecentYears(''); }}
+          />
+
           <div style={{ marginTop:8 }}>
             {filtered.map(c => (
               <Card
@@ -216,10 +280,18 @@ export default function Page(){
     );
   }
 
-  // ===== Recruiter screen (add/edit/delete + Date Entered) =====
+  // ===== Recruiter screen (add/edit/delete + filters) =====
   if (user && user.role === 'recruiter'){
     const [q, setQ] = useState('');
-    const filtered = useMemo(() => filterCandidates(cands, q), [cands, q]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [minRecentYears, setMinRecentYears] = useState('');
+    const [maxRecentYears, setMaxRecentYears] = useState('');
+
+    const filtered = useMemo(() => filterAndSortCandidates(cands, {
+      q, dateFrom, dateTo, minRecentYears, maxRecentYears
+    }), [cands, q, dateFrom, dateTo, minRecentYears, maxRecentYears]);
+
     function addCandidate(rec){ setCands(prev => [...prev, rec]); }
     function updateCandidate(id, patch){ setCands(prev => prev.map(x => x.id===id ? { ...x, ...patch } : x)); }
     function removeCandidate(id){ setCands(prev => prev.filter(x => x.id!==id)); }
@@ -227,7 +299,7 @@ export default function Page(){
     return (
       <div style={bodyStyle}>
         <SkylineBG />
-        <div style={{ width:'100%', maxWidth:900, margin:'0 auto' }}>
+        <div style={{ width:'100%', maxWidth:1000, margin:'0 auto' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div style={{ fontWeight:700, fontSize:18 }}>Recruiter</div>
             <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
@@ -235,10 +307,14 @@ export default function Page(){
 
           <RecruiterAddForm onAdd={addCandidate} />
 
-          <div style={{ marginTop:12 }}>
-            <label style={{ fontSize:12, color:'#9ca3af' }}>Keyword (name, title, law, location, notes, date)</label>
-            <input value={q} onChange={e=>setQ(e.target.value)} style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }} />
-          </div>
+          <Filters
+            q={q} setQ={setQ}
+            dateFrom={dateFrom} setDateFrom={setDateFrom}
+            dateTo={dateTo} setDateTo={setDateTo}
+            minRecentYears={minRecentYears} setMinRecentYears={setMinRecentYears}
+            maxRecentYears={maxRecentYears} setMaxRecentYears={setMaxRecentYears}
+            onClear={() => { setQ(''); setDateFrom(''); setDateTo(''); setMinRecentYears(''); setMaxRecentYears(''); }}
+          />
 
           <div style={{ marginTop:8 }}>
             {filtered.map(c => (
@@ -313,12 +389,45 @@ function Area({ label, value, onChange, placeholder }){
   );
 }
 
-// ========= Recruiter Add Form (includes Date Entered) =========
+// ========= Filters Block =========
+function Filters({
+  q, setQ,
+  dateFrom, setDateFrom,
+  dateTo, setDateTo,
+  minRecentYears, setMinRecentYears,
+  maxRecentYears, setMaxRecentYears,
+  onClear
+}){
+  return (
+    <div style={{ marginTop:12, border:'1px solid #1f2937', borderRadius:12, padding:12, background:'#0b0b0b' }}>
+      <div style={{ fontWeight:600, marginBottom:8 }}>Filters</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8 }}>
+        <Field label='Keyword' value={q} onChange={setQ} placeholder='name, law, notes, city, date...' />
+        <label style={{ display:'block', fontSize:12, marginTop:6 }}>
+          <div style={{ color:'#9ca3af', marginBottom:4 }}>Date Entered (From)</div>
+          <input type='date' value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }} />
+        </label>
+        <label style={{ display:'block', fontSize:12, marginTop:6 }}>
+          <div style={{ color:'#9ca3af', marginBottom:4 }}>Date Entered (To)</div>
+          <input type='date' value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }} />
+        </label>
+        <Num label='Min Years in Most Recent' value={minRecentYears} onChange={setMinRecentYears} />
+        <Num label='Max Years in Most Recent' value={maxRecentYears} onChange={setMaxRecentYears} />
+      </div>
+      <div style={{ display:'flex', justifyContent:'flex-end', marginTop:8 }}>
+        <button onClick={onClear} style={{ fontSize:12, padding:'6px 10px', border:'1px solid #1f2937', borderRadius:8 }}>Clear filters</button>
+      </div>
+    </div>
+  );
+}
+
+// ========= Recruiter Add Form (includes Date Entered + Years in Most Recent) =========
 function RecruiterAddForm({ onAdd }){
   const [name, setName] = useState('');
   const [roles, setRoles] = useState('');
   const [practice, setPractice] = useState('');
   const [years, setYears] = useState('');
+  const [yearsInMostRecent, setYearsInMostRecent] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [salary, setSalary] = useState('');
@@ -344,6 +453,7 @@ function RecruiterAddForm({ onAdd }){
       roles: (roles ? parseCSV(roles) : ['Attorney']),
       practiceAreas: (practice ? parseCSV(practice) : []),
       years: Number(years)||0,
+      yearsInMostRecent: Number(yearsInMostRecent)||0,
       city: city.trim(),
       state: state.trim(),
       salary: Number(salary)||0,
@@ -354,9 +464,8 @@ function RecruiterAddForm({ onAdd }){
     };
     onAdd(rec);
     setOk('Candidate added');
-    setName(''); setRoles(''); setPractice(''); setYears('');
-    setCity(''); setState(''); setSalary(''); setContract(false);
-    setHourly(''); setNotes('');
+    setName(''); setRoles(''); setPractice(''); setYears(''); setYearsInMostRecent('');
+    setCity(''); setState(''); setSalary(''); setContract(false); setHourly(''); setNotes('');
     const d = new Date(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
     setDateEntered(`${d.getFullYear()}-${mm}-${dd}`);
   }
@@ -369,6 +478,7 @@ function RecruiterAddForm({ onAdd }){
         <Field label='Titles (CSV)' value={roles} onChange={setRoles} placeholder='Attorney, Paralegal' />
         <Field label='Type of Law (CSV)' value={practice} onChange={setPractice} placeholder='Litigation, Immigration' />
         <Num label='Years of experience' value={years} onChange={setYears} />
+        <Num label='Years in Most Recent Position' value={yearsInMostRecent} onChange={setYearsInMostRecent} />
         <Field label='City' value={city} onChange={setCity} />
         <Field label='State' value={state} onChange={setState} />
         <Num label='Salary desired' value={salary} onChange={setSalary} />
@@ -377,8 +487,6 @@ function RecruiterAddForm({ onAdd }){
           <span>Available for contract</span>
         </label>
         {contract ? <Num label='Hourly rate' value={hourly} onChange={setHourly} /> : null}
-
-        {/* Date Entered */}
         <label style={{ display:'block', fontSize:12, marginTop:6 }}>
           <div style={{ color:'#9ca3af', marginBottom:4 }}>Date Entered</div>
           <input type='date' value={dateEntered || ''} onChange={e=>setDateEntered(e.target.value)} style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }} />
@@ -394,7 +502,7 @@ function RecruiterAddForm({ onAdd }){
   );
 }
 
-// ========= Candidate Card (shows & edits Date Entered) =========
+// ========= Candidate Card (shows & edits both new fields) =========
 function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(c.name);
@@ -405,6 +513,7 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
   const [hourly, setHourly] = useState(String(c.hourly||''));
   const [notes, setNotes] = useState(c.notes||'');
   const [dateEntered, setDateEntered] = useState(c.dateEntered || '');
+  const [yearsInMostRecent, setYearsInMostRecent] = useState(String(c.yearsInMostRecent || ''));
 
   function save(){
     if (contract && (!hourly || Number(hourly) <= 0)) return;
@@ -421,6 +530,7 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
       city: c.city,
       state: c.state,
       years: c.years,
+      yearsInMostRecent: Number(yearsInMostRecent)||0,
       dateEntered: dateEntered || null
     });
     setEdit(false);
@@ -437,6 +547,11 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
               <div style={{ fontSize:12, color:'#9ca3af' }}>
                 {(c.city||'') + (c.state ? ', ' + c.state : '')} - {c.years} yrs
               </div>
+              {typeof c.yearsInMostRecent === 'number' || c.yearsInMostRecent ? (
+                <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+                  Most Recent Position: {c.yearsInMostRecent} yrs
+                </div>
+              ) : null}
               {c.dateEntered ? (
                 <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
                   Date Entered: {c.dateEntered}
@@ -505,6 +620,9 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
               style={{ width:'100%', padding:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:8 }}
             />
           </label>
+
+          {/* Editable Years in Most Recent */}
+          <Num label='Years in Most Recent Position' value={yearsInMostRecent} onChange={setYearsInMostRecent} />
 
           <Area label='Candidate Notes' value={notes} onChange={setNotes} placeholder='Short summary: strengths, availability, fit notes.' />
           <div style={{ display:'flex', gap:8, marginTop:8 }}>
