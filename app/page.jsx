@@ -127,52 +127,51 @@ export default function Page() {
   const [inviteFlash, setInviteFlash] = useState('');
 
   async function adminInvite() {
-    try {
-      setInviteErr('');
-      setInviteFlash('');
-      if (!newEmail || !newPw) {
-        setInviteErr('Email and temp password are required.');
-        return;
-      }
-      const res = await fetch('/api/admin/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: newEmail.trim(),
-          role: newRole,
-          org: newOrg.trim(),
-          amEmail: newAm.trim(),
-          password: newPw
-        })
-      });
-
-      let data = {};
-      try { data = await res.json(); } catch {}
-
-      if (!res.ok || !data.ok) {
-        setInviteErr(data?.error || `Invite failed with HTTP ${res.status}`);
-        return;
-      }
-      // Add to local mirror so you see it immediately
-      setUsers(prev => [
-        ...prev,
-        {
-          id: data.id || ('u' + Math.random().toString(36).slice(2,8)),
-          email: newEmail.trim(),
-          role: newRole,
-          org: newOrg.trim(),
-          amEmail: newAm.trim(),
-          password: newPw,
-          loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: []
-        }
-      ]);
-      setInviteFlash(`Added ${newEmail} as ${newRole}`);
-      setNewEmail(''); setNewRole('client'); setNewOrg(''); setNewAm(''); setNewPw('');
-    } catch (e) {
-      setInviteErr(`Server error inviting user: ${e.message || e}`);
-      console.error(e);
+  try {
+    setInviteErr('');
+    setInviteFlash('');
+    if (!newEmail || !newPw) {
+      setInviteErr('Email and temp password are required.');
+      return;
     }
+    const res = await fetch('/api/admin/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: newEmail.trim(),
+        role: newRole,
+        org: newOrg.trim(),
+        amEmail: newAm.trim(),
+        password: newPw
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data?.ok) {
+      setInviteErr(`${data?.step || 'server'}: ${data?.error || 'Invite failed'}`);
+      return;
+    }
+
+    // Only update local mirror if server succeeded
+    setUsers(prev => [
+      ...prev,
+      {
+        id: data.id,
+        email: newEmail.trim(),
+        role: newRole,
+        org: newOrg.trim(),
+        amEmail: newAm.trim(),
+        password: newPw,
+        loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: []
+      }
+    ]);
+    setInviteFlash(`Added ${newEmail} as ${newRole}`);
+    setNewEmail(''); setNewRole('client'); setNewOrg(''); setNewAm(''); setNewPw('');
+  } catch (e) {
+    setInviteErr('Server error inviting user');
+    console.error(e);
   }
+}
 
   // --------------------------------------------
   // Simple UI
