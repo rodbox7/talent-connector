@@ -1,3 +1,5 @@
+const BUILD_TAG = 'supa-v2';
+
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
