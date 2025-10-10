@@ -89,3 +89,12 @@ h1,h2,h3{margin:0 0 .6rem}
 .table-row{display:grid; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--border-blue-subtle)}
 .table-row.header{color:#eaf2ff; font-weight:600; border-top:none}
 .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#0f1c2e;border:1px solid var(--border-blue-subtle);color:#b9cbe2;font-size:12px}
+/* KILL SWITCH: remove any legacy header/branding & borders */
+.app-header,
+header.app-header,
+.app-header-inner,
+.brand {
+  display: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
