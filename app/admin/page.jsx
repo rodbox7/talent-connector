@@ -3,123 +3,165 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase as sb } from '../../lib/supabaseClient';
 
-export default function AdminPage() {
+// ========= Admin Panel (classic / restored) =========
+function AdminPanel({ users, meId, addUser, deleteUser, updateUser }){
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('client');
-  const [org, setOrg] = useState('');
-  const [password, setPassword] = useState('Temp#12345');
-  const [amEmail, setAmEmail] = useState('');
-  const [err, setErr] = useState('');
+  const [org, setOrg]   = useState('');
+  const [am, setAm]     = useState('');   // salesperson email (account manager)
+  const [password, setPassword] = useState('');
+
+  const [err, setErr]   = useState('');
   const [flash, setFlash] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [users, setUsers] = useState([]);
+  const [passEdits, setPassEdits] = useState({});
+  const [amEdits, setAmEdits]     = useState({});
 
-  async function fetchUsers() {
-    setLoading(true); setErr('');
-    const { data, error } = await sb
-      .from('profiles')
-      .select('id, email, role, org, account_manager_email')
-      .order('email', { ascending: true });
-    if (error) setErr(error.message); else setUsers(data || []);
-    setLoading(false);
-  }
-  useEffect(() => { fetchUsers(); }, []);
-
-  async function handleAddUser(e) {
-    e.preventDefault(); setErr(''); setFlash('');
-    const res = await fetch('/api/admin/invite', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, role, org, password, amEmail })
-    });
-    const j = await res.json();
-    if (!res.ok) { setErr(j.error || 'Database error creating new user'); return; }
-    setFlash(`Added ${email} as ${role}`);
-    setEmail(''); setOrg(''); setPassword(''); setAmEmail(''); setRole('client');
-    await fetchUsers();
-  }
-
-  async function updateUser(u, patch) {
+  function add(){
     setErr(''); setFlash('');
-    const { error } = await sb.from('profiles').update(patch).eq('id', u.id);
-    if (error) { setErr(error.message); return; }
-    setFlash('Saved changes'); await fetchUsers();
+    const e = String(email).trim().toLowerCase();
+    if (!e.includes('@')){ setErr('Enter a valid email'); return; }
+    if (!password){ setErr('Set a temporary password'); return; }
+    if (users.some(u => String(u.email||'').toLowerCase() === e)){
+      setErr('That email already exists'); return;
+    }
+    addUser({ email: e, role, org, password, amEmail: am });
+    setFlash(`Added ${email} as ${role}`);
+    setEmail(''); setOrg(''); setAm(''); setPassword(''); setRole('client');
   }
 
-  async function removeUser(u) {
-    if (!confirm(`Delete profile for ${u.email}?`)) return;
-    const { error } = await sb.from('profiles').delete().eq('id', u.id);
-    if (error) { setErr(error.message); return; }
-    setFlash('Deleted'); await fetchUsers();
-  }
+  function fmt(ts){ if (!ts) return '—'; try { return new Date(ts).toLocaleString(); } catch { return '—'; } }
 
-  const header = useMemo(() => (
-    <div className="table-row header grid-5">
-      <div>Email</div><div>Role</div><div>Org</div><div>Sales contact (clients)</div><div>Actions</div>
-    </div>
-  ), []);
+  // Classic, light-but-readable surfaces
+  const card = { border: '1px solid #22304a', background: '#0d1626', borderRadius: 12, padding: 12 };
+  const subtle = { color: '#9fb3ce' };
 
   return (
-    <div className="container" style={{paddingTop:24}}>
-      <div className="panel" style={{marginBottom:20}}>
-        <h1 className="panel-title" style={{fontSize:24, marginBottom:8}}>Admin · Users (invitation only)</h1>
-        <div className="panel-sub" style={{marginBottom:16}}>
-          Create users with one click. This creates a Supabase Auth account and a matching profile with role & optional salesperson email.
+    <div style={{ display:'grid', gap: 12, marginTop: 12 }}>
+      {/* Add user */}
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Users (invitation-only)</div>
+        <div style={{ ...subtle, fontSize: 12, marginBottom: 8 }}>
+          Only users listed here can sign in. Create an Auth account plus a matching profile row.
         </div>
 
-        <form onSubmit={handleAddUser} className="grid grid-5" style={{alignItems:'center'}}>
-          <input className="input" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-          <select className="input" value={role} onChange={e => setRole(e.target.value)}>
-            <option value="client">Client</option>
-            <option value="recruiter">Recruiter</option>
-            <option value="admin">Admin</option>
-          </select>
-          <input className="input" placeholder="Organization (optional)" value={org} onChange={e => setOrg(e.target.value)} />
-          <input className="input" placeholder="Sales contact email (clients)" value={amEmail} onChange={e => setAmEmail(e.target.value)} />
-          <input className="input" placeholder="Temp password" value={password} onChange={e => setPassword(e.target.value)} required />
-          <div style={{gridColumn:'1 / -1', display:'flex', gap:10, marginTop:12}}>
-            <button type="submit" className="btn btn-primary">Add user</button>
-            <button type="button" className="btn" onClick={fetchUsers}>Refresh</button>
-            {loading && <span className="badge">Loading…</span>}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap: 8 }}>
+          <Field label="Email" value={email} onChange={setEmail} placeholder="name@company.com" />
+          <Select
+            label="Role"
+            value={role}
+            onChange={setRole}
+            options={[{label:'Client',value:'client'},{label:'Recruiter',value:'recruiter'},{label:'Admin',value:'admin'}]}
+          />
+          <Field label="Organization (optional)" value={org} onChange={setOrg} placeholder="Firm / Dept" />
+          <Field label="Sales contact email (clients)" value={am} onChange={setAm} placeholder="sales@youragency.com" />
+          <Field label="Temp password" value={password} onChange={setPassword} type="password" placeholder="set a password" />
+        </div>
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: 8 }}>
+          <button onClick={add} style={{ fontSize: 12, padding:'6px 10px', border:'1px solid #22304a', borderRadius:8 }}>
+            Add user
+          </button>
+          <div style={{ fontSize: 12 }}>
+            {err ? <span style={{ color:'#f87171' }}>{err}</span> : <span style={{ color:'#93e2b7' }}>{flash}</span>}
           </div>
-          {(err || flash) && (
-            <div style={{gridColumn:'1 / -1', marginTop:10}}>
-              {err && <div style={{color:'#ef4444'}}>{err}</div>}
-              {flash && <div style={{color:'#22c55e'}}>{flash}</div>}
-            </div>
-          )}
-        </form>
+        </div>
       </div>
 
-      <div className="panel">
-        <div style={{display:'flex', justifyContent:'space-between', marginBottom:8}}>
-          <div className="panel-title" style={{fontSize:18}}>Registered users</div>
-          <span className="badge">{users?.length || 0} total</span>
+      {/* Directory */}
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Directory & activity</div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ textAlign:'left', ...subtle }}>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Email</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Role</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Org</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Sales contact</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Logins</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Last login</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Total minutes</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Password</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id}>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.email}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.role}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.org || '—'}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438', minWidth:240 }}>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                      <input
+                        type="email"
+                        value={(amEdits[u.id] !== undefined ? amEdits[u.id] : (u.amEmail || ''))}
+                        onChange={e => setAmEdits({ ...amEdits, [u.id]: e.target.value })}
+                        placeholder="sales@youragency.com"
+                        style={{ width:200, padding:6, background:'#0f1a2c', color:'#e5e5e5', border:'1px solid #22304a', borderRadius:6 }}
+                      />
+                      <button
+                        onClick={() => { const v = amEdits[u.id] ?? u.amEmail ?? ''; updateUser(u.id, { amEmail: v }); setFlash(`Sales contact set for ${u.email}`); }}
+                        style={{ fontSize:12 }}
+                      >
+                        Set
+                      </button>
+                    </div>
+                  </td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.loginCount || 0}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{fmt(u.lastLoginAt)}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.totalMinutes || 0}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                      <input
+                        type="text"
+                        value={passEdits[u.id] || ''}
+                        onChange={e => setPassEdits({ ...passEdits, [u.id]: e.target.value })}
+                        placeholder="new pw"
+                        style={{ width:120, padding:6, background:'#0f1a2c', color:'#e5e5e5', border:'1px solid #22304a', borderRadius:6 }}
+                      />
+                      <button
+                        onClick={() => {
+                          const v = passEdits[u.id] || '';
+                          if (!v) return;
+                          updateUser(u.id, { password: v });
+                          setFlash(`Password set for ${u.email}`);
+                          setPassEdits({ ...passEdits, [u.id]: '' });
+                        }}
+                        style={{ fontSize:12 }}
+                      >
+                        Set
+                      </button>
+                      <button
+                        onClick={() => {
+                          const np = Math.random().toString(36).slice(2,8);
+                          updateUser(u.id, { password: np });
+                          setPassEdits({ ...passEdits, [u.id]: np });
+                          setFlash(`Temp password for ${u.email}: ${np}`);
+                        }}
+                        style={{ fontSize:12 }}
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  </td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>
+                    <button
+                      disabled={u.id === meId}
+                      onClick={() => deleteUser(u.id)}
+                      style={{ fontSize:12, opacity: u.id===meId ? 0.5 : 1 }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 ? (
+                <tr><td colSpan={9} style={{ padding:'10px 8px', color:'#9fb3ce' }}>No users yet.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
-        {header}
-        {(users || []).map(u => (
-          <div key={u.id} className="table-row grid-5">
-            <div>{u.email}</div>
-            <div>
-              <select className="input" value={u.role} onChange={(e)=>updateUser(u,{role:e.target.value})}>
-                <option value="client">Client</option>
-                <option value="recruiter">Recruiter</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div>
-              <input className="input" defaultValue={u.org || ''} onBlur={(e)=> (e.target.value !== (u.org||'')) && updateUser(u,{org:e.target.value||null})}/>
-            </div>
-            <div>
-              <input className="input" defaultValue={u.account_manager_email || ''} onBlur={(e)=> (e.target.value !== (u.account_manager_email||'')) && updateUser(u,{account_manager_email:e.target.value||null})}/>
-            </div>
-            <div style={{display:'flex', gap:8}}>
-              <button className="btn" onClick={()=>updateUser(u,{role:u.role, org:u.org||null, account_manager_email:u.account_manager_email||null})}>Save</button>
-              <button className="btn btn-danger" onClick={()=>removeUser(u)}>Delete</button>
-            </div>
-          </div>
-        ))}
-        {(!users || users.length===0) && <div className="panel-sub" style={{padding:'16px 0'}}>No users yet.</div>}
       </div>
     </div>
   );
