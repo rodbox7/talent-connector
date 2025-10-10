@@ -671,50 +671,110 @@ function Auth({ users, onLogin, onAddRecruiterViaCode }){
       if (!e.includes('@')){ setErr('Enter a valid email'); return; }
 
       // Preferred: Supabase Auth
-      const { data: auth, error: authErr } = await sb.auth.signInWithPassword({ email: e, password: pwd });
+      const { data: auth, error: authErr } =
+        await sb.auth.signInWithPassword({ email: e, password: pwd });
+
       if (!authErr && auth?.user){
-        const { data: prof, error: profErr } = await sb.from('profiles').select('*').eq('id', auth.user.id).single();
+        const { data: prof, error: profErr } =
+          await sb.from('profiles').select('*').eq('id', auth.user.id).single();
         if (!profErr && prof){
-          if (mode !== prof.role){ setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab or ask Admin to change the role.`); return; }
-          onLogin({ id: prof.id, email: prof.email, role: prof.role, org: prof.org || '', amEmail: prof.account_manager_email || prof.am_email || '' });
+          if (mode !== prof.role){
+            setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab or ask Admin to change the role.`);
+            return;
+          }
+          onLogin({
+            id: prof.id,
+            email: prof.email,
+            role: prof.role,
+            org: prof.org || '',
+            amEmail: prof.account_manager_email || prof.am_email || '',
+          });
           return;
         }
       }
 
-      // Fallback: local user list (keeps Admin accessible for preview)
+      // Fallback local users (keeps preview usable)
       const local = localFindUser(users, e, pwd);
       if (local){
-        if (mode !== local.role){ setErr(`This account is a ${local.role}. Switch to the ${local.role} tab.`); return; }
+        if (mode !== local.role){
+          setErr(`This account is a ${local.role}. Switch to the ${local.role} tab.`);
+          return;
+        }
         onLogin(local);
         return;
       }
 
       setErr('Invalid credentials or profile not found.');
-    } catch(ex){
-      setErr('Login error. Please try again.');
+    } catch (ex){
       console.error(ex);
+      setErr('Login error. Please try again.');
     }
   }
 
-  // LOGIN: no card border, no title text, pure inputs over the background
+  // Full-screen background stays; the panel is now borderless/transparent.
   return (
-    <div style={{ fontFamily: 'system-ui, Arial', background: '#0a0a0a', color: '#e5e5e5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative', overflow: 'hidden' }}>
+    <div
+      style={{
+        fontFamily: 'system-ui, Arial',
+        background: '#0a0a0a',
+        color: '#e5e5e5',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
       <SkylineBG />
-      <div style={{ width: '100%', maxWidth: 380, background: 'transparent', border: 'none', borderRadius: 0, padding: 0, position: 'relative' }}>
-        {/* Tabs */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 380,
+          // removed border + solid background:
+          background: 'rgba(0,0,0,0)',      // fully transparent panel
+          border: 'none',                   // no border
+          borderRadius: 0,
+          padding: 16,
+          position: 'relative',
+        }}
+      >
+        {/* Removed the “Talent Connector - Powered by…” title and the subtitle */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <button onClick={() => setMode('recruiter')} style={{ padding: 8, background: mode==='recruiter' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}>Recruiter</button>
-          <button onClick={() => setMode('client')} style={{ padding: 8, background: mode==='client' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}>Client</button>
-          <button onClick={() => setMode('admin')} style={{ padding: 8, background: mode==='admin' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}>Admin</button>
+          <button
+            onClick={() => setMode('recruiter')}
+            style={{ padding: 8, background: mode==='recruiter' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}
+          >
+            Recruiter
+          </button>
+          <button
+            onClick={() => setMode('client')}
+            style={{ padding: 8, background: mode==='client' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}
+          >
+            Client
+          </button>
+          <button
+            onClick={() => setMode('admin')}
+            style={{ padding: 8, background: mode==='admin' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}
+          >
+            Admin
+          </button>
         </div>
 
-        {/* Form */}
         <div style={{ marginTop: 12 }}>
-          <Field label='Email' value={email} onChange={setEmail} placeholder='name@company.com' type='email' />
-          <Field label='Password' value={pwd} onChange={setPwd} placeholder='your password' type='password' />
-          <button onClick={login} style={{ width: '100%', padding: 10, marginTop: 8, background: '#4f46e5', color: 'white', borderRadius: 8 }}>Log in</button>
+          <Field label="Email" value={email} onChange={setEmail} placeholder="name@company.com" type="email" />
+          <Field label="Password" value={pwd} onChange={setPwd} placeholder="your password" type="password" />
+          <button
+            onClick={login}
+            style={{ width: '100%', padding: 10, marginTop: 8, background: '#4f46e5', color: 'white', borderRadius: 8 }}
+          >
+            Log in
+          </button>
           {err ? <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div> : null}
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>No self-serve signup. Ask an Admin to add your account.</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            No self-serve signup. Ask an Admin to add your account.
+          </div>
         </div>
       </div>
     </div>
