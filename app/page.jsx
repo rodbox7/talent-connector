@@ -211,16 +211,8 @@ function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, up
 
   const bodyStyle = { fontFamily: 'system-ui, Arial', background: '#0a0a0a', color: '#e5e5e5', minHeight: '100vh', padding: 16 };
   const styles = (<RangeStyles/>);
-  const header = (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div>
-        <div style={{ fontWeight: 700 }}>{APP_NAME}</div>
-        <div style={{ fontSize: 12, color: '#9ca3af' }}>{String(user.role||'').replace(/^./, s=>s.toUpperCase())} workspace</div>
-      </div>
-      <button onClick={onLogout} style={{ fontSize: 12 }}>Log out</button>
-    </div>
-  );
-
+ // Replace your existing header const with this:
+const header = null;
   if (user.role === 'admin'){
     return (
       <div style={bodyStyle}>
