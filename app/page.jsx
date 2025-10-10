@@ -2,63 +2,39 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
 
-/*********************************
- * Talent Connector – Stable Build (cleaned login)
- * - Auth with Admin / Recruiter / Client (invitation-only)
- * - Admin: add/delete users, set/generate passwords, basic activity
- * - Recruiter: add/edit/delete candidates + Candidate Notes
- * - Client: read-only search + filters (years range slider 0–50)
- * - Background: fixed NYC photo with safe fallback
- * - Unit tests at bottom for filtering logic
- *********************************/
+/**
+ * Fresh, stable build:
+ * - No header/title on login box. No border. Full-bleed NYC image.
+ * - Old/classic Admin panel restored.
+ * - Recruiter can add/edit/delete candidates. Client is read-only.
+ * - Keyword search hits notes/titles/areas/city/state.
+ * - Years range slider 0–50.
+ */
 
-// ========= Config =========
-const APP_NAME = 'Talent Connector - Powered by Beacon Hill Legal'; // not displayed anymore
-const RECRUITER_CODE = ''; // invitation-only (no self-join)
-const NYC_URL = 'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
+/* ===== Config ===== */
+const NYC_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
-function buildContactMailto(c, user) {
-  const to = user?.amEmail || 'info@youragency.com';
-  const subj = `Talent Connector Candidate – ${c?.name || ''}`;
-  const body = [
-    `Hello,`,
-    ``,
-    `I'm interested in this candidate:`,
-    `• Name: ${c?.name || ''}`,
-    `• Title(s): ${(c?.roles || []).join(', ')}`,
-    `• Practice Areas: ${(c?.practice_areas || c?.practiceAreas || []).join(', ')}`,
-    `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
-    `• Years: ${c?.years ?? ''}`,
-    ``,
-    `My email: ${user?.email || ''}`,
-    ``,
-    `Sent from Talent Connector`
-  ].join('\n');
-
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-}
-
-// ========= Demo seed data =========
-const seedCandidates = [
-  { id: '1', name: 'Alexis Chen', roles: ['Attorney', 'Contract Attorney'], practiceAreas: ['Securities Litigation', 'Internal Investigations'], city: 'New York', state: 'NY', years: 6, contract: true, hourly: 95, salary: 175000, notes: 'Strong writer. Securities litigation focus. Immediate.' },
-  { id: '2', name: 'Diego Martinez', roles: ['Paralegal'], practiceAreas: ['Immigration', 'Global Mobility'], city: 'Miami', state: 'FL', years: 8, contract: true, hourly: 48, salary: 92000, notes: 'Immigration paralegal, Spanish bilingual. Remote ready.' },
-  { id: '3', name: 'Priya Raman', roles: ['eDiscovery Reviewer', 'Litigation Support'], practiceAreas: ['Antitrust', 'Class Actions'], city: 'Boston', state: 'MA', years: 4, contract: false, hourly: 0, salary: 0, notes: '' },
-];
-
+/* ===== Local fallback demo users/candidates (for preview) ===== */
 const seedUsers = [
   { id: 'u1', email: 'admin@youragency.com', role: 'admin', org: 'Your Agency', password: 'admin', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] },
   { id: 'u2', email: 'recruiter@youragency.com', role: 'recruiter', org: 'Your Agency', password: 'recruit', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] },
   { id: 'u3', email: 'client@samplefirm.com', role: 'client', org: 'Sample Firm', password: 'client', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] },
 ];
 
-// ========= Utilities =========
+const seedCandidates = [
+  { id: '1', name: 'Alexis Chen', roles: ['Attorney', 'Contract Attorney'], practiceAreas: ['Securities Litigation', 'Internal Investigations'], city: 'New York', state: 'NY', years: 6, contract: true, hourly: 95, salary: 175000, notes: 'Strong writer. Securities litigation focus. Immediate.' },
+  { id: '2', name: 'Diego Martinez', roles: ['Paralegal'], practiceAreas: ['Immigration', 'Global Mobility'], city: 'Miami', state: 'FL', years: 8, contract: true, hourly: 48, salary: 92000, notes: 'Immigration paralegal, Spanish bilingual. Remote ready.' },
+  { id: '3', name: 'Priya Raman', roles: ['eDiscovery Reviewer', 'Litigation Support'], practiceAreas: ['Antitrust', 'Class Actions'], city: 'Boston', state: 'MA', years: 4, contract: false, hourly: 0, salary: 0, notes: '' },
+];
+
+/* ===== Utilities ===== */
 function parseCSVLower(s){ return String(s||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean); }
 function parseCSV(s){ return String(s||'').split(',').map(x=>x.trim()).filter(Boolean); }
 function localFindUser(users, email, pwd){
   const e = String(email||'').toLowerCase();
   return users.find(u => String(u.email||'').toLowerCase() === e && String(u.password||'') === String(pwd||'')) || null;
 }
-
 function filterCandidates(cands, params){
   const { q, titlesFilter, lawFilter, cityFilter, stateFilter, minYears, maxYears, minSalary, maxSalary, contractOnly, minHourly, maxHourly } = params;
   const s = String(q||'').trim().toLowerCase();
@@ -74,7 +50,7 @@ function filterCandidates(cands, params){
     let pass = true;
     if (s){
       const blob = (String(c.name||'') + ' ' + (c.roles||[]).join(' ') + ' ' + (c.practiceAreas||[]).join(' ') + ' ' + (c.city||'') + ' ' + (c.state||'') + ' ' + (c.notes||'')).toLowerCase();
-      if (blob.indexOf(s) < 0) pass = false;
+      if (!blob.includes(s)) pass = false;
     }
     if (pass && titleTokens.length){
       const roleMatches = (c.roles||[]).some(r => titleTokens.some(t => String(r||'').toLowerCase().includes(t)));
@@ -97,13 +73,12 @@ function filterCandidates(cands, params){
   });
 }
 
-// ========= App root =========
+/* ===== App Root ===== */
 export default function App(){
-  const [user, setUser] = useState(null); // { id, email, role, org, amEmail? }
+  const [user, setUser] = useState(null);
   const [users, setUsers] = useState(() => { try { const s = localStorage.getItem('tc_users'); if (s) return JSON.parse(s); } catch {} return seedUsers; });
   const [cands, setCands] = useState(() => { try { const s = localStorage.getItem('tc_cands'); if (s) return JSON.parse(s); } catch {} return seedCandidates; });
 
-  // Persist to localStorage
   useEffect(() => { try { localStorage.setItem('tc_users', JSON.stringify(users)); } catch {} }, [users]);
   useEffect(() => { try { localStorage.setItem('tc_cands', JSON.stringify(cands)); } catch {} }, [cands]);
 
@@ -111,7 +86,7 @@ export default function App(){
     setUsers(prev => prev.map(x => {
       if (x.id !== u.id) return x;
       const now = Date.now();
-      return { ...x, loginCount: (x.loginCount||0)+1, lastLoginAt: now, sessions: [...x.sessions, { start: now }] };
+      return { ...x, loginCount: (x.loginCount||0)+1, lastLoginAt: now, sessions: [...(x.sessions||[]), { start: now }] };
     }));
   }
   function endSession(u){
@@ -149,19 +124,7 @@ export default function App(){
 
   if (!user) {
     return (
-      <Auth
-        users={users}
-        onLogin={handleLogin}
-        onAddRecruiterViaCode={function(email){
-          if (!RECRUITER_CODE) return; // disabled
-          const existed = users.find(u => u.email.toLowerCase() === String(email).toLowerCase());
-          if (existed){ handleLogin(existed); return; }
-          const id = 'u' + Math.random().toString(36).slice(2,8);
-          const nu = { id, email, role: 'recruiter', org: 'Your Agency', password: '', loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] };
-          setUsers(prev => [...prev, nu]);
-          handleLogin(nu);
-        }}
-      />
+      <Auth users={users} onLogin={handleLogin} onAddRecruiterViaCode={() => {}} />
     );
   }
 
@@ -179,7 +142,7 @@ export default function App(){
   );
 }
 
-// ========= Shell (routes by role) =========
+/* ===== Shell (role routing) ===== */
 function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, updateUser }){
   const [q, setQ] = useState('');
   const [titlesFilter, setTitlesFilter] = useState('');
@@ -214,14 +177,12 @@ function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, up
   const bodyStyle = { fontFamily: 'system-ui, Arial', background: '#0a0a0a', color: '#e5e5e5', minHeight: '100vh', padding: 16 };
   const styles = (<RangeStyles/>);
 
-  // Remove branded header entirely
-  const header = null;
-
   if (user.role === 'admin'){
     return (
       <div style={bodyStyle}>
         {styles}
-        {header}
+        {/* No header/title */}
+        <button onClick={onLogout} style={{ fontSize: 12, marginBottom: 8 }}>Log out</button>
         <AdminPanel users={users} meId={user.id||''} addUser={addUser} deleteUser={deleteUser} updateUser={updateUser} />
       </div>
     );
@@ -284,7 +245,7 @@ function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, up
     return (
       <div style={bodyStyle}>
         {styles}
-        {header}
+        <button onClick={onLogout} style={{ fontSize: 12, marginBottom: 8 }}>Log out</button>
         {searchBox}
         {filtersUI}
         {list}
@@ -292,11 +253,11 @@ function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, up
     );
   }
 
-  // Recruiter workspace
+  // Recruiter
   return (
     <div style={bodyStyle}>
       {styles}
-      {header}
+      <button onClick={onLogout} style={{ fontSize: 12, marginBottom: 8 }}>Log out</button>
       <RecruiterAddForm onAdd={addCandidate} />
       {searchBox}
       {list}
@@ -304,105 +265,164 @@ function Shell({ user, onLogout, cands, setCands, users, addUser, deleteUser, up
   );
 }
 
-// ========= Admin Panel =========
+/* ===== Admin Panel (classic) ===== */
 function AdminPanel({ users, meId, addUser, deleteUser, updateUser }){
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('client');
   const [org, setOrg] = useState('');
-  const [am, setAm] = useState(''); // salesperson email (account manager)
+  const [am, setAm] = useState(''); // salesperson email
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
+  const [flash, setFlash] = useState('');
   const [passEdits, setPassEdits] = useState({});
   const [amEdits, setAmEdits] = useState({});
-  const [flash, setFlash] = useState('');
 
   function add(){
     setErr(''); setFlash('');
     const e = String(email).trim().toLowerCase();
     if (!e.includes('@')){ setErr('Enter a valid email'); return; }
-    if (!password){ setErr('Set a password'); return; }
-    if (users.some(u => String(u.email||'').toLowerCase() === e)) { setErr('Email already exists'); return; }
+    if (!password){ setErr('Set a temporary password'); return; }
+    if (users.some(u => String(u.email||'').toLowerCase() === e)){ setErr('That email already exists'); return; }
     addUser({ email: e, role, org, password, amEmail: am });
-    setFlash('Added ' + email + ' as ' + role);
+    setFlash(`Added ${email} as ${role}`);
     setEmail(''); setOrg(''); setAm(''); setPassword(''); setRole('client');
   }
+  function fmt(ts){ if (!ts) return '—'; try { return new Date(ts).toLocaleString(); } catch { return '—'; } }
 
-  function fmtTime(ts){ if (!ts) return '-'; const d = new Date(ts); return d.toLocaleString(); }
+  const card = { border: '1px solid #22304a', background: '#0d1626', borderRadius: 12, padding: 12 };
+  const subtle = { color: '#9fb3ce' };
 
   return (
-    <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-      <div style={{ border: '1px solid #1f2937', borderRadius: 12, padding: 12, background: '#0b0b0b' }}>
+    <div style={{ display:'grid', gap: 12, marginTop: 12 }}>
+      <div style={card}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Users (invitation-only)</div>
-        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Only users listed here can sign in. Use this form to add/remove access.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          <Field label='Email' value={email} onChange={setEmail} placeholder='name@company.com' />
-          <Select label='Role' value={role} onChange={setRole} options={[{label:'Client', value:'client'},{label:'Recruiter', value:'recruiter'},{label:'Admin', value:'admin'}]} />
-          <Field label='Organization' value={org} onChange={setOrg} placeholder='(optional)' />
-          <Field label='Sales contact email (optional)' value={am} onChange={setAm} placeholder='sales@youragency.com' />
-          <Field label='Temp password' value={password} onChange={setPassword} placeholder='set a password' type='password' />
+        <div style={{ ...subtle, fontSize: 12, marginBottom: 8 }}>
+          Only users listed here can sign in. Create an Auth account plus a matching profile row.
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-          <button onClick={add} style={{ fontSize: 12, padding: '6px 10px', border: '1px solid #1f2937', borderRadius: 8 }}>Add user</button>
-          {err ? <div style={{ color: '#f87171', fontSize: 12 }}>{err}</div> : <div/>}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap: 8 }}>
+          <Field label="Email" value={email} onChange={setEmail} placeholder="name@company.com" />
+          <Select label="Role" value={role} onChange={setRole} options={[
+            {label:'Client',value:'client'},
+            {label:'Recruiter',value:'recruiter'},
+            {label:'Admin',value:'admin'}
+          ]} />
+          <Field label="Organization (optional)" value={org} onChange={setOrg} placeholder="Firm / Dept" />
+          <Field label="Sales contact email (clients)" value={am} onChange={setAm} placeholder="sales@youragency.com" />
+          <Field label="Temp password" value={password} onChange={setPassword} type="password" placeholder="set a password" />
         </div>
-        {flash ? <div style={{ color: '#a7f3d0', fontSize: 12, marginTop: 6 }}>{flash}</div> : null}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop: 8 }}>
+          <button onClick={add} style={{ fontSize: 12, padding:'6px 10px', border:'1px solid #22304a', borderRadius:8 }}>
+            Add user
+          </button>
+          <div style={{ fontSize: 12 }}>
+            {err ? <span style={{ color:'#f87171' }}>{err}</span> : <span style={{ color:'#93e2b7' }}>{flash}</span>}
+          </div>
+        </div>
       </div>
 
-      <div style={{ border: '1px solid #1f2937', borderRadius: 12, padding: 12, background: '#0b0b0b' }}>
+      <div style={card}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Directory & activity</div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: '#9ca3af' }}>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Email</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Role</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Org</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Sales contact</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Logins</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Last login</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Total minutes</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Set password</th>
-                <th style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>Actions</th>
+              <tr style={{ textAlign:'left', ...subtle }}>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Email</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Role</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Org</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Sales contact</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Logins</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Last login</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Total minutes</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Password</th>
+                <th style={{ padding:'6px 8px', borderBottom:'1px solid #22304a' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.id}>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>{u.email}</td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>{u.role}</td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>{u.org || '-'}</td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937', minWidth: 240 }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input type='email' value={(amEdits[u.id] !== undefined ? amEdits[u.id] : (u.amEmail || ''))} onChange={e => setAmEdits({ ...amEdits, [u.id]: e.target.value })} placeholder='sales@youragency.com' style={{ width: 180, padding: 6, background: '#111827', color: '#e5e5e5', border: '1px solid #1f2937', borderRadius: 6 }} />
-                      <button onClick={() => { const v = (amEdits[u.id] !== undefined ? amEdits[u.id] : (u.amEmail || '')); updateUser(u.id, { amEmail: v }); setFlash('Sales contact set for ' + u.email); }} style={{ fontSize: 12 }}>Set</button>
-                    </div>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.email}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.role}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.org || '—'}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438', minWidth:240 }}>
+                    <SalesContactCell u={u} amEdits={amEdits} setAmEdits={setAmEdits} updateUser={updateUser} setFlash={setFlash} />
                   </td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>{u.loginCount}</td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>{fmtTime(u.lastLoginAt)}</td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>{u.totalMinutes}</td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input type='text' value={passEdits[u.id] || ''} onChange={e => setPassEdits({ ...passEdits, [u.id]: e.target.value })} placeholder='new pw' style={{ width: 120, padding: 6, background: '#111827', color: '#e5e5e5', border: '1px solid #1f2937', borderRadius: 6 }} />
-                      <button onClick={() => { const v = passEdits[u.id] || ''; if (!v) return; updateUser(u.id, { password: v }); setFlash('Password set for ' + u.email); setPassEdits({ ...passEdits, [u.id]: '' }); }} style={{ fontSize: 12 }}>Set</button>
-                      <button onClick={() => { const np = Math.random().toString(36).slice(2,8); updateUser(u.id, { password: np }); setPassEdits({ ...passEdits, [u.id]: np }); setFlash('Temp password for ' + u.email + ': ' + np); }} style={{ fontSize: 12 }}>Generate</button>
-                    </div>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.loginCount || 0}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{fmt(u.lastLoginAt)}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>{u.totalMinutes || 0}</td>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>
+                    <PasswordCell u={u} passEdits={passEdits} setPassEdits={setPassEdits} updateUser={updateUser} setFlash={setFlash} />
                   </td>
-                  <td style={{ padding: '6px 8px', borderBottom: '1px solid #1f2937' }}>
-                    <button disabled={u.id === meId} onClick={() => deleteUser(u.id)} style={{ fontSize: 12, opacity: u.id===meId?0.5:1 }}>Delete</button>
+                  <td style={{ padding:'6px 8px', borderBottom:'1px solid #1a2438' }}>
+                    <button disabled={u.id===meId} onClick={() => deleteUser(u.id)} style={{ fontSize:12, opacity:u.id===meId?0.5:1 }}>Delete</button>
                   </td>
                 </tr>
               ))}
+              {users.length === 0 ? (<tr><td colSpan={9} style={{ padding:'10px 8px', color:'#9fb3ce' }}>No users yet.</td></tr>) : null}
             </tbody>
           </table>
         </div>
       </div>
     </div>
   );
-
-  function fmtTime(ts){ if (!ts) return '-'; const d = new Date(ts); return d.toLocaleString(); }
 }
 
-// ========= Recruiter Add Form =========
+function SalesContactCell({ u, amEdits, setAmEdits, updateUser, setFlash }){
+  return (
+    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+      <input
+        type="email"
+        value={(amEdits[u.id] !== undefined ? amEdits[u.id] : (u.amEmail || ''))}
+        onChange={e => setAmEdits({ ...amEdits, [u.id]: e.target.value })}
+        placeholder="sales@youragency.com"
+        style={{ width:200, padding:6, background:'#0f1a2c', color:'#e5e5e5', border:'1px solid #22304a', borderRadius:6 }}
+      />
+      <button
+        onClick={() => { const v = amEdits[u.id] ?? u.amEmail ?? ''; updateUser(u.id, { amEmail: v }); setFlash(`Sales contact set for ${u.email}`); }}
+        style={{ fontSize:12 }}
+      >
+        Set
+      </button>
+    </div>
+  );
+}
+function PasswordCell({ u, passEdits, setPassEdits, updateUser, setFlash }){
+  return (
+    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+      <input
+        type="text"
+        value={passEdits[u.id] || ''}
+        onChange={e => setPassEdits({ ...passEdits, [u.id]: e.target.value })}
+        placeholder="new pw"
+        style={{ width:120, padding:6, background:'#0f1a2c', color:'#e5e5e5', border:'1px solid #22304a', borderRadius:6 }}
+      />
+      <button
+        onClick={() => {
+          const v = passEdits[u.id] || '';
+          if (!v) return;
+          updateUser(u.id, { password: v });
+          setFlash(`Password set for ${u.email}`);
+          setPassEdits({ ...passEdits, [u.id]: '' });
+        }}
+        style={{ fontSize:12 }}
+      >
+        Set
+      </button>
+      <button
+        onClick={() => {
+          const np = Math.random().toString(36).slice(2,8);
+          updateUser(u.id, { password: np });
+          setPassEdits({ ...passEdits, [u.id]: np });
+          setFlash(`Temp password for ${u.email}: ${np}`);
+        }}
+        style={{ fontSize:12 }}
+      >
+        Generate
+      </button>
+    </div>
+  );
+}
+
+/* ===== Recruiter Add Form ===== */
 function RecruiterAddForm({ onAdd }){
   const [name, setName] = useState('');
   const [roles, setRoles] = useState('');
@@ -465,7 +485,27 @@ function RecruiterAddForm({ onAdd }){
   );
 }
 
-// ========= Candidate Card =========
+/* ===== Candidate Card ===== */
+function buildContactMailto(c, user){
+  const to = user?.amEmail || 'info@youragency.com';
+  const subj = `Talent Connector Candidate – ${c?.name || ''}`;
+  const body = [
+    `Hello,`,
+    ``,
+    `I'm interested in this candidate:`,
+    `• Name: ${c?.name || ''}`,
+    `• Title(s): ${(c?.roles || []).join(', ')}`,
+    `• Practice Areas: ${(c?.practiceAreas || []).join(', ')}`,
+    `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
+    `• Years: ${c?.years ?? ''}`,
+    ``,
+    `My email: ${user?.email || ''}`,
+    ``,
+    `Sent from Talent Connector`
+  ].join('\n');
+
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
 function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(c.name);
@@ -511,7 +551,6 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
           <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 6 }}>Salary: {c.salary ? ('$' + c.salary) : '-'}</div>
           <div style={{ fontSize: 12, color: '#e5e5e5' }}>Contract: {c.contract ? ('Yes' + (c.hourly ? ', $' + c.hourly + '/hr' : '')) : 'No'}</div>
 
-          {/* Client-only contact button (emails assigned salesperson) */}
           {userRole === 'client' && (
             <div style={{ marginTop: 8 }}>
               <a
@@ -557,7 +596,7 @@ function Card({ c, canEdit, onDelete, onUpdate, userRole, clientInfo }){
   );
 }
 
-// ========= Inputs =========
+/* ===== Inputs & Slider ===== */
 function Field({ label, value, onChange, placeholder, type='text' }){
   return (
     <label style={{ display: 'block', fontSize: 12, marginTop: 6 }}>
@@ -592,8 +631,6 @@ function Select({ label, value, onChange, options }){
     </label>
   );
 }
-
-// Global styles for dual-thumb range slider
 function RangeStyles(){
   return (
     <style>{`
@@ -618,8 +655,6 @@ function RangeStyles(){
     `}</style>
   );
 }
-
-// Years range slider (0–50)
 function YearsRange({ min, max, low, high, onChange }){
   const lo = Math.max(min, Math.min(high, Number.isFinite(low) ? low : min));
   const hi = Math.min(max, Math.max(lo, Number.isFinite(high) ? high : max));
@@ -631,14 +666,8 @@ function YearsRange({ min, max, low, high, onChange }){
   const selectionStyle = { position: 'absolute', top: 12, left: (leftPct + '%'), right: ((100 - rightPct) + '%'), height: 4, background: '#4f46e5', borderRadius: 999, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.15), 0 1px 2px rgba(0,0,0,.7)' };
   const inputStyle = { position: 'absolute', left: 0, right: 0, top: 0, width: '100%', height: 28, background: 'transparent' };
 
-  function handleLow(e){
-    const next = Math.min(Number(e.target.value), hi);
-    onChange(next, hi);
-  }
-  function handleHigh(e){
-    const next = Math.max(Number(e.target.value), lo);
-    onChange(lo, next);
-  }
+  function handleLow(e){ const next = Math.min(Number(e.target.value), hi); onChange(next, hi); }
+  function handleHigh(e){ const next = Math.max(Number(e.target.value), lo); onChange(lo, next); }
 
   return (
     <div style={{ gridColumn: '1 / -1' }}>
@@ -657,8 +686,8 @@ function YearsRange({ min, max, low, high, onChange }){
   );
 }
 
-// ========= Auth (invitation only) =========
-function Auth({ users, onLogin, onAddRecruiterViaCode }){
+/* ===== Auth (no title/border, full-bleed background) ===== */
+function Auth({ users, onLogin }){
   const [mode, setMode] = useState('recruiter');
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
@@ -670,206 +699,74 @@ function Auth({ users, onLogin, onAddRecruiterViaCode }){
       const e = String(email).trim().toLowerCase();
       if (!e.includes('@')){ setErr('Enter a valid email'); return; }
 
-      // Preferred: Supabase Auth
-      const { data: auth, error: authErr } =
-        await sb.auth.signInWithPassword({ email: e, password: pwd });
-
+      // Supabase first
+      const { data: auth, error: authErr } = await sb.auth.signInWithPassword({ email: e, password: pwd });
       if (!authErr && auth?.user){
-        const { data: prof, error: profErr } =
-          await sb.from('profiles').select('*').eq('id', auth.user.id).single();
+        const { data: prof, error: profErr } = await sb.from('profiles').select('*').eq('id', auth.user.id).single();
         if (!profErr && prof){
-          if (mode !== prof.role){
-            setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab or ask Admin to change the role.`);
-            return;
-          }
-          onLogin({
-            id: prof.id,
-            email: prof.email,
-            role: prof.role,
-            org: prof.org || '',
-            amEmail: prof.account_manager_email || prof.am_email || '',
-          });
+          if (mode !== prof.role){ setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab or ask Admin to change the role.`); return; }
+          onLogin({ id: prof.id, email: prof.email, role: prof.role, org: prof.org || '', amEmail: prof.account_manager_email || prof.am_email || '' });
           return;
         }
       }
 
-      // Fallback local users (keeps preview usable)
+      // Local fallback
       const local = localFindUser(users, e, pwd);
       if (local){
-        if (mode !== local.role){
-          setErr(`This account is a ${local.role}. Switch to the ${local.role} tab.`);
-          return;
-        }
+        if (mode !== local.role){ setErr(`This account is a ${local.role}. Switch to the ${local.role} tab.`); return; }
         onLogin(local);
         return;
       }
-
       setErr('Invalid credentials or profile not found.');
-    } catch (ex){
-      console.error(ex);
+    } catch(ex){
       setErr('Login error. Please try again.');
+      console.error(ex);
     }
   }
 
-  // Full-screen background stays; the panel is now borderless/transparent.
   return (
-    <div
-      style={{
-        fontFamily: 'system-ui, Arial',
-        background: '#0a0a0a',
-        color: '#e5e5e5',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
+    <div style={{
+      fontFamily:'system-ui, Arial', background:'#0a0a0a', color:'#e5e5e5',
+      minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+      padding:0, position:'relative', overflow:'hidden'
+    }}>
       <SkylineBG />
-      <div
-        style={{
-          width: '100%',
-          maxWidth: 380,
-          // removed border + solid background:
-          background: 'rgba(0,0,0,0)',      // fully transparent panel
-          border: 'none',                   // no border
-          borderRadius: 0,
-          padding: 16,
-          position: 'relative',
-        }}
-      >
-        {/* Removed the “Talent Connector - Powered by…” title and the subtitle */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <button
-            onClick={() => setMode('recruiter')}
-            style={{ padding: 8, background: mode==='recruiter' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}
-          >
-            Recruiter
-          </button>
-          <button
-            onClick={() => setMode('client')}
-            style={{ padding: 8, background: mode==='client' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}
-          >
-            Client
-          </button>
-          <button
-            onClick={() => setMode('admin')}
-            style={{ padding: 8, background: mode==='admin' ? '#1f2937' : '#111827', color: '#e5e5e5', borderRadius: 8 }}
-          >
-            Admin
-          </button>
+      <div style={{
+        width:'100%', maxWidth:380,
+        background:'transparent', border:'none', borderRadius:0, padding:16, position:'relative'
+      }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+          <button onClick={() => setMode('recruiter')} style={{ padding:8, background: mode==='recruiter' ? '#1f2937' : '#111827', color:'#e5e5e5', borderRadius:8 }}>Recruiter</button>
+          <button onClick={() => setMode('client')}    style={{ padding:8, background: mode==='client'    ? '#1f2937' : '#111827', color:'#e5e5e5', borderRadius:8 }}>Client</button>
+          <button onClick={() => setMode('admin')}     style={{ padding:8, background: mode==='admin'     ? '#1f2937' : '#111827', color:'#e5e5e5', borderRadius:8 }}>Admin</button>
         </div>
-
         <div style={{ marginTop: 12 }}>
-          <Field label="Email" value={email} onChange={setEmail} placeholder="name@company.com" type="email" />
-          <Field label="Password" value={pwd} onChange={setPwd} placeholder="your password" type="password" />
-          <button
-            onClick={login}
-            style={{ width: '100%', padding: 10, marginTop: 8, background: '#4f46e5', color: 'white', borderRadius: 8 }}
-          >
-            Log in
-          </button>
-          {err ? <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div> : null}
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
-            No self-serve signup. Ask an Admin to add your account.
-          </div>
+          <Field label='Email' value={email} onChange={setEmail} placeholder='name@company.com' type='email' />
+          <Field label='Password' value={pwd} onChange={setPwd} placeholder='your password' type='password' />
+          <button onClick={login} style={{ width:'100%', padding:10, marginTop:8, background:'#4f46e5', color:'#fff', borderRadius:8 }}>Log in</button>
+          {err ? <div style={{ color:'#f87171', fontSize: 12, marginTop: 8 }}>{err}</div> : null}
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>No self-serve signup. Ask an Admin to add your account.</div>
         </div>
       </div>
     </div>
   );
 }
 
-// ========= Background (single-root, safe) =========
+/* ===== Background (full-bleed, no border) ===== */
 function SkylineBG(){
   const [failed, setFailed] = useState(false);
-  const style = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, pointerEvents: 'none', overflow: 'hidden' };
+  const cover = { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' };
   if (failed || !NYC_URL){
-    return (
-      <div aria-hidden='true' style={{ ...style, background: 'radial-gradient(ellipse at top, #101827, #07070b 60%)' }} />
-    );
+    return <div aria-hidden='true' style={{ ...cover, background: 'radial-gradient(ellipse at top, #101827, #07070b 60%)' }} />;
   }
   return (
-    <div aria-hidden='true' style={style}>
+    <div aria-hidden='true' style={cover}>
       <img
         alt=''
         src={NYC_URL}
         onError={() => setFailed(true)}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(0.15) contrast(1.1) brightness(0.95)', opacity: 0.95, display:'block', border:'none' }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(0.15) contrast(1.1) brightness(0.95)', opacity: 0.95 }}
       />
     </div>
   );
 }
-
-/***************
- * Unit Tests  *
- ***************/
-function runUnitTests(){
-  const sample = [...seedCandidates,
-    { id: 'x1', name: 'Test Spanish Cand', roles: ['Paralegal'], practiceAreas: ['Immigration'], city: 'Austin', state: 'TX', years: 2, contract: true, hourly: 35, salary: 65000, notes: 'Fluent Spanish; contract-ready' },
-  ];
-  const base = { q:'', titlesFilter:'', lawFilter:'', cityFilter:'', stateFilter:'', minYears:'', maxYears:'', minSalary:'', maxSalary:'', contractOnly:false, minHourly:'', maxHourly:'' };
-
-  // 1) Keyword should match notes ("Spanish")
-  let out = filterCandidates(sample, { ...base, q: 'spanish' });
-  console.assert(out.some(c => c.id==='x1'), 'Test 1 failed: keyword should match notes');
-
-  // 2) Title filter should match roles
-  out = filterCandidates(sample, { ...base, titlesFilter: 'paralegal' });
-  console.assert(out.some(c => (c.roles||[]).includes('Paralegal')), 'Test 2 failed: titles filter');
-
-  // 3) Contract-only + min hourly
-  out = filterCandidates(sample, { ...base, contractOnly: true, minHourly: '40' });
-  console.assert(out.every(c => c.contract && (c.hourly||0) >= 40), 'Test 3 failed: contract/hourly filter');
-
-  // 4) Years range
-  out = filterCandidates(sample, { ...base, minYears: '5', maxYears: '6' });
-  console.assert(out.every(c => (c.years||0) >= 5 && (c.years||0) <= 6), 'Test 4 failed: years range');
-
-  // 5) City/state filter
-  out = filterCandidates(sample, { ...base, cityFilter: 'new', stateFilter: 'ny' });
-  console.assert(out.every(c => String(c.city||'').toLowerCase().includes('new') && String(c.state||'').toLowerCase().includes('ny')), 'Test 5 failed: city/state');
-
-  // 6) Years range full span should include everyone
-  out = filterCandidates(sample, { ...base, minYears: '0', maxYears: '50' });
-  console.assert(out.length === sample.length, 'Test 6 failed: full years range should yield all');
-
-  // 7) Salary min should filter correctly
-  out = filterCandidates(sample, { ...base, minSalary: '100000' });
-  console.assert(out.every(c => (c.salary||0) >= 100000), 'Test 7 failed: min salary filter');
-
-  // 8) Law filter should match Immigration
-  out = filterCandidates(sample, { ...base, lawFilter: 'immigration' });
-  console.assert(out.every(c => (c.practiceAreas||[]).some(p => String(p).toLowerCase().includes('immigration'))), 'Test 8 failed: law filter');
-
-  // 9) Min years only (>= 5)
-  out = filterCandidates(sample, { ...base, minYears: '5' });
-  console.assert(out.every(c => (c.years||0) >= 5), 'Test 9 failed: min years');
-
-  // 10) Max years only (<= 6)
-  out = filterCandidates(sample, { ...base, maxYears: '6' });
-  console.assert(out.every(c => (c.years||0) <= 6), 'Test 10 failed: max years');
-
-  // 11) Combined years range 3-7
-  out = filterCandidates(sample, { ...base, minYears: '3', maxYears: '7' });
-  console.assert(out.every(c => (c.years||0) >= 3 && (c.years||0) <= 7), 'Test 11 failed: combined range');
-
-  // 12) buildContactMailto should include candidate name and recipient
-  const testUser = { email:'client@firm.com', amEmail:'am@youragency.com' };
-  const testCand = { name:'Jane Roe', roles:['Paralegal'], practice_areas:['Litigation'], city:'NYC', state:'NY', years:7 };
-  const ml = buildContactMailto(testCand, testUser);
-  console.assert(ml.includes('mailto:am%40youragency.com'), 'Test 12 failed: mailto recipient');
-  console.assert(ml.includes('Jane%20Roe'), 'Test 12 failed: candidate name encoded');
-
-  // 13) Ensure non-contract hourly filters exclude non-contract candidates
-  out = filterCandidates(sample, { ...base, minHourly: '10' });
-  console.assert(out.every(c => c.contract), 'Test 13 failed: hourly filter should imply contract candidates only');
-
-  // 14) Local auth fallback should allow admin preview
-  const adminLocal = localFindUser(seedUsers, 'admin@youragency.com', 'admin');
-  console.assert(adminLocal && adminLocal.role === 'admin', 'Test 14 failed: local admin fallback');
-
-  console.log('All unit tests passed.');
-}
-try { runUnitTests(); } catch(e){ console.error('Unit tests error:', e); }
