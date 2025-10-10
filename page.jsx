@@ -145,9 +145,12 @@ export default function Page() {
           password: newPw
         })
       });
-      const data = await res.json();
+
+      let data = {};
+      try { data = await res.json(); } catch {}
+
       if (!res.ok || !data.ok) {
-        setInviteErr(data?.error || 'Invite failed');
+        setInviteErr(data?.error || `Invite failed with HTTP ${res.status}`);
         return;
       }
       // Add to local mirror so you see it immediately
@@ -166,7 +169,7 @@ export default function Page() {
       setInviteFlash(`Added ${newEmail} as ${newRole}`);
       setNewEmail(''); setNewRole('client'); setNewOrg(''); setNewAm(''); setNewPw('');
     } catch (e) {
-      setInviteErr('Server error inviting user');
+      setInviteErr(`Server error inviting user: ${e.message || e}`);
       console.error(e);
     }
   }
@@ -175,7 +178,8 @@ export default function Page() {
   // Simple UI
   // --------------------------------------------
   const pageStyle = { minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#0a0a0a', color: '#e5e5e5', fontFamily: 'system-ui, Arial' };
-  const card = { width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid '#1f2937', borderRadius: 12, padding: 16 };
+  // FIXED: border string must not have nested quotes
+  const card = { width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid #1f2937', borderRadius: 12, padding: 16 };
 
   // Admin screen (full)
   if (user && user.role === 'admin') {
@@ -283,7 +287,7 @@ export default function Page() {
   // Login screen
   return (
     <div style={pageStyle}>
-      <div style={{ width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid #1f2937', borderRadius: 12, padding: 16 }}>
+      <div style={card}>
         <div style={{ textAlign: 'center', fontWeight: 700 }}>Talent Connector</div>
         <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Invitation-only access</div>
 
