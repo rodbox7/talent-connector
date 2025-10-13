@@ -1,4 +1,4 @@
-// app/layout.jsx
+'use client';  // <-- force this layout to be a Client Component
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -23,11 +23,9 @@ export default function RootLayout({ children }) {
         {/* Page content */}
         <div className="tc-content">{children}</div>
 
-        {/* Global styles — plain <style>, NOT styled-jsx */}
+        {/* Global styles — plain <style> (NOT styled-jsx) */}
         <style>{`
-          html, body {
-            height: 100%;
-          }
+          html, body { height: 100%; }
           body {
             margin: 0;
             font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -48,9 +46,7 @@ export default function RootLayout({ children }) {
             filter: grayscale(0.15) contrast(1.1) brightness(0.95);
             opacity: 0.95;
           }
-          .tc-content {
-            min-height: 100vh;
-          }
+          .tc-content { min-height: 100vh; }
         `}</style>
       </body>
     </html>
