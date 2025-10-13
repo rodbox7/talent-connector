@@ -1,51 +1,57 @@
 // app/layout.jsx
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata = {
   title: 'Talent Connector',
-  description: 'Invitation-only access',
+  description: 'Invitation-only portal',
 };
 
 const NYC_URL =
-  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
+  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui, Arial' }}>
-        {/* Background layer (fixed across all routes) */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 0,
-            pointerEvents: 'none',
-            overflow: 'hidden',
-            background:
-              'radial-gradient(ellipse at top, #101827, #07070b 60%)',
-          }}
-        >
-          <img
-            alt=""
-            src={NYC_URL}
-            onError={(e) => {
-              // hide if it fails to load
-              e.currentTarget.style.display = 'none';
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              filter:
-                'grayscale(0.15) contrast(1.1) brightness(0.95)',
-              opacity: 0.95,
-            }}
-          />
+      <body>
+        {/* Background image across ALL pages */}
+        <div className="tc-fixed-bg" aria-hidden="true">
+          <img src={NYC_URL} alt="" />
         </div>
 
-        {/* App content above background */}
-        <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh' }}>
-          {children}
-        </div>
+        {/* Page content */}
+        <div className="tc-content">{children}</div>
+
+        {/* Global styles */}
+        <style jsx global>{`
+          html, body {
+            height: 100%;
+          }
+          body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            color: #e5e5e5;
+            background: #0a0a0a;
+          }
+          .tc-fixed-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            background: radial-gradient(ellipse at top, #101827, #07070b 60%);
+          }
+          .tc-fixed-bg img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(0.15) contrast(1.1) brightness(0.95);
+            opacity: 0.95;
+          }
+          .tc-content {
+            min-height: 100vh;
+          }
+        `}</style>
       </body>
     </html>
   );
