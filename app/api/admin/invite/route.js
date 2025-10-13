@@ -1,10 +1,8 @@
 // app/api/admin/invite/route.js
-// Force Node runtime so the Admin SDK can run
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-// relative path from /app/api/admin/invite to /lib
-import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin'; // <-- four levels up
 
 export async function POST(req) {
   try {
@@ -13,7 +11,7 @@ export async function POST(req) {
     if (!email || !password) {
       return NextResponse.json({ ok: false, error: 'Email and temporary password are required.' }, { status: 400 });
     }
-    if (!['admin','recruiter','client'].includes(role)) {
+    if (!['admin', 'recruiter', 'client'].includes(role)) {
       return NextResponse.json({ ok: false, error: 'Invalid role.' }, { status: 400 });
     }
 
@@ -21,7 +19,7 @@ export async function POST(req) {
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // let them log in immediately
+      email_confirm: true,
     });
     if (createErr) {
       return NextResponse.json({ ok: false, error: createErr.message }, { status: 400 });
@@ -32,7 +30,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: 'User creation returned no id.' }, { status: 500 });
     }
 
-    // 2) Upsert the matching profile row
+    // 2) Upsert matching profile row
     const { error: profileErr } = await supabaseAdmin
       .from('profiles')
       .upsert(
