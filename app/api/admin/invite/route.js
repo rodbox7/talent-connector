@@ -1,55 +1,58 @@
-
+// app/api/admin/invite/route.js
+// Force Node runtime so the Admin SDK can run
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// relative path from /app/api/admin/invite to /lib
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
-    if (!url || !serviceRole) {
-      return NextResponse.json({ ok: false, error: 'Missing environment variables' }, { status: 500 });
+    const { email, password, role = 'client', org = '', amEmail = '' } = await req.json();
+
+    if (!email || !password) {
+      return NextResponse.json({ ok: false, error: 'Email and temporary password are required.' }, { status: 400 });
+    }
+    if (!['admin','recruiter','client'].includes(role)) {
+      return NextResponse.json({ ok: false, error: 'Invalid role.' }, { status: 400 });
     }
 
-    const { email, password, role } = await req.json();
-    if (!email || !password || !role) {
-      return NextResponse.json({ ok: false, error: 'email, password, and role are required' }, { status: 400 });
-    }
-
-    const admin = createClient(url, serviceRole);
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    // 1) Create the Auth user
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true
+      email_confirm: true, // let them log in immediately
     });
-
-    if (createErr) return NextResponse.json({ ok: false, error: createErr.message }, { status: 400 });
-
-    const userId = created?.user?.id;
-    if (!userId) return NextResponse.json({ ok: false, error: 'No user ID returned' }, { status: 500 });
-
-    await admin.from('profiles').upsert({ id: userId, email, role });
-    return NextResponse.json({ ok: true, id: userId });
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  try {
-    if (!url || !serviceRole) {
-      return NextResponse.json({ ok: false, error: 'Missing environment variables' }, { status: 500 });
+    if (createErr) {
+      return NextResponse.json({ ok: false, error: createErr.message }, { status: 400 });
     }
 
-    const admin = createClient(url, serviceRole);
-    const { data, error } = await admin.from('profiles').select('id,email,role').order('email', { ascending: true });
-    if (error) throw error;
+    const userId = created?.user?.id;
+    if (!userId) {
+      return NextResponse.json({ ok: false, error: 'User creation returned no id.' }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: true, count: data.length, users: data });
+    // 2) Upsert the matching profile row
+    const { error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          email,
+          role,
+          org,
+          account_manager_email: amEmail || null,
+        },
+        { onConflict: 'id' }
+      );
+
+    if (profileErr) {
+      return NextResponse.json({ ok: false, error: profileErr.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ ok: true, id: userId });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    console.error('invite route error:', e);
+    return NextResponse.json({ ok: false, error: 'Server error' }, { status: 500 });
   }
 }
