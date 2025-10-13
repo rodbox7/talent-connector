@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
 
-// -------------- helpers -----------------
+// ---- Config ----
+const BG_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
+
+// helpers
 const csv = (s) =>
   String(s || '')
     .split(',')
@@ -20,9 +24,8 @@ const prettyDate = (ts) => {
   }
 };
 
-// -------------- page -----------------
 export default function Page() {
-  const [mode, setMode] = useState('recruiter'); // recruiter | client | admin
+  const [mode, setMode] = useState('recruiter');
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   const [err, setErr] = useState('');
@@ -44,7 +47,6 @@ export default function Page() {
         setErr('Invalid credentials');
         return;
       }
-      // fetch profile for role
       const { data: prof, error: perr } = await sb
         .from('profiles')
         .select('id,email,role,org')
@@ -76,7 +78,13 @@ export default function Page() {
     setMode('recruiter');
   }
 
-  if (!me) return <AuthScreen {...{ mode, setMode, email, setEmail, pwd, setPwd, err, login }} />;
+  if (!me)
+    return (
+      <AuthScreen
+        {...{ mode, setMode, email, setEmail, pwd, setPwd, err }}
+        onLogin={login}
+      />
+    );
 
   if (me.role === 'recruiter') return <RecruiterScreen me={me} onLogout={logout} />;
 
@@ -89,8 +97,9 @@ export default function Page() {
   );
 }
 
-// -------------- auth ui -----------------
-function AuthScreen({ mode, setMode, email, setEmail, pwd, setPwd, err, login }) {
+/* ========================= AUTH ========================= */
+
+function AuthScreen({ mode, setMode, email, setEmail, pwd, setPwd, err, onLogin }) {
   const page = {
     minHeight: '100vh',
     display: 'grid',
@@ -98,18 +107,46 @@ function AuthScreen({ mode, setMode, email, setEmail, pwd, setPwd, err, login })
     background: '#0a0a0a',
     color: '#e5e5e5',
     fontFamily: 'system-ui, Arial',
+    position: 'relative',
+    overflow: 'hidden',
   };
   const card = {
     width: '100%',
     maxWidth: 420,
-    background: '#0b0b0b',
+    background: 'rgba(11,11,11,.88)',
     border: '1px solid #1f2937',
     borderRadius: 12,
     padding: 16,
+    position: 'relative',
+    zIndex: 1,
+    backdropFilter: 'blur(2px)',
   };
 
   return (
     <div style={page}>
+      {/* Background image (no border, covers, muted) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+        }}
+      >
+        <img
+          alt=""
+          src={BG_URL}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            filter: 'grayscale(.15) contrast(1.1) brightness(.95)',
+            opacity: 0.95,
+          }}
+        />
+      </div>
+
       <div style={card}>
         <div style={{ textAlign: 'center', fontWeight: 700 }}>Talent Connector</div>
         <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginBottom: 10 }}>
@@ -146,7 +183,7 @@ function AuthScreen({ mode, setMode, email, setEmail, pwd, setPwd, err, login })
             style={input}
           />
         </Field>
-        <button onClick={login} style={cta}>
+        <button onClick={onLogin} style={cta}>
           Log in
         </button>
         {err ? (
@@ -159,23 +196,25 @@ function AuthScreen({ mode, setMode, email, setEmail, pwd, setPwd, err, login })
   );
 }
 
-// -------------- recruiter -----------------
+/* ====================== RECRUITER ======================= */
+
 function RecruiterScreen({ me, onLogout }) {
-  const [list, setList] = useState([]); // candidates
+  const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState('');
 
-  // form
+  // form state
   const [name, setName] = useState('');
   const [titles, setTitles] = useState('Attorney, Paralegal');
   const [laws, setLaws] = useState('Litigation, Immigration');
   const [years, setYears] = useState('');
-  const [recentYears, setRecentYears] = useState(''); // NEW: years in most recent role
+  const [recentYears, setRecentYears] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [salary, setSalary] = useState('');
   const [contract, setContract] = useState(false);
   const [hourly, setHourly] = useState('');
+  const [dateEntered, setDateEntered] = useState(todayISODate()); // NEW: date field (YYYY-MM-DD)
   const [notes, setNotes] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -186,54 +225,54 @@ function RecruiterScreen({ me, onLogout }) {
       setLoading(true);
       setLoadErr('');
       try {
-        // Prefer v_candidates (if it exists). Otherwise assemble from base + joins.
         let rows = [];
-        const { data: viewData, error: viewErr } = await sb.from('v_candidates').select('*').order('created_at', { ascending: false });
-        if (!viewErr && Array.isArray(viewData)) {
-          rows = viewData.map((r) => ({
+        const { data: vrows, error: verr } = await sb
+          .from('v_candidates')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!verr && Array.isArray(vrows)) {
+          rows = vrows.map((r) => ({
             ...r,
             roles: r.roles || [],
             practice_areas: r.practice_areas || [],
           }));
         } else {
-          // Fallback: assemble from tables
-          const { data: base, error: baseErr } = await sb
+          const { data: base, error: bErr } = await sb
             .from('candidates')
             .select('*')
             .order('created_at', { ascending: false });
-          if (baseErr) throw baseErr;
+          if (bErr) throw bErr;
 
           const ids = base.map((b) => b.id);
           let rolesMap = {};
           let areasMap = {};
-          // roles
+
           try {
-            const { data: rs, error: rErr } = await sb
+            const { data: rs } = await sb
               .from('candidate_roles')
               .select('candidate_id,role')
               .in('candidate_id', ids);
-            if (!rErr && Array.isArray(rs)) {
+            if (Array.isArray(rs)) {
               rolesMap = rs.reduce((acc, r) => {
-                acc[r.candidate_id] = acc[r.candidate_id] || [];
-                acc[r.candidate_id].push(r.role);
+                (acc[r.candidate_id] ||= []).push(r.role);
                 return acc;
               }, {});
             }
           } catch {}
-          // areas
+
           try {
-            const { data: as, error: aErr } = await sb
+            const { data: as } = await sb
               .from('candidate_practice_areas')
               .select('candidate_id,practice_area')
               .in('candidate_id', ids);
-            if (!aErr && Array.isArray(as)) {
+            if (Array.isArray(as)) {
               areasMap = as.reduce((acc, r) => {
-                acc[r.candidate_id] = acc[r.candidate_id] || [];
-                acc[r.candidate_id].push(r.practice_area);
+                (acc[r.candidate_id] ||= []).push(r.practice_area);
                 return acc;
               }, {});
             }
           } catch {}
+
           rows = base.map((b) => ({
             ...b,
             roles: rolesMap[b.id] || [],
@@ -258,6 +297,9 @@ function RecruiterScreen({ me, onLogout }) {
       return;
     }
 
+    // if user picked a date, convert "YYYY-MM-DD" -> timestamptz ISO string
+    const dateEnteredTs = dateEntered ? `${dateEntered}T00:00:00Z` : null;
+
     const payload = {
       name: name.trim(),
       years: Number(years) || 0,
@@ -269,11 +311,10 @@ function RecruiterScreen({ me, onLogout }) {
       hourly: contract ? Number(hourly) || 0 : 0,
       notes: String(notes || ''),
       created_by: me.id,
-      // date_entered is DEFAULT now(), so we omit it to let DB set it
+      ...(dateEnteredTs ? { date_entered: dateEnteredTs } : {}),
     };
 
     try {
-      // 1) insert candidate
       const { data: inserted, error: insErr } = await sb
         .from('candidates')
         .insert(payload)
@@ -283,7 +324,6 @@ function RecruiterScreen({ me, onLogout }) {
       if (insErr) throw insErr;
       const candId = inserted.id;
 
-      // 2) optional role/practice inserts (best-effort)
       const roleArr = csv(titles);
       const lawArr = csv(laws);
 
@@ -303,7 +343,6 @@ function RecruiterScreen({ me, onLogout }) {
         } catch {}
       }
 
-      // 3) push into list optimistically
       setList((prev) => [
         {
           ...inserted,
@@ -314,7 +353,6 @@ function RecruiterScreen({ me, onLogout }) {
       ]);
 
       setMsg('Candidate added');
-      // reset form
       setName('');
       setTitles('Attorney, Paralegal');
       setLaws('Litigation, Immigration');
@@ -325,6 +363,7 @@ function RecruiterScreen({ me, onLogout }) {
       setSalary('');
       setContract(false);
       setHourly('');
+      setDateEntered(todayISODate());
       setNotes('');
     } catch (ex) {
       console.error(ex);
@@ -334,7 +373,6 @@ function RecruiterScreen({ me, onLogout }) {
 
   return (
     <Shell onLogout={onLogout} title="Recruiter workspace">
-      {/* add form */}
       <Card title="Add candidate">
         <div style={grid}>
           <Field label="Full name">
@@ -394,7 +432,18 @@ function RecruiterScreen({ me, onLogout }) {
               />
             </Field>
           ) : null}
+
+          {/* NEW: Date Entered field */}
+          <Field label="Date Entered">
+            <input
+              type="date"
+              value={dateEntered}
+              onChange={(e) => setDateEntered(e.target.value)}
+              style={input}
+            />
+          </Field>
         </div>
+
         <Field label="Candidate Notes">
           <textarea
             rows={4}
@@ -414,7 +463,6 @@ function RecruiterScreen({ me, onLogout }) {
         </div>
       </Card>
 
-      {/* list */}
       <Card title="Candidates">
         {loading ? (
           <div style={{ fontSize: 12, color: '#9ca3af' }}>Loading…</div>
@@ -495,7 +543,8 @@ function RecruiterScreen({ me, onLogout }) {
   );
 }
 
-// -------------- layout bits -----------------
+/* ======================= LAYOUT BITS ======================= */
+
 function Shell({ onLogout, title, children }) {
   const wrap = {
     minHeight: '100vh',
@@ -580,7 +629,7 @@ function Field({ label, children }) {
   );
 }
 
-// -------------- shared styles -----------------
+// shared inputs
 const input = {
   width: '100%',
   padding: 8,
@@ -593,3 +642,11 @@ const area = { ...input, height: 'auto' };
 const cta = { width: '100%', padding: 10, marginTop: 8, background: '#4f46e5', color: 'white', borderRadius: 8 };
 const btn = { fontSize: 12, padding: '6px 10px', border: '1px solid #1f2937', borderRadius: 8 };
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 };
+
+// today's date in YYYY-MM-DD for <input type="date">
+function todayISODate() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
