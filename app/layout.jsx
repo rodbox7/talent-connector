@@ -1,4 +1,8 @@
-export const metadata = { title: 'Talent Connector', description: 'Smoke test' };
+
+export const metadata = {
+  title: 'Talent Connector',
+  description: 'Smoke test'
+};
 
 export default function RootLayout({ children }) {
   return (
