@@ -23,8 +23,8 @@ export default function RootLayout({ children }) {
         {/* Page content */}
         <div className="tc-content">{children}</div>
 
-        {/* Global styles */}
-        <style jsx global>{`
+        {/* Global styles — plain <style>, NOT styled-jsx */}
+        <style>{`
           html, body {
             height: 100%;
           }
