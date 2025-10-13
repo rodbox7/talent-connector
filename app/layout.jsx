@@ -1,7 +1,4 @@
-'use client';  // <-- force this layout to be a Client Component
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Server Component layout (no 'use client')
 
 export const metadata = {
   title: 'Talent Connector',
@@ -23,8 +20,8 @@ export default function RootLayout({ children }) {
         {/* Page content */}
         <div className="tc-content">{children}</div>
 
-        {/* Global styles — plain <style> (NOT styled-jsx) */}
-        <style>{`
+        {/* Global styles — plain <style> (server-safe, NOT styled-jsx) */}
+        <style dangerouslySetInnerHTML={{ __html: `
           html, body { height: 100%; }
           body {
             margin: 0;
@@ -47,7 +44,7 @@ export default function RootLayout({ children }) {
             opacity: 0.95;
           }
           .tc-content { min-height: 100vh; }
-        `}</style>
+        `}} />
       </body>
     </html>
   );
