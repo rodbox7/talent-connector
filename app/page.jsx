@@ -1,17 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 
-/**
- * Minimal, self-contained app:
- * - Login tabs (admin / recruiter / client)
- * - Admin: add users + view directory (local persistence only)
- * - Recruiter: add candidates with "Date Entered" + "Years in current role"
- * - Client: read-only list
- *
- * Data persistence: localStorage (tc_users, tc_cands)
- * If you want this wired to Supabase again, I can provide the secure API + SQL.
- */
-
 /* ---------------- Seed / Helpers ---------------- */
 
 const seedUsers = [
@@ -44,7 +33,6 @@ function parseCSV(val) {
     .map(s => s.trim())
     .filter(Boolean);
 }
-
 function localFindUser(users, email, pwd) {
   const e = String(email || '').toLowerCase();
   return (
@@ -124,7 +112,6 @@ export default function Page() {
   const pageStyle = { minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#0a0a0a', color: '#e5e5e5', fontFamily: 'system-ui, Arial' };
   const shellStyle = { minHeight:'100vh', background:'#0a0a0a', color:'#e5e5e5', fontFamily:'system-ui, Arial', display:'flex', justifyContent:'center', padding:24 };
   const card = { width: '100%', maxWidth: 380, background: '#0b0b0b', border: '1px solid #1f2937', borderRadius: 12, padding: 16 };
-  const panel = { width:'100%', maxWidth: 1000, background:'#0b0b0b', border:'1px solid #1f2937', borderRadius:12, padding:16 };
 
   /* ---------- Admin UI ---------- */
   if (user && user.role === 'admin') {
@@ -152,7 +139,7 @@ export default function Page() {
             <div style={{ fontWeight:700 }}>Talent Connector - Powered by Beacon Hill Legal</div>
             <button onClick={logout} style={{ fontSize:12 }}>Log out</button>
           </div>
-          <div style={{ fontSize:12, color:'#9ca3af', marginBottom:8 }}>Recruiter workspace</div>
+        <div style={{ fontSize:12, color:'#9ca3af', marginBottom:8 }}>Recruiter workspace</div>
 
           <RecruiterAdd onAdd={rec => setCands(prev => [...prev, rec])} />
           <CandidateList cands={cands} canEdit onChange={(id, patch) => setCands(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c))} onDelete={id => setCands(prev => prev.filter(c => c.id !== id))} />
@@ -223,7 +210,7 @@ function LoginCard({ mode, setMode, email, setEmail, pwd, setPwd, err, onLogin }
 }
 
 function AdminPanel({ users, setUsers }) {
-  // add user form (local-only)
+  // add user (secure via API)
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('client');
   const [org, setOrg] = useState('');
@@ -232,16 +219,41 @@ function AdminPanel({ users, setUsers }) {
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
 
-  function addUser() {
-    setErr(''); setFlash('');
-    const e = String(email).trim().toLowerCase();
-    if (!e.includes('@')) { setErr('Enter a valid email'); return; }
-    if (!password) { setErr('Temp password is required'); return; }
-    if (users.some(u => String(u.email || '').toLowerCase() === e)) { setErr('Email already exists'); return; }
-    const id = 'u' + Math.random().toString(36).slice(2, 10);
-    setUsers(prev => [...prev, { id, email: e, role, org, amEmail, password, loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: [] }]);
-    setFlash(`Added ${e} as ${role}`);
-    setEmail(''); setRole('client'); setOrg(''); setAmEmail(''); setPassword('');
+  async function addUser() {
+    try {
+      setErr(''); setFlash('');
+      const e = String(email).trim().toLowerCase();
+      if (!e.includes('@')) { setErr('Enter a valid email'); return; }
+      if (!password) { setErr('Temp password is required'); return; }
+
+      // Call secure server route
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: e, password, role, org, amEmail })
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        setErr(data?.error || 'Invite failed'); return;
+      }
+
+      // Update local mirror so it shows instantly
+      setUsers(prev => [...prev, {
+        id: data.id,
+        email: e,
+        role,
+        org,
+        amEmail,
+        password: '(set on server)',
+        loginCount: 0, lastLoginAt: null, totalMinutes: 0, sessions: []
+      }]);
+
+      setFlash(`Added ${e} as ${role}`);
+      setEmail(''); setRole('client'); setOrg(''); setAmEmail(''); setPassword('');
+    } catch (ex) {
+      console.error(ex);
+      setErr('Server error inviting user');
+    }
   }
 
   const panel = { width:'100%', background:'#0b0b0b', border:'1px solid #1f2937', borderRadius:12, padding:16, marginBottom:12 };
@@ -465,7 +477,6 @@ function LabeledInput({ label, value, onChange, placeholder, type='text' }) {
     </label>
   );
 }
-
 function LabeledTextarea({ label, value, onChange, placeholder }) {
   return (
     <label style={{ display:'block', fontSize:12, marginTop:6 }}>
@@ -480,7 +491,6 @@ function LabeledTextarea({ label, value, onChange, placeholder }) {
     </label>
   );
 }
-
 function LabeledSelect({ label, value, onChange, options }) {
   return (
     <label style={{ display:'block', fontSize:12, marginTop:6 }}>
@@ -495,7 +505,6 @@ function LabeledSelect({ label, value, onChange, options }) {
     </label>
   );
 }
-
 function Tag({ text }) {
   return (
     <span style={{ display:'inline-block', fontSize:11, padding:'2px 8px', background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', borderRadius:999, marginRight:6, marginBottom:4 }}>
