@@ -1,55 +1,102 @@
-// app/layout.jsx  — server component (no 'use client')
+'use client';
+import React, { useState } from 'react';
 
-export const metadata = {
-  title: 'Talent Connector',
-  description: 'Invitation-only portal',
-};
+export default function Page() {
+  const [mode, setMode] = useState<'recruiter' | 'client' | 'admin'>('recruiter');
+  const [email, setEmail] = useState('');
+  const [pwd, setPwd] = useState('');
+  const [err, setErr] = useState('');
 
-const NYC_URL =
-  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
+  function login() {
+    setErr('');
+    if (!email.includes('@')) { setErr('Enter a valid email'); return; }
+    // Placeholder login — keep your real logic here.
+    setErr('This is a placeholder login; background fix only.');
+  }
 
-export default function RootLayout({ children }) {
+  // NOTE: No solid background on the page wrapper — keep it transparent!
   return (
-    <html lang="en">
-      <body>
-        {/* Fixed background image behind the entire app */}
-        <div className="tc-fixed-bg" aria-hidden="true">
-          <img src={NYC_URL} alt="" />
+    <div style={{
+      minHeight: '100vh',
+      display: 'grid',
+      placeItems: 'center',
+      padding: 16,
+      // background: 'transparent'  // (implicit)
+    }}>
+      {/* Card has a dark, slightly transparent backdrop so the skyline subtly shows through */}
+      <div style={{
+        width: '100%',
+        maxWidth: 420,
+        background: 'rgba(11,11,11,0.92)',
+        border: '1px solid rgba(31,41,55,0.75)',
+        borderRadius: 12,
+        padding: 16,
+        boxShadow: '0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)',
+        color: '#e5e5e5',
+        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center', fontWeight: 700 }}>Talent Connector</div>
+        <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
+          Invitation-only access
         </div>
 
-        {/* App content */}
-        <div className="tc-content">{children}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <button onClick={() => setMode('recruiter')} style={{
+            padding: 8,
+            background: mode==='recruiter' ? 'rgba(31,41,55,.9)' : 'rgba(17,24,39,.85)',
+            color: '#e5e5e5', borderRadius: 8, border: '1px solid rgba(31,41,55,.9)'
+          }}>Recruiter</button>
+          <button onClick={() => setMode('client')} style={{
+            padding: 8,
+            background: mode==='client' ? 'rgba(31,41,55,.9)' : 'rgba(17,24,39,.85)',
+            color: '#e5e5e5', borderRadius: 8, border: '1px solid rgba(31,41,55,.9)'
+          }}>Client</button>
+          <button onClick={() => setMode('admin')} style={{
+            padding: 8,
+            background: mode==='admin' ? 'rgba(31,41,55,.9)' : 'rgba(17,24,39,.85)',
+            color: '#e5e5e5', borderRadius: 8, border: '1px solid rgba(31,41,55,.9)'
+          }}>Admin</button>
+        </div>
 
-        {/* Global styles (server-safe) */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          html, body { height: 100%; }
-          body {
-            margin: 0;
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-            color: #e5e5e5;
-            background: transparent; /* keep transparent so photo shows */
-          }
-          /* Fixed background layer */
-          .tc-fixed-bg {
-            position: fixed;
-            inset: 0;
-            z-index: -1;
-            overflow: hidden;
-            background: radial-gradient(ellipse at top, #101827, #07070b 60%);
-          }
-          .tc-fixed-bg img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: grayscale(0.15) contrast(1.1) brightness(0.95);
-            opacity: 0.95;
-          }
-          /* Let pages scroll normally on top */
-          .tc-content {
-            min-height: 100vh;
-          }
-        `}} />
-      </body>
-    </html>
+        <div style={{ marginTop: 12 }}>
+          <label style={{ display: 'block', fontSize: 12, marginTop: 6 }}>
+            <div style={{ color: '#9ca3af', marginBottom: 4 }}>Email</div>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="name@company.com"
+              style={{
+                width: '100%', padding: 10,
+                background: 'rgba(17,24,39,.9)', color: '#e5e5e5',
+                border: '1px solid rgba(31,41,55,.9)', borderRadius: 8
+              }}
+            />
+          </label>
+          <label style={{ display: 'block', fontSize: 12, marginTop: 6 }}>
+            <div style={{ color: '#9ca3af', marginBottom: 4 }}>Password</div>
+            <input
+              type="password"
+              value={pwd}
+              onChange={e => setPwd(e.target.value)}
+              placeholder="your password"
+              style={{
+                width: '100%', padding: 10,
+                background: 'rgba(17,24,39,.9)', color: '#e5e5e5',
+                border: '1px solid rgba(31,41,55,.9)', borderRadius: 8
+              }}
+            />
+          </label>
+          <button onClick={login} style={{
+            width: '100%', padding: 12, marginTop: 10,
+            background: '#4f46e5', color: 'white', borderRadius: 8,
+            boxShadow: '0 6px 18px rgba(79,70,229,.35)'
+          }}>
+            Log in
+          </button>
+          {err ? <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div> : null}
+        </div>
+      </div>
+    </div>
   );
 }
