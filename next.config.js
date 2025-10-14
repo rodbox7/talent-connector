@@ -1,13 +1,10 @@
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true
+  // Keep this minimal. DO NOT set `output: 'export'`.
+  reactStrictMode: false,
+  experimental: {
+    appDir: true, // you're using the /app router
   },
-  typescript: {
-    ignoreBuildErrors: true
-  }
 };
 
 module.exports = nextConfig;
