@@ -161,7 +161,6 @@ export default function Page() {
       setListErr('');
       setListFlash('');
 
-      // pull the most recent 50 for now
       const { data, error } = await supabase
         .from('candidates')
         .select(
@@ -210,7 +209,7 @@ export default function Page() {
           salary: salary ? Number(salary) : null,
           contract: !!contract,
           hourly: contract ? (hourly ? Number(hourly) : null) : null,
-          date_entered: dateEntered || null, // NEW
+          date_entered: dateEntered || null, // NEW (date)
           notes: notes || null,
         },
       ]);
@@ -255,6 +254,83 @@ export default function Page() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role]);
+
+  // ---------- CLIENT UI STATE ----------
+  const [clientErr, setClientErr] = useState('');
+  const [todayCount, setTodayCount] = useState(0);
+  const [clientList, setClientList] = useState([]);
+  const [clientLoading, setClientLoading] = useState(false);
+  const [q, setQ] = useState('');
+
+  function todayStr() {
+    const t = new Date();
+    const mm = String(t.getMonth() + 1).padStart(2, '0');
+    const dd = String(t.getDate()).padStart(2, '0');
+    return `${t.getFullYear()}-${mm}-${dd}`;
+    // Using a DATE column, so this matches exactly.
+  }
+
+  async function loadClientData() {
+    try {
+      setClientLoading(true);
+      setClientErr('');
+
+      // Count candidates with date_entered = today
+      const { count, error: countErr } = await supabase
+        .from('candidates')
+        .select('id', { count: 'exact', head: true })
+        .eq('date_entered', todayStr());
+
+      if (countErr) throw countErr;
+      setTodayCount(count || 0);
+
+      // List (with optional keyword filter on several fields)
+      let query = supabase
+        .from('candidates')
+        .select('id, name, roles, practice_areas, years, recent_years, city, state, salary, contract, hourly, date_entered, notes, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (q.trim()) {
+        const term = `%${q.trim()}%`;
+        // Postgres: ilike on text fields; join arrays to text for simple filter
+        query = query.or(
+          [
+            `name.ilike.${term}`,
+            `city.ilike.${term}`,
+            `state.ilike.${term}`,
+            `notes.ilike.${term}`,
+          ].join(',')
+        );
+      }
+
+      const { data: listData, error: listErr } = await query;
+      if (listErr) throw listErr;
+
+      setClientList(listData || []);
+    } catch (ex) {
+      console.error(ex);
+      setClientErr('Error loading client view.');
+    } finally {
+      setClientLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (user?.role === 'client') {
+      loadClientData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
+
+  // When user types in search, fetch again (small debounce not strictly needed)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (user?.role === 'client') loadClientData();
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
   // ---------- LOGGED-IN VIEWS ----------
   if (user) {
@@ -400,13 +476,77 @@ export default function Page() {
       );
     }
 
-    // CLIENT
+    // CLIENT (NEW)
     return (
       <div style={page}>
-        <div style={card}>
-          <Header title="Client workspace" onLogout={logout} simple />
-          <div style={{ marginTop: 8, ...subtle }}>
-            Minimal placeholder for <b>client</b>. (Read-only search UI coming next.)
+        <div style={bigWrap}>
+          <Header title="Client workspace" onLogout={logout} />
+
+          {/* KPI bar */}
+          <div style={{ ...panel, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>Candidates added today</div>
+              <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1 }}>{todayCount}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search name/city/state/notes"
+                style={input}
+              />
+              <button onClick={loadClientData} style={btnGhost} disabled={clientLoading}>
+                {clientLoading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {/* Recent list */}
+          <div style={{ ...panel, marginTop: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Recent candidates (read-only)</div>
+            {clientErr ? (
+              <div style={{ color: '#f87171', fontSize: 12, marginBottom: 8 }}>{clientErr}</div>
+            ) : null}
+            {clientList.length === 0 ? (
+              <div style={subtle}>No candidates found.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', color: '#9ca3af' }}>
+                      <th style={th}>Name</th>
+                      <th style={th}>Titles</th>
+                      <th style={th}>Type of Law</th>
+                      <th style={th}>Yrs</th>
+                      <th style={th}>Recent Yrs</th>
+                      <th style={th}>Location</th>
+                      <th style={th}>Salary</th>
+                      <th style={th}>Contract</th>
+                      <th style={th}>Hourly</th>
+                      <th style={th}>Date entered</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientList.map((c) => (
+                      <tr key={c.id}>
+                        <td style={td}>{c.name}</td>
+                        <td style={td}>{(c.roles || []).join(', ')}</td>
+                        <td style={td}>{(c.practice_areas || []).join(', ')}</td>
+                        <td style={td}>{c.years ?? '-'}</td>
+                        <td style={td}>{c.recent_years ?? '-'}</td>
+                        <td style={td}>
+                          {[c.city, c.state].filter(Boolean).join(', ') || '-'}
+                        </td>
+                        <td style={td}>{c.salary ? `$${c.salary}` : '-'}</td>
+                        <td style={td}>{c.contract ? 'Yes' : 'No'}</td>
+                        <td style={td}>{c.hourly ? `$${c.hourly}/hr` : '-'}</td>
+                        <td style={td}>{c.date_entered || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>
