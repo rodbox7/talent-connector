@@ -1,10 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Keep this minimal. DO NOT set `output: 'export'`.
   reactStrictMode: false,
   experimental: {
-    appDir: true, // you're using the /app router
+    appDir: true,
   },
+  // IMPORTANT: Do NOT set `output: 'export'`.
 };
 
 module.exports = nextConfig;
