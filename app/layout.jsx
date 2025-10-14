@@ -1,4 +1,4 @@
-// Server Component layout (no 'use client')
+// app/layout.jsx  — server component (no 'use client')
 
 export const metadata = {
   title: 'Talent Connector',
@@ -12,23 +12,24 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        {/* Background image across ALL pages */}
+        {/* Fixed background image behind the entire app */}
         <div className="tc-fixed-bg" aria-hidden="true">
           <img src={NYC_URL} alt="" />
         </div>
 
-        {/* Page content */}
+        {/* App content */}
         <div className="tc-content">{children}</div>
 
-        {/* Global styles — plain <style> (server-safe, NOT styled-jsx) */}
+        {/* Global styles (server-safe) */}
         <style dangerouslySetInnerHTML={{ __html: `
           html, body { height: 100%; }
           body {
             margin: 0;
             font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
             color: #e5e5e5;
-            background: #0a0a0a;
+            background: transparent; /* keep transparent so photo shows */
           }
+          /* Fixed background layer */
           .tc-fixed-bg {
             position: fixed;
             inset: 0;
@@ -43,7 +44,10 @@ export default function RootLayout({ children }) {
             filter: grayscale(0.15) contrast(1.1) brightness(0.95);
             opacity: 0.95;
           }
-          .tc-content { min-height: 100vh; }
+          /* Let pages scroll normally on top */
+          .tc-content {
+            min-height: 100vh;
+          }
         `}} />
       </body>
     </html>
