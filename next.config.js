@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     appDir: true,
   },
-  // IMPORTANT: Do NOT set `output: 'export'`.
+  // IMPORTANT: do NOT set `output: 'export'`
 };
 
 module.exports = nextConfig;
