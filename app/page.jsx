@@ -4,13 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Small shared helpers
+// Shared styling + helpers
 // ───────────────────────────────────────────────────────────────────────────────
 const NYC_URL =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
 const glass = {
-  // less transparent than before
   background: 'rgba(17,19,24,0.88)',
   border: '1px solid rgba(255,255,255,0.08)',
   boxShadow:
@@ -26,6 +25,16 @@ const btn = {
   borderRadius: 8,
   padding: '9px 14px',
   border: '1px solid rgba(255,255,255,.12)',
+  cursor: 'pointer',
+};
+
+const btnGhost = {
+  background: '#1f2937',
+  color: '#e8eaed',
+  borderRadius: 8,
+  padding: '9px 14px',
+  border: '1px solid rgba(255,255,255,.12)',
+  cursor: 'pointer',
 };
 
 const input = {
@@ -40,23 +49,6 @@ const input = {
 
 const label = { fontSize: 12, color: '#b6beca', marginBottom: 6 };
 
-const chipWrap = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 6,
-};
-const chip = {
-  display: 'inline-block',
-  fontSize: 12,
-  lineHeight: '18px',
-  padding: '2px 10px',
-  borderRadius: 999,
-  background: 'rgba(30,34,42,.9)',
-  border: '1px solid rgba(255,255,255,.10)',
-  color: '#e8eaed',
-};
-
-// CSV ↔︎ array helpers (we store titles/practice_areas as CSV text)
 const csvToArray = (s) =>
   String(s || '')
     .split(',')
@@ -64,17 +56,37 @@ const csvToArray = (s) =>
     .filter(Boolean);
 const arrayToCsv = (arr) => (Array.isArray(arr) ? arr.join(', ') : '');
 
+// Mailto for client → salesperson
+function buildContactMailto(c, amEmail, clientEmail) {
+  const to = amEmail || 'info@youragency.com';
+  const subj = `Talent Connector Candidate – ${c?.name || ''}`;
+  const body = [
+    `Hello,`,
+    ``,
+    `I'm interested in this candidate:`,
+    `• Name: ${c?.name || ''}`,
+    `• Title(s): ${arrayToCsv(csvToArray(c?.titles))}`,
+    `• Type(s) of Law: ${arrayToCsv(csvToArray(c?.practice_areas))}`,
+    `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
+    `• Years: ${c?.years ?? ''}`,
+    ``,
+    `My email: ${clientEmail || ''}`,
+    ``,
+    `Sent from Talent Connector`,
+  ].join('\n');
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
-// Login shell
+// App shell (login + role routing)
 // ───────────────────────────────────────────────────────────────────────────────
 export default function Page() {
-  const [session, setSession] = useState(null); // { id, email, role }
+  const [session, setSession] = useState(null); // { id, email, role? }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data?.session ? { id: data.session.user.id, email: data.session.user.email } : null);
     });
-
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
       if (s?.user) {
         setSession({ id: s.user.id, email: s.user.email });
@@ -97,16 +109,11 @@ export default function Page() {
       setErr('Enter a valid email');
       return;
     }
-    // sign in
-    const { data: auth, error } = await supabase.auth.signInWithPassword({
-      email: e,
-      password: pwd,
-    });
+    const { data: auth, error } = await supabase.auth.signInWithPassword({ email: e, password: pwd });
     if (error) {
       setErr(error.message || 'Login failed');
       return;
     }
-    // load profile to confirm role
     const { data: prof, error: pErr } = await supabase
       .from('profiles')
       .select('id,email,role')
@@ -129,7 +136,20 @@ export default function Page() {
     setSession(null);
   }
 
-  // UI
+  const baseShell = (
+    <div
+      style={{
+        minHeight: '100vh',
+        color: '#e8eaed',
+        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      <SkylineBG />
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -155,19 +175,19 @@ export default function Page() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               <button
                 onClick={() => setRole('recruiter')}
-                style={{ ...btn, background: role === 'recruiter' ? '#1f2937' : '#16181e' }}
+                style={{ ...btnGhost, background: role === 'recruiter' ? '#1f2937' : '#16181e' }}
               >
                 Recruiter
               </button>
               <button
                 onClick={() => setRole('client')}
-                style={{ ...btn, background: role === 'client' ? '#1f2937' : '#16181e' }}
+                style={{ ...btnGhost, background: role === 'client' ? '#1f2937' : '#16181e' }}
               >
                 Client
               </button>
               <button
                 onClick={() => setRole('admin')}
-                style={{ ...btn, background: role === 'admin' ? '#1f2937' : '#16181e' }}
+                style={{ ...btnGhost, background: role === 'admin' ? '#1f2937' : '#16181e' }}
               >
                 Admin
               </button>
@@ -207,7 +227,7 @@ export default function Page() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Admin (placeholder)
+// Admin placeholder (unchanged)
 // ───────────────────────────────────────────────────────────────────────────────
 function AdminView({ email, onLogout }) {
   return (
@@ -223,7 +243,7 @@ function AdminView({ email, onLogout }) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Recruiter: Add + list
+// Recruiter view (unchanged from your working build)
 // ───────────────────────────────────────────────────────────────────────────────
 function RecruiterView({ email, onLogout }) {
   const [name, setName] = useState('');
@@ -407,13 +427,26 @@ function RecruiterView({ email, onLogout }) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Client: Count + list (+ chips for Title and Type of Law)
+// Client view (updated as requested)
 // ───────────────────────────────────────────────────────────────────────────────
 function ClientView({ email, onLogout }) {
   const [todayCount, setTodayCount] = useState(0);
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
   const [err, setErr] = useState('');
+  const [amEmail, setAmEmail] = useState(''); // salesperson email tied to this client
+
+  // Load profile to get client's salesperson email
+  useEffect(() => {
+    (async () => {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('account_manager_email')
+        .eq('email', email)
+        .single();
+      setAmEmail(prof?.account_manager_email || '');
+    })();
+  }, [email]);
 
   async function loadAll() {
     setErr('');
@@ -425,16 +458,13 @@ function ClientView({ email, onLogout }) {
     const startISO = `${yyyy}-${mm}-${dd}T00:00:00.000Z`;
     const endISO = `${yyyy}-${mm}-${dd}T23:59:59.999Z`;
 
-    // Count entered today
-    const { count: cnt, error: cErr } = await supabase
+    const { count: cnt } = await supabase
       .from('candidates')
       .select('id', { count: 'exact', head: true })
       .gte('date_entered', startISO)
       .lte('date_entered', endISO);
+    if (typeof cnt === 'number') setTodayCount(cnt);
 
-    if (!cErr && typeof cnt === 'number') setTodayCount(cnt);
-
-    // recent list
     const { data, error } = await supabase
       .from('candidates')
       .select(
@@ -443,11 +473,8 @@ function ClientView({ email, onLogout }) {
       .order('date_entered', { ascending: false })
       .limit(100);
 
-    if (error) {
-      setErr('Error loading client view.');
-    } else {
-      setRows(data || []);
-    }
+    if (error) setErr('Error loading client view.');
+    else setRows(data || []);
   }
 
   useEffect(() => {
@@ -458,14 +485,7 @@ function ClientView({ email, onLogout }) {
     const s = q.trim().toLowerCase();
     if (!s) return rows;
     return rows.filter((r) => {
-      const blob = [
-        r.name,
-        r.titles,
-        r.practice_areas,
-        r.city,
-        r.state,
-        r.notes,
-      ]
+      const blob = [r.name, r.titles, r.practice_areas, r.city, r.state, r.notes]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -506,13 +526,13 @@ function ClientView({ email, onLogout }) {
           </button>
         </div>
 
-        {/* Recent list (with Title + Type of Law chips) */}
+        {/* Results */}
         <div style={{ ...glass, padding: 14, marginTop: 10 }}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Recent candidates (read-only)</div>
           {err ? <div style={{ color: '#f87171', marginBottom: 8 }}>{err}</div> : null}
 
           {filtered.map((c) => (
-            <CandidateCard key={c.id} c={c} showChips />
+            <ClientCandidateRow key={c.id} c={c} amEmail={amEmail} clientEmail={email} />
           ))}
           {!filtered.length ? <div style={{ color: '#b6beca' }}>No candidates found.</div> : null}
         </div>
@@ -521,61 +541,44 @@ function ClientView({ email, onLogout }) {
   );
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Shared candidate card (chips for titles / law; expandable notes)
-// ───────────────────────────────────────────────────────────────────────────────
-function CandidateCard({ c, showChips = false }) {
+// A non-clickable row with inline header + buttons
+function ClientCandidateRow({ c, amEmail, clientEmail }) {
   const [open, setOpen] = useState(false);
-  const titles = csvToArray(c.titles);
-  const laws = csvToArray(c.practice_areas);
+  const titlesCsv = arrayToCsv(csvToArray(c.titles));
+  const lawCsv = arrayToCsv(csvToArray(c.practice_areas));
   const when = c.date_entered ? new Date(c.date_entered) : null;
 
   return (
     <div style={{ ...glass, padding: 12, marginBottom: 10 }}>
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }}
-        onClick={() => setOpen((v) => !v)}
-      >
+      {/* Header line: Name — Titles — Type of Law */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div style={{ fontWeight: 700 }}>{c.name}</div>
+          <div style={{ fontWeight: 700 }}>
+            {c.name}
+            {titlesCsv ? ` — ${titlesCsv}` : ''}
+            {lawCsv ? ` — ${lawCsv}` : ''}
+          </div>
           <div style={{ fontSize: 12, color: '#b6beca' }}>
             {[c.city, c.state].filter(Boolean).join(', ')} • {c.years ?? '-'} yrs
             {c.years_in_recent_role != null ? ` • ${c.years_in_recent_role} yrs recent role` : ''}
             {when ? ` • ${when.toLocaleDateString()}` : ''}
           </div>
-
-          {showChips ? (
-            <>
-              {!!titles.length && (
-                <div style={{ ...chipWrap, marginTop: 6 }}>
-                  {titles.map((t) => (
-                    <span style={chip} key={t}>
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {!!laws.length && (
-                <div style={{ ...chipWrap, marginTop: 6 }}>
-                  {laws.map((l) => (
-                    <span style={chip} key={l}>
-                      {l}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : null}
         </div>
-        <div style={{ textAlign: 'right', minWidth: 160, color: '#b6beca' }}>
-          <div>Salary: {c.salary ? `$${c.salary.toLocaleString()}` : '-'}</div>
-          <div>
-            Contract:{' '}
-            {c.contract ? (c.hourly ? `Yes, $${Number(c.hourly).toLocaleString()}/hr` : 'Yes') : 'No'}
-          </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'start', flexWrap: 'wrap' }}>
+          <button onClick={() => setOpen((v) => !v)} style={btnGhost}>
+            Additional information
+          </button>
+          <a
+            href={buildContactMailto(c, amEmail, clientEmail)}
+            style={{ ...btn, textDecoration: 'none', display: 'inline-block' }}
+          >
+            Email for more information
+          </a>
         </div>
       </div>
 
+      {/* Notes (expanded only by button) */}
       {open && c.notes ? (
         <div
           style={{
@@ -603,7 +606,7 @@ function Header({ title, onLogout }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ fontWeight: 800, fontSize: 20 }}>{title}</div>
-      <button onClick={onLogout} style={{ ...btn, background: '#1f2937' }}>
+      <button onClick={onLogout} style={{ ...btnGhost, background: '#1f2937' }}>
         Log out
       </button>
     </div>
