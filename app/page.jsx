@@ -77,6 +77,89 @@ function buildContactMailto(c, amEmail, clientEmail) {
   return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 }
 
+// Dual-thumb slider styles (years & salary)
+function RangeStyles() {
+  return (
+    <style>{`
+      .dual-wrap { position: relative; height: 28px; }
+      .dual-track {
+        position: absolute; top: 12px; left: 0; right: 0; height: 4px;
+        background: #1f2937; border-radius: 999px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.6);
+      }
+      .dual-sel {
+        position: absolute; top: 12px; height: 4px; background: #4f46e5; border-radius: 999px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 1px 2px rgba(0,0,0,.7);
+      }
+      .dual-range { -webkit-appearance:none; appearance:none; position:absolute; left:0; right:0; top:0; width:100%; height:28px; background:transparent; margin:0; }
+      .dual-range:focus{ outline:none; }
+      .dual-range::-webkit-slider-runnable-track{ background:transparent; }
+      .dual-range::-moz-range-track{ background:transparent; border:none; }
+      .dual-range.low{ z-index:4; }
+      .dual-range.high{ z-index:5; pointer-events:none; }
+      .dual-range.high::-webkit-slider-thumb{ pointer-events:all; }
+      .dual-range.high::-moz-range-thumb{ pointer-events:all; }
+      .dual-range::-webkit-slider-thumb{
+        -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+        background:#22d3ee; border:2px solid #0b0b0b;
+        box-shadow: 0 2px 3px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.35);
+      }
+      .dual-range::-moz-range-thumb{
+        width:18px; height:18px; border-radius:50%;
+        background:#22d3ee; border:2px solid #0b0b0b;
+        box-shadow: 0 2px 3px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.35);
+      }
+    `}</style>
+  );
+}
+
+function DualSlider({ min, max, low, high, onChange }) {
+  const lo = Math.max(min, Math.min(high, Number.isFinite(low) ? low : min));
+  const hi = Math.min(max, Math.max(lo, Number.isFinite(high) ? high : max));
+  const pct = (v) => ((v - min) / (max - min)) * 100;
+  const leftPct = pct(lo);
+  const rightPct = pct(hi);
+
+  function handleLow(e) {
+    const next = Math.min(Number(e.target.value), hi);
+    onChange(next, hi);
+  }
+  function handleHigh(e) {
+    const next = Math.max(Number(e.target.value), lo);
+    onChange(lo, next);
+  }
+
+  return (
+    <div className="dual-wrap">
+      <div className="dual-track" />
+      <div
+        className="dual-sel"
+        style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+      />
+      <input
+        className="dual-range low"
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={lo}
+        onChange={handleLow}
+        onInput={handleLow}
+      />
+      <input
+        className="dual-range high"
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={hi}
+        onChange={handleHigh}
+        onInput={handleHigh}
+      />
+    </div>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
 // App shell (login + role routing)
 // ───────────────────────────────────────────────────────────────────────────────
@@ -135,20 +218,6 @@ export default function Page() {
     await supabase.auth.signOut();
     setSession(null);
   }
-
-  const baseShell = (
-    <div
-      style={{
-        minHeight: '100vh',
-        color: '#e8eaed',
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <SkylineBG />
-    </div>
-  );
 
   return (
     <div
@@ -243,7 +312,7 @@ function AdminView({ email, onLogout }) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Recruiter view (unchanged from your working build)
+// Recruiter view (add + list + delete, with improved error display)
 // ───────────────────────────────────────────────────────────────────────────────
 function RecruiterView({ email, onLogout }) {
   const [name, setName] = useState('');
@@ -271,7 +340,7 @@ function RecruiterView({ email, onLogout }) {
           'id,name,titles,practice_areas,years,city,state,salary,contract,hourly,notes,date_entered,years_in_recent_role'
         )
         .order('date_entered', { ascending: false })
-        .limit(50);
+        .limit(100);
       if (!error) setRows(data || []);
     })();
   }, [refreshKey]);
@@ -299,7 +368,7 @@ function RecruiterView({ email, onLogout }) {
     };
     const { error } = await supabase.from('candidates').insert([payload]);
     if (error) {
-      setErr('Database error adding candidate');
+      setErr(`Database error adding candidate: ${error.message || 'Unknown error'}`);
       return;
     }
     setFlash('Candidate added.');
@@ -317,8 +386,18 @@ function RecruiterView({ email, onLogout }) {
     setRefreshKey((x) => x + 1);
   }
 
+  async function deleteCandidate(id) {
+    const { error } = await supabase.from('candidates').delete().eq('id', id);
+    if (error) {
+      alert(`Delete failed: ${error.message || 'Unknown error'}`);
+      return;
+    }
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  }
+
   return (
     <div style={{ padding: 16 }}>
+      <RangeStyles />
       <div style={{ ...glass, padding: 14, maxWidth: 1200, margin: '10px auto' }}>
         <Header title="Recruiter workspace" onLogout={onLogout} />
 
@@ -413,11 +492,46 @@ function RecruiterView({ email, onLogout }) {
           </div>
         </div>
 
-        {/* Recent list */}
+        {/* Recent list (with delete) */}
         <div style={{ ...glass, padding: 14, marginTop: 10 }}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Recent candidates</div>
           {rows.map((c) => (
-            <CandidateCard key={c.id} c={c} />
+            <div key={c.id} style={{ ...glass, padding: 12, marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {c.name}
+                    {c.titles ? ` — ${arrayToCsv(csvToArray(c.titles))}` : ''}
+                    {c.practice_areas ? ` — ${arrayToCsv(csvToArray(c.practice_areas))}` : ''}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#b6beca' }}>
+                    {[c.city, c.state].filter(Boolean).join(', ')} • {c.years ?? '-'} yrs
+                    {c.years_in_recent_role != null
+                      ? ` • ${c.years_in_recent_role} yrs recent role`
+                      : ''}
+                  </div>
+                </div>
+                <button onClick={() => deleteCandidate(c.id)} style={{ ...btnGhost }}>
+                  Delete
+                </button>
+              </div>
+              {c.notes ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    background: 'rgba(23,25,32,.9)',
+                    border: '1px solid rgba(255,255,255,.12)',
+                    borderRadius: 10,
+                    padding: 10,
+                    color: '#e8eaed',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Candidate Notes</div>
+                  {c.notes}
+                </div>
+              ) : null}
+            </div>
           ))}
           {!rows.length ? <div style={{ color: '#b6beca' }}>No candidates yet.</div> : null}
         </div>
@@ -427,14 +541,25 @@ function RecruiterView({ email, onLogout }) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Client view (updated as requested)
+// Client view (filters + sliders + email + expandable notes)
 // ───────────────────────────────────────────────────────────────────────────────
 function ClientView({ email, onLogout }) {
   const [todayCount, setTodayCount] = useState(0);
   const [rows, setRows] = useState([]);
-  const [q, setQ] = useState('');
   const [err, setErr] = useState('');
   const [amEmail, setAmEmail] = useState(''); // salesperson email tied to this client
+
+  // Filters
+  const [q, setQ] = useState('');
+  const [titlesFilter, setTitlesFilter] = useState('');
+  const [lawFilter, setLawFilter] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [minYears, setMinYears] = useState(0);
+  const [maxYears, setMaxYears] = useState(50);
+  const [minSalary, setMinSalary] = useState(0);
+  const [maxSalary, setMaxSalary] = useState(300000);
+  const [contractOnly, setContractOnly] = useState(false);
 
   // Load profile to get client's salesperson email
   useEffect(() => {
@@ -471,7 +596,7 @@ function ClientView({ email, onLogout }) {
         'id,name,titles,practice_areas,years,city,state,salary,contract,hourly,notes,date_entered,years_in_recent_role'
       )
       .order('date_entered', { ascending: false })
-      .limit(100);
+      .limit(300);
 
     if (error) setErr('Error loading client view.');
     else setRows(data || []);
@@ -483,18 +608,61 @@ function ClientView({ email, onLogout }) {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return rows;
+    const titlesTokens = csvToArray(titlesFilter).map((x) => x.toLowerCase());
+    const lawTokens = csvToArray(lawFilter).map((x) => x.toLowerCase());
+    const cityTok = cityFilter.trim().toLowerCase();
+    const stateTok = stateFilter.trim().toLowerCase();
+
     return rows.filter((r) => {
       const blob = [r.name, r.titles, r.practice_areas, r.city, r.state, r.notes]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      return blob.includes(s);
+
+      if (s && !blob.includes(s)) return false;
+
+      if (titlesTokens.length) {
+        const roles = csvToArray(r.titles).map((x) => x.toLowerCase());
+        const match = roles.some((role) => titlesTokens.some((t) => role.includes(t)));
+        if (!match) return false;
+      }
+
+      if (lawTokens.length) {
+        const areas = csvToArray(r.practice_areas).map((x) => x.toLowerCase());
+        const match = areas.some((area) => lawTokens.some((t) => area.includes(t)));
+        if (!match) return false;
+      }
+
+      if (cityTok && !String(r.city || '').toLowerCase().includes(cityTok)) return false;
+      if (stateTok && !String(r.state || '').toLowerCase().includes(stateTok)) return false;
+
+      const yrs = Number(r.years) || 0;
+      if (yrs < minYears || yrs > maxYears) return false;
+
+      const sal = Number(r.salary) || 0;
+      if (sal < minSalary || sal > maxSalary) return false;
+
+      if (contractOnly && !r.contract) return false;
+
+      return true;
     });
-  }, [q, rows]);
+  }, [
+    rows,
+    q,
+    titlesFilter,
+    lawFilter,
+    cityFilter,
+    stateFilter,
+    minYears,
+    maxYears,
+    minSalary,
+    maxSalary,
+    contractOnly,
+  ]);
 
   return (
     <div style={{ padding: 16 }}>
+      <RangeStyles />
       <div style={{ ...glass, padding: 14, maxWidth: 1200, margin: '10px auto' }}>
         <Header title="Client workspace" onLogout={onLogout} />
 
@@ -526,6 +694,83 @@ function ClientView({ email, onLogout }) {
           </button>
         </div>
 
+        {/* Filters */}
+        <div style={{ ...glass, padding: 14, marginTop: 10 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Filters</div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
+              gap: 10,
+            }}
+          >
+            <L label="Titles (CSV)">
+              <input
+                style={input}
+                value={titlesFilter}
+                onChange={(e) => setTitlesFilter(e.target.value)}
+                placeholder="Attorney, Paralegal"
+              />
+            </L>
+            <L label="Type of Law (CSV)">
+              <input
+                style={input}
+                value={lawFilter}
+                onChange={(e) => setLawFilter(e.target.value)}
+                placeholder="Litigation, Immigration"
+              />
+            </L>
+            <L label="City">
+              <input style={input} value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} />
+            </L>
+            <L label="State">
+              <input style={input} value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} />
+            </L>
+            <L label="Years of experience">
+              <DualSlider
+                min={0}
+                max={50}
+                low={minYears}
+                high={maxYears}
+                onChange={(lo, hi) => {
+                  setMinYears(lo);
+                  setMaxYears(hi);
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6 }}>
+                <span>{minYears} yrs</span>
+                <span>{maxYears} yrs</span>
+              </div>
+            </L>
+            <L label="Salary range ($)">
+              <DualSlider
+                min={0}
+                max={300000}
+                low={minSalary}
+                high={maxSalary}
+                onChange={(lo, hi) => {
+                  setMinSalary(lo);
+                  setMaxSalary(hi);
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6 }}>
+                <span>${minSalary.toLocaleString()}</span>
+                <span>${maxSalary.toLocaleString()}</span>
+              </div>
+            </L>
+            <L label=" ">
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={contractOnly}
+                  onChange={(e) => setContractOnly(e.target.checked)}
+                />
+                Contract only
+              </label>
+            </L>
+          </div>
+        </div>
+
         {/* Results */}
         <div style={{ ...glass, padding: 14, marginTop: 10 }}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Recent candidates (read-only)</div>
@@ -541,7 +786,7 @@ function ClientView({ email, onLogout }) {
   );
 }
 
-// A non-clickable row with inline header + buttons
+// A row with inline header + buttons + expandable notes
 function ClientCandidateRow({ c, amEmail, clientEmail }) {
   const [open, setOpen] = useState(false);
   const titlesCsv = arrayToCsv(csvToArray(c.titles));
