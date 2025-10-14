@@ -189,133 +189,187 @@ function AuthCard({ mode, setMode, email, setEmail, pwd, setPwd, onLogin, err })
 }
 
 /* -------------------------------------------------------
-   Recruiter UI (add + list + delete)
-------------------------------------------------------- */
-function RecruiterUI({ user, onLogout }) {
-  const [form, setForm] = useState({
-    name: '', titles: '', law: '', years: '',
-    city: '', state: '', salary: '', contract: false, hourly: '',
-    notes: ''
-  });
-  const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState('');
-  const [err, setErr] = useState('');
-  const [rows, setRows] = useState([]);
+// ========= Recruiter Add Form (clean layout) =========
+function RecruiterAddForm({ onAdd }) {
+  const [name, setName] = React.useState('');
+  const [titles, setTitles] = React.useState('');               // CSV
+  const [law, setLaw] = React.useState('');                     // CSV
+  const [years, setYears] = React.useState('');
+  const [city, setCity] = React.useState('');
+  const [state, setState] = React.useState('');
+  const [salary, setSalary] = React.useState('');
+  const [contract, setContract] = React.useState(false);
+  const [notes, setNotes] = React.useState('');
+  const [flash, setFlash] = React.useState('');
+  const [err, setErr] = React.useState('');
 
-  function set(k, v) { setForm(prev => ({ ...prev, [k]: v })); }
-
-  async function loadMine() {
-    const { data, error } = await sb.from('candidates')
-      .select('id,name,titles,law,years,city,state,salary,contract,hourly,notes,date_entered,created_at')
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false });
-    if (!error) setRows(data || []);
-  }
-  useEffect(() => { loadMine(); }, []);
+  // Shared styles
+  const panel = {
+    border: '1px solid rgba(255,255,255,.10)',
+    borderRadius: 14,
+    padding: 16,
+    background: 'rgba(8, 10, 16, .88)',     // <-- a bit less transparent
+    boxShadow: '0 8px 24px rgba(0,0,0,.35)',
+  };
+  const label = { fontSize: 12, color: '#9ca3af', marginBottom: 6 };
+  const input = {
+    width: '100%',
+    padding: 10,
+    borderRadius: 10,
+    background: '#0f172a',
+    color: '#e5e7eb',
+    border: '1px solid #1f2937',
+  };
+  const grid = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(12, minmax(0,1fr))',
+    gap: 12,
+  };
 
   async function submit() {
-    try {
-      setErr(''); setBusy(true); setFlash('');
-      if (!form.name.trim()) { setErr('Name is required'); return; }
-      if (form.contract && (!form.hourly || Number(form.hourly) <= 0)) {
-        setErr('Enter an hourly rate for contract'); return;
-      }
-      const payload = {
-        name: form.name.trim(),
-        titles: form.titles.trim(),         // simple text fields in DB
-        law: form.law.trim(),               // simple text fields in DB
-        years: Number(form.years) || 0,
-        city: form.city.trim(),
-        state: form.state.trim(),
-        salary: Number(form.salary) || 0,
-        contract: !!form.contract,
-        hourly: form.contract ? (Number(form.hourly) || 0) : 0,
-        notes: form.notes.trim()
-        // created_by & date_entered handled by trigger/defaults
-      };
-      const { error } = await sb.from('candidates').insert(payload).select('id').single();
-      if (error) { setErr('Database error adding candidate'); return; }
-      setFlash('Candidate added');
-      setForm({ name:'', titles:'', law:'', years:'', city:'', state:'', salary:'', contract:false, hourly:'', notes:'' });
-      await loadMine();
-    } finally { setBusy(false); }
-  }
+    setFlash('');
+    setErr('');
 
-  async function del(id) {
-    const ok = confirm('Delete this candidate?');
-    if (!ok) return;
-    const { error } = await sb.from('candidates').delete().eq('id', id);
-    if (!error) setRows(prev => prev.filter(r => r.id !== id));
+    const yearsNum  = Number(years)  || 0;
+    const salaryNum = Number(salary) || 0;
+
+    if (!name.trim()) { setErr('Please enter a full name.'); return; }
+
+    try {
+      await onAdd({
+        name: name.trim(),
+        titles,               // CSV string (handled server-side)
+        law,                  // CSV string (handled server-side)
+        years: yearsNum,
+        city: city.trim(),
+        state: state.trim(),
+        salary: salaryNum,
+        contract: !!contract,
+        notes: String(notes || '').trim(),
+      });
+
+      setName(''); setTitles(''); setLaw('');
+      setYears(''); setCity(''); setState('');
+      setSalary(''); setContract(false); setNotes('');
+      setFlash('Candidate added');
+    } catch (e) {
+      console.error(e);
+      setErr('Database error adding candidate.');
+    }
   }
 
   return (
-    <div style={{ minHeight: '100vh', padding: 16 }}>
-      <div style={{ ...box, maxWidth: 1200, margin: '0 auto' }}>
-        <Header title="Recruiter workspace" onLogout={onLogout} />
+    <div style={panel}>
+      <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Add candidate</div>
 
-        {/* Add candidate */}
-        <div style={{ ...box, marginTop: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Add candidate</div>
-
-          <div style={{
-            display:'grid',
-            gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',
-            gap: 8
-          }}>
-            <Field label="Full name" value={form.name} onChange={v=>set('name', v)} />
-            <Field label="Titles (e.g., Attorney, Paralegal)" value={form.titles} onChange={v=>set('titles', v)} />
-            <Field label="Type of Law (e.g., Litigation, Immigration)" value={form.law} onChange={v=>set('law', v)} />
-            <Num   label="Years of experience" value={form.years} onChange={v=>set('years', v)} />
-            <Field label="City"  value={form.city}  onChange={v=>set('city', v)} />
-            <Field label="State" value={form.state} onChange={v=>set('state', v)} />
-            <Num   label="Salary desired" value={form.salary} onChange={v=>set('salary', v)} />
-            <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#a1a1aa', marginTop:6 }}>
-              <input type="checkbox" checked={form.contract} onChange={e=>set('contract', e.target.checked)} />
-              <span>Available for contract</span>
-            </label>
-            {form.contract ? <Num label="Hourly rate" value={form.hourly} onChange={v=>set('hourly', v)} /> : null}
-          </div>
-
-          <Area label="Candidate Notes" value={form.notes} onChange={v=>set('notes', v)}
-                placeholder="Short summary: strengths, availability, fit notes." />
-
-          <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8 }}>
-            <button disabled={busy} onClick={submit} style={{ fontSize: 12, padding:'8px 12px' }}>
-              {busy ? 'Saving…' : 'Add candidate'}
-            </button>
-            {err ? <span style={{ color:'#f87171', fontSize:12 }}>{err}</span> : null}
-            {flash ? <span style={{ color:'#93e2b7', fontSize:12 }}>{flash}</span> : null}
-          </div>
+      {/* GRID */}
+      <div style={grid}>
+        {/* Row 1 */}
+        <div style={{ gridColumn: 'span 4' }}>
+          <div style={label}>Full name</div>
+          <input value={name} onChange={e=>setName(e.target.value)} style={input} />
         </div>
 
-        {/* My list (with delete) */}
-        <div style={{ ...box, marginTop: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>My recent candidates</div>
-          {rows.length === 0 ? (
-            <div style={{ color:'#a1a1aa', fontSize: 13 }}>No candidates yet.</div>
-          ) : (
-            <div style={{ display:'grid', gap:8 }}>
-              {rows.map(c => (
-                <div key={c.id} style={{ ...box }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>
-                        {c.name}
-                      </div>
-                      <div style={{ color:'#a1a1aa', fontSize: 12, marginTop: 2 }}>
-                        {[c.titles, c.law, [c.city, c.state].filter(Boolean).join(', '), `${c.years||0} yrs`]
-                          .filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                    <button onClick={() => del(c.id)} style={{ fontSize: 12 }}>Delete</button>
-                  </div>
-                  {c.salary ? <div style={{ fontSize:12, marginTop:6 }}>Salary: ${c.salary}</div> : null}
-                  <div style={{ fontSize:12 }}>Contract: {c.contract ? (`Yes${c.hourly ? `, $${c.hourly}/hr` : ''}`) : 'No'}</div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div style={{ gridColumn: 'span 4' }}>
+          <div style={label}>Titles (e.g., Attorney, Paralegal)</div>
+          <input
+            value={titles}
+            onChange={e=>setTitles(e.target.value)}
+            placeholder="Attorney, Paralegal"
+            style={input}
+          />
         </div>
+
+        <div style={{ gridColumn: 'span 4' }}>
+          <div style={label}>Type of Law (e.g., Litigation, Immigration)</div>
+          <input
+            value={law}
+            onChange={e=>setLaw(e.target.value)}
+            placeholder="Litigation, Immigration"
+            style={input}
+          />
+        </div>
+
+        {/* Row 2 */}
+        <div style={{ gridColumn: 'span 3' }}>
+          <div style={label}>Years of experience</div>
+          <input
+            type="number"
+            value={years}
+            onChange={e=>setYears(e.target.value)}
+            style={input}
+          />
+        </div>
+
+        <div style={{ gridColumn: 'span 5' }}>
+          <div style={label}>City</div>
+          <input value={city} onChange={e=>setCity(e.target.value)} style={input} />
+        </div>
+
+        <div style={{ gridColumn: 'span 4' }}>
+          <div style={label}>State</div>
+          <input value={state} onChange={e=>setState(e.target.value)} style={input} />
+        </div>
+
+        {/* Row 3 */}
+        <div style={{ gridColumn: 'span 4' }}>
+          <div style={label}>Salary desired</div>
+          <input
+            type="number"
+            value={salary}
+            onChange={e=>setSalary(e.target.value)}
+            style={input}
+            placeholder="e.g., 120000"
+          />
+        </div>
+
+        <div style={{ gridColumn: 'span 4', display: 'flex', alignItems: 'end' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#e5e7eb' }}>
+            <input
+              type="checkbox"
+              checked={contract}
+              onChange={e=>setContract(e.target.checked)}
+              style={{ width: 16, height: 16 }}
+            />
+            Available for contract
+          </label>
+        </div>
+
+        {/* Spacer to balance row */}
+        <div style={{ gridColumn: 'span 4' }} />
+
+        {/* Notes block spans full width */}
+        <div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
+          <div style={label}>Candidate Notes</div>
+          <textarea
+            rows={5}
+            value={notes}
+            onChange={e=>setNotes(e.target.value)}
+            placeholder="Short summary: strengths, availability, fit notes."
+            style={{ ...input, resize: 'vertical' }}
+          />
+        </div>
+      </div>
+
+      {/* Actions / feedback */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 12 }}>
+        <button
+          onClick={submit}
+          style={{
+            padding: '10px 14px',
+            fontSize: 13,
+            borderRadius: 10,
+            background: '#4f46e5',
+            color: 'white',
+            border: '1px solid rgba(255,255,255,.08)',
+            boxShadow: '0 6px 18px rgba(79,70,229,.35)',
+          }}
+        >
+          Add candidate
+        </button>
+
+        {flash ? <div style={{ fontSize: 13, color: '#a7f3d0' }}>{flash}</div> : null}
+        {err ? <div style={{ fontSize: 13, color: '#fca5a5' }}>{err}</div> : null}
       </div>
     </div>
   );
