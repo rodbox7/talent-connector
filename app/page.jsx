@@ -1,890 +1,580 @@
 'use client';
-
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase as sb } from '../lib/supabaseClient';
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Shared styling + helpers
-// ───────────────────────────────────────────────────────────────────────────────
-const NYC_URL =
-  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
-
-const glass = {
-  background: 'rgba(17,19,24,0.88)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow:
-    '0 8px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 1px rgba(255,255,255,.25)',
-  backdropFilter: 'blur(6px)',
-  WebkitBackdropFilter: 'blur(6px)',
-  borderRadius: 14,
+/* -------------------------------------------------------
+   Small helpers
+------------------------------------------------------- */
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(Number(n) || 0, hi));
+const startOfTodayISO = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+};
+const endOfTodayISO = () => {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+};
+const box = {
+  background: 'rgba(0,0,0,.82)',
+  border: '1px solid rgba(255,255,255,.08)',
+  borderRadius: 12,
+  padding: 16,
 };
 
-const btn = {
-  background: '#3b82f6',
-  color: '#fff',
-  borderRadius: 8,
-  padding: '9px 14px',
-  border: '1px solid rgba(255,255,255,.12)',
-  cursor: 'pointer',
-};
-
-const btnGhost = {
-  background: '#1f2937',
-  color: '#e8eaed',
-  borderRadius: 8,
-  padding: '9px 14px',
-  border: '1px solid rgba(255,255,255,.12)',
-  cursor: 'pointer',
-};
-
-const input = {
-  width: '100%',
-  padding: 10,
-  borderRadius: 8,
-  background: 'rgba(22,24,30,0.92)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  color: '#e8eaed',
-  outline: 'none',
-};
-
-const label = { fontSize: 12, color: '#b6beca', marginBottom: 6 };
-
-const csvToArray = (s) =>
-  String(s || '')
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-const arrayToCsv = (arr) => (Array.isArray(arr) ? arr.join(', ') : '');
-
-// Mailto for client → salesperson
-function buildContactMailto(c, amEmail, clientEmail) {
-  const to = amEmail || 'info@youragency.com';
-  const subj = `Talent Connector Candidate – ${c?.name || ''}`;
-  const body = [
-    `Hello,`,
-    ``,
-    `I'm interested in this candidate:`,
-    `• Name: ${c?.name || ''}`,
-    `• Title(s): ${arrayToCsv(csvToArray(c?.titles))}`,
-    `• Type(s) of Law: ${arrayToCsv(csvToArray(c?.practice_areas))}`,
-    `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
-    `• Years: ${c?.years ?? ''}`,
-    ``,
-    `My email: ${clientEmail || ''}`,
-    ``,
-    `Sent from Talent Connector`,
-  ].join('\n');
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-}
-
-// Dual-thumb slider styles (years & salary)
-function RangeStyles() {
-  return (
-    <style>{`
-      .dual-wrap { position: relative; height: 28px; }
-      .dual-track {
-        position: absolute; top: 12px; left: 0; right: 0; height: 4px;
-        background: #1f2937; border-radius: 999px;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.6);
-      }
-      .dual-sel {
-        position: absolute; top: 12px; height: 4px; background: #4f46e5; border-radius: 999px;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 1px 2px rgba(0,0,0,.7);
-      }
-      .dual-range { -webkit-appearance:none; appearance:none; position:absolute; left:0; right:0; top:0; width:100%; height:28px; background:transparent; margin:0; }
-      .dual-range:focus{ outline:none; }
-      .dual-range::-webkit-slider-runnable-track{ background:transparent; }
-      .dual-range::-moz-range-track{ background:transparent; border:none; }
-      .dual-range.low{ z-index:4; }
-      .dual-range.high{ z-index:5; pointer-events:none; }
-      .dual-range.high::-webkit-slider-thumb{ pointer-events:all; }
-      .dual-range.high::-moz-range-thumb{ pointer-events:all; }
-      .dual-range::-webkit-slider-thumb{
-        -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
-        background:#22d3ee; border:2px solid #0b0b0b;
-        box-shadow: 0 2px 3px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.35);
-      }
-      .dual-range::-moz-range-thumb{
-        width:18px; height:18px; border-radius:50%;
-        background:#22d3ee; border:2px solid #0b0b0b;
-        box-shadow: 0 2px 3px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.35);
-      }
-    `}</style>
-  );
-}
-
-function DualSlider({ min, max, low, high, onChange }) {
-  const lo = Math.max(min, Math.min(high, Number.isFinite(low) ? low : min));
-  const hi = Math.min(max, Math.max(lo, Number.isFinite(high) ? high : max));
-  const pct = (v) => ((v - min) / (max - min)) * 100;
-  const leftPct = pct(lo);
-  const rightPct = pct(hi);
-
-  function handleLow(e) {
-    const next = Math.min(Number(e.target.value), hi);
-    onChange(next, hi);
-  }
-  function handleHigh(e) {
-    const next = Math.max(Number(e.target.value), lo);
-    onChange(lo, next);
-  }
-
-  return (
-    <div className="dual-wrap">
-      <div className="dual-track" />
-      <div
-        className="dual-sel"
-        style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
-      />
-      <input
-        className="dual-range low"
-        type="range"
-        min={min}
-        max={max}
-        step={1}
-        value={lo}
-        onChange={handleLow}
-        onInput={handleLow}
-      />
-      <input
-        className="dual-range high"
-        type="range"
-        min={min}
-        max={max}
-        step={1}
-        value={hi}
-        onChange={handleHigh}
-        onInput={handleHigh}
-      />
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────────
-// App shell (login + role routing)
-// ───────────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------
+   Page (role-aware)
+------------------------------------------------------- */
 export default function Page() {
-  const [session, setSession] = useState(null); // { id, email, role? }
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data?.session ? { id: data.session.user.id, email: data.session.user.email } : null);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
-      if (s?.user) {
-        setSession({ id: s.user.id, email: s.user.email });
-      } else {
-        setSession(null);
-      }
-    });
-    return () => sub?.subscription?.unsubscribe();
-  }, []);
-
-  const [role, setRole] = useState('recruiter');
+  const [mode, setMode] = useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   const [err, setErr] = useState('');
+  const [user, setUser] = useState(null); // { id, email, role, org, amEmail? }
 
-  async function doLogin() {
-    setErr('');
-    const e = email.trim().toLowerCase();
-    if (!e.includes('@')) {
-      setErr('Enter a valid email');
-      return;
-    }
-    const { data: auth, error } = await supabase.auth.signInWithPassword({ email: e, password: pwd });
-    if (error) {
-      setErr(error.message || 'Login failed');
-      return;
-    }
-    const { data: prof, error: pErr } = await supabase
-      .from('profiles')
-      .select('id,email,role')
-      .eq('id', auth.user.id)
-      .single();
+  // attempt session restore (SSR-safe)
+  useEffect(() => {
+    sb.auth.getSession().then(async ({ data }) => {
+      const u = data?.session?.user;
+      if (!u) return;
+      // get role and AM email from profiles
+      const { data: p } = await sb.from('profiles')
+        .select('id,email,role,org,account_manager_email')
+        .eq('id', u.id)
+        .single();
+      if (p) {
+        setUser({
+          id: p.id, email: p.email, role: p.role,
+          org: p.org || '', amEmail: p.account_manager_email || ''
+        });
+        setMode(p.role || 'recruiter');
+      }
+    });
+  }, []);
 
-    if (pErr || !prof) {
-      setErr('Profile not found. Ask admin to invite you.');
-      return;
+  async function login() {
+    try {
+      setErr('');
+      const e = String(email).trim().toLowerCase();
+      if (!e.includes('@')) { setErr('Enter a valid email'); return; }
+
+      const { data: auth, error: authErr } =
+        await sb.auth.signInWithPassword({ email: e, password: pwd });
+
+      if (authErr) { setErr(authErr.message || 'Invalid credentials'); return; }
+
+      // pull profile to enforce role
+      const { data: p, error: pErr } = await sb.from('profiles')
+        .select('id,email,role,org,account_manager_email')
+        .eq('id', auth.user.id)
+        .single();
+      if (pErr || !p) { setErr('Profile not found. Ask Admin.'); return; }
+      if (mode !== p.role) { setErr(`This account is a ${p.role}. Switch to the ${p.role} tab.`); return; }
+
+      setUser({
+        id: p.id, email: p.email, role: p.role,
+        org: p.org || '', amEmail: p.account_manager_email || ''
+      });
+    } catch (ex) {
+      console.error(ex);
+      setErr('Login error.');
     }
-    if (String(prof.role) !== role) {
-      setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
-      return;
-    }
-    setSession({ id: prof.id, email: prof.email, role: prof.role });
   }
 
-  async function doLogout() {
-    await supabase.auth.signOut();
-    setSession(null);
+  async function logout() {
+    try { await sb.auth.signOut(); } catch {}
+    setUser(null); setEmail(''); setPwd(''); setMode('recruiter');
   }
 
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        color: '#e8eaed',
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <SkylineBG />
-
-      {!session || !session.role ? (
-        <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', padding: 16 }}>
-          <div style={{ width: '100%', maxWidth: 520, padding: 18, ...glass }}>
-            <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>
-              Talent Connector - Powered by Beacon Hill Legal
-            </div>
-            <div style={{ textAlign: 'center', color: '#b6beca', fontSize: 12, marginBottom: 12 }}>
-              Invitation-only access
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-              <button
-                onClick={() => setRole('recruiter')}
-                style={{ ...btnGhost, background: role === 'recruiter' ? '#1f2937' : '#16181e' }}
-              >
-                Recruiter
-              </button>
-              <button
-                onClick={() => setRole('client')}
-                style={{ ...btnGhost, background: role === 'client' ? '#1f2937' : '#16181e' }}
-              >
-                Client
-              </button>
-              <button
-                onClick={() => setRole('admin')}
-                style={{ ...btnGhost, background: role === 'admin' ? '#1f2937' : '#16181e' }}
-              >
-                Admin
-              </button>
-            </div>
-
-            <div style={{ marginTop: 14 }}>
-              <div style={label}>Email</div>
-              <input style={input} value={email} onChange={(e) => setEmail(e.target.value)} />
-              <div style={{ ...label, marginTop: 10 }}>Password</div>
-              <input
-                type="password"
-                style={input}
-                value={pwd}
-                onChange={(e) => setPwd(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && doLogin()}
-              />
-              <div style={{ marginTop: 12 }}>
-                <button onClick={doLogin} style={{ ...btn, width: '100%', background: '#4f46e5' }}>
-                  Log in
-                </button>
-              </div>
-              {err ? (
-                <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : session.role === 'admin' ? (
-        <AdminView email={session.email} onLogout={doLogout} />
-      ) : session.role === 'recruiter' ? (
-        <RecruiterView email={session.email} onLogout={doLogout} />
-      ) : (
-        <ClientView email={session.email} onLogout={doLogout} />
-      )}
-    </div>
+  // ---------- Role routing ----------
+  if (!user) return (
+    <AuthCard
+      mode={mode} setMode={setMode}
+      email={email} setEmail={setEmail}
+      pwd={pwd} setPwd={setPwd}
+      onLogin={login} err={err}
+    />
   );
+
+  if (user.role === 'admin') {
+    return (
+      <div style={{ minHeight: '100vh', padding: 16 }}>
+        <div style={{ ...box, maxWidth: 980, margin: '0 auto' }}>
+          <Header title="Admin workspace" onLogout={logout} />
+          <p style={{ color: '#a3a3a3', marginTop: 8 }}>
+            Minimal placeholder for <b>admin</b>. (Recruiters have full add/list UI.)
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user.role === 'recruiter') {
+    return <RecruiterUI user={user} onLogout={logout} />;
+  }
+
+  // client
+  return <ClientUI user={user} onLogout={logout} />;
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Admin placeholder (unchanged)
-// ───────────────────────────────────────────────────────────────────────────────
-function AdminView({ email, onLogout }) {
+/* -------------------------------------------------------
+   Auth Card
+------------------------------------------------------- */
+function AuthCard({ mode, setMode, email, setEmail, pwd, setPwd, onLogin, err }) {
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ ...glass, padding: 14, maxWidth: 1200, margin: '10px auto' }}>
-        <Header title="Admin workspace" onLogout={onLogout} />
-        <div style={{ color: '#b6beca' }}>
-          Minimal placeholder for <b>admin</b>. (Recruiters/Clients have the full UI.)
+    <div style={{
+      minHeight: '100vh', display: 'grid', placeItems: 'center',
+      padding: 16, fontFamily: 'system-ui, Arial'
+    }}>
+      <div style={{ ...box, width: '100%', maxWidth: 420 }}>
+        <div style={{ textAlign: 'center', fontWeight: 700 }}>
+          Talent Connector - Powered by Beacon Hill Legal
         </div>
+        <div style={{ textAlign: 'center', fontSize: 12, color: '#a1a1aa', marginTop: 4 }}>
+          Invitation-only access
+        </div>
+
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginTop: 10
+        }}>
+          <button
+            onClick={() => setMode('recruiter')}
+            style={{ padding: 8, borderRadius: 8, background: mode === 'recruiter' ? '#1f2937' : '#111827', color: '#e5e5e5' }}>
+            Recruiter
+          </button>
+          <button
+            onClick={() => setMode('client')}
+            style={{ padding: 8, borderRadius: 8, background: mode === 'client' ? '#1f2937' : '#111827', color: '#e5e5e5' }}>
+            Client
+          </button>
+          <button
+            onClick={() => setMode('admin')}
+            style={{ padding: 8, borderRadius: 8, background: mode === 'admin' ? '#1f2937' : '#111827', color: '#e5e5e5' }}>
+            Admin
+          </button>
+        </div>
+
+        <label style={{ display: 'block', fontSize: 12, marginTop: 12, color: '#a1a1aa' }}>
+          Email
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                 placeholder="name@company.com"
+                 style={{
+                   width: '100%', padding: 10, borderRadius: 8,
+                   background: '#111827', color: '#e5e5e5',
+                   border: '1px solid #1f2937', marginTop: 6
+                 }}/>
+        </label>
+        <label style={{ display: 'block', fontSize: 12, marginTop: 8, color: '#a1a1aa' }}>
+          Password
+          <input type="password" value={pwd} onChange={e => setPwd(e.target.value)}
+                 placeholder="your password"
+                 style={{
+                   width: '100%', padding: 10, borderRadius: 8,
+                   background: '#111827', color: '#e5e5e5',
+                   border: '1px solid #1f2937', marginTop: 6
+                 }}/>
+        </label>
+        <button onClick={onLogin}
+                style={{
+                  width: '100%', marginTop: 10, padding: 12,
+                  background: '#4f46e5', color: '#fff', borderRadius: 8
+                }}>
+          Log in
+        </button>
+        {err ? <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div> : null}
       </div>
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Recruiter view (add + list + delete, with improved error display)
-// ───────────────────────────────────────────────────────────────────────────────
-function RecruiterView({ email, onLogout }) {
-  const [name, setName] = useState('');
-  const [titlesCsv, setTitlesCsv] = useState('');
-  const [practiceCsv, setPracticeCsv] = useState('');
-  const [years, setYears] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [salary, setSalary] = useState('');
-  const [contract, setContract] = useState(false);
-  const [hourly, setHourly] = useState('');
-  const [recentYears, setRecentYears] = useState('');
-  const [notes, setNotes] = useState('');
+/* -------------------------------------------------------
+   Recruiter UI (add + list + delete)
+------------------------------------------------------- */
+function RecruiterUI({ user, onLogout }) {
+  const [form, setForm] = useState({
+    name: '', titles: '', law: '', years: '',
+    city: '', state: '', salary: '', contract: false, hourly: '',
+    notes: ''
+  });
+  const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState('');
   const [err, setErr] = useState('');
-
   const [rows, setRows] = useState([]);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select(
-          'id,name,titles,practice_areas,years,city,state,salary,contract,hourly,notes,date_entered,years_in_recent_role'
-        )
-        .order('date_entered', { ascending: false })
-        .limit(100);
-      if (!error) setRows(data || []);
-    })();
-  }, [refreshKey]);
+  function set(k, v) { setForm(prev => ({ ...prev, [k]: v })); }
 
-  async function addCandidate() {
-    setErr('');
-    setFlash('');
-    if (!name.trim()) {
-      setErr('Name required');
-      return;
-    }
-    const payload = {
-      name: name.trim(),
-      titles: titlesCsv.trim(),
-      practice_areas: practiceCsv.trim(),
-      years: years ? Number(years) : null,
-      city: city.trim() || null,
-      state: state.trim() || null,
-      salary: salary ? Number(salary) : null,
-      contract: !!contract,
-      hourly: contract && hourly ? Number(hourly) : null,
-      years_in_recent_role: recentYears ? Number(recentYears) : null,
-      notes: notes || null,
-      date_entered: new Date().toISOString(),
-    };
-    const { error } = await supabase.from('candidates').insert([payload]);
-    if (error) {
-      setErr(`Database error adding candidate: ${error.message || 'Unknown error'}`);
-      return;
-    }
-    setFlash('Candidate added.');
-    setName('');
-    setTitlesCsv('');
-    setPracticeCsv('');
-    setYears('');
-    setCity('');
-    setState('');
-    setSalary('');
-    setContract(false);
-    setHourly('');
-    setRecentYears('');
-    setNotes('');
-    setRefreshKey((x) => x + 1);
+  async function loadMine() {
+    const { data, error } = await sb.from('candidates')
+      .select('id,name,titles,law,years,city,state,salary,contract,hourly,notes,date_entered,created_at')
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false });
+    if (!error) setRows(data || []);
+  }
+  useEffect(() => { loadMine(); }, []);
+
+  async function submit() {
+    try {
+      setErr(''); setBusy(true); setFlash('');
+      if (!form.name.trim()) { setErr('Name is required'); return; }
+      if (form.contract && (!form.hourly || Number(form.hourly) <= 0)) {
+        setErr('Enter an hourly rate for contract'); return;
+      }
+      const payload = {
+        name: form.name.trim(),
+        titles: form.titles.trim(),         // simple text fields in DB
+        law: form.law.trim(),               // simple text fields in DB
+        years: Number(form.years) || 0,
+        city: form.city.trim(),
+        state: form.state.trim(),
+        salary: Number(form.salary) || 0,
+        contract: !!form.contract,
+        hourly: form.contract ? (Number(form.hourly) || 0) : 0,
+        notes: form.notes.trim()
+        // created_by & date_entered handled by trigger/defaults
+      };
+      const { error } = await sb.from('candidates').insert(payload).select('id').single();
+      if (error) { setErr('Database error adding candidate'); return; }
+      setFlash('Candidate added');
+      setForm({ name:'', titles:'', law:'', years:'', city:'', state:'', salary:'', contract:false, hourly:'', notes:'' });
+      await loadMine();
+    } finally { setBusy(false); }
   }
 
-  async function deleteCandidate(id) {
-    const { error } = await supabase.from('candidates').delete().eq('id', id);
-    if (error) {
-      alert(`Delete failed: ${error.message || 'Unknown error'}`);
-      return;
-    }
-    setRows((prev) => prev.filter((r) => r.id !== id));
+  async function del(id) {
+    const ok = confirm('Delete this candidate?');
+    if (!ok) return;
+    const { error } = await sb.from('candidates').delete().eq('id', id);
+    if (!error) setRows(prev => prev.filter(r => r.id !== id));
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <RangeStyles />
-      <div style={{ ...glass, padding: 14, maxWidth: 1200, margin: '10px auto' }}>
+    <div style={{ minHeight: '100vh', padding: 16 }}>
+      <div style={{ ...box, maxWidth: 1200, margin: '0 auto' }}>
         <Header title="Recruiter workspace" onLogout={onLogout} />
 
-        {/* Add Form */}
-        <div style={{ ...glass, padding: 14, marginTop: 10 }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>Add candidate</div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
-              gap: 10,
-            }}
-          >
-            <L label="Full name">
-              <input style={input} value={name} onChange={(e) => setName(e.target.value)} />
-            </L>
-            <L label="Titles (CSV)">
-              <input
-                style={input}
-                value={titlesCsv}
-                onChange={(e) => setTitlesCsv(e.target.value)}
-                placeholder="Attorney, Paralegal"
-              />
-            </L>
-            <L label="Type of Law (CSV)">
-              <input
-                style={input}
-                value={practiceCsv}
-                onChange={(e) => setPracticeCsv(e.target.value)}
-                placeholder="Litigation, Immigration"
-              />
-            </L>
-            <L label="Years">
-              <input style={input} type="number" value={years} onChange={(e) => setYears(e.target.value)} />
-            </L>
-            <L label="City">
-              <input style={input} value={city} onChange={(e) => setCity(e.target.value)} />
-            </L>
-            <L label="State">
-              <input style={input} value={state} onChange={(e) => setState(e.target.value)} />
-            </L>
-            <L label="Salary">
-              <input
-                style={input}
-                type="number"
-                value={salary}
-                onChange={(e) => setSalary(e.target.value)}
-              />
-            </L>
-            <L label="Available for contract">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={contract}
-                  onChange={(e) => setContract(e.target.checked)}
-                />
-                {contract ? (
-                  <input
-                    style={{ ...input, maxWidth: 150 }}
-                    placeholder="Hourly"
-                    type="number"
-                    value={hourly}
-                    onChange={(e) => setHourly(e.target.value)}
-                  />
-                ) : null}
-              </div>
-            </L>
-            <L label="Years in most recent role">
-              <input
-                style={input}
-                type="number"
-                value={recentYears}
-                onChange={(e) => setRecentYears(e.target.value)}
-              />
-            </L>
+        {/* Add candidate */}
+        <div style={{ ...box, marginTop: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Add candidate</div>
+
+          <div style={{
+            display:'grid',
+            gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',
+            gap: 8
+          }}>
+            <Field label="Full name" value={form.name} onChange={v=>set('name', v)} />
+            <Field label="Titles (e.g., Attorney, Paralegal)" value={form.titles} onChange={v=>set('titles', v)} />
+            <Field label="Type of Law (e.g., Litigation, Immigration)" value={form.law} onChange={v=>set('law', v)} />
+            <Num   label="Years of experience" value={form.years} onChange={v=>set('years', v)} />
+            <Field label="City"  value={form.city}  onChange={v=>set('city', v)} />
+            <Field label="State" value={form.state} onChange={v=>set('state', v)} />
+            <Num   label="Salary desired" value={form.salary} onChange={v=>set('salary', v)} />
+            <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#a1a1aa', marginTop:6 }}>
+              <input type="checkbox" checked={form.contract} onChange={e=>set('contract', e.target.checked)} />
+              <span>Available for contract</span>
+            </label>
+            {form.contract ? <Num label="Hourly rate" value={form.hourly} onChange={v=>set('hourly', v)} /> : null}
           </div>
-          <L label="Candidate Notes">
-            <textarea
-              rows={4}
-              style={{ ...input, resize: 'vertical' }}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Short summary: strengths, availability, fit notes."
-            />
-          </L>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={addCandidate} style={btn}>
-              Add candidate
+
+          <Area label="Candidate Notes" value={form.notes} onChange={v=>set('notes', v)}
+                placeholder="Short summary: strengths, availability, fit notes." />
+
+          <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8 }}>
+            <button disabled={busy} onClick={submit} style={{ fontSize: 12, padding:'8px 12px' }}>
+              {busy ? 'Saving…' : 'Add candidate'}
             </button>
-            {flash ? <div style={{ color: '#93e2b7', fontSize: 12 }}>{flash}</div> : null}
-            {err ? <div style={{ color: '#f87171', fontSize: 12 }}>{err}</div> : null}
+            {err ? <span style={{ color:'#f87171', fontSize:12 }}>{err}</span> : null}
+            {flash ? <span style={{ color:'#93e2b7', fontSize:12 }}>{flash}</span> : null}
           </div>
         </div>
 
-        {/* Recent list (with delete) */}
-        <div style={{ ...glass, padding: 14, marginTop: 10 }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>Recent candidates</div>
-          {rows.map((c) => (
-            <div key={c.id} style={{ ...glass, padding: 12, marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>
-                    {c.name}
-                    {c.titles ? ` — ${arrayToCsv(csvToArray(c.titles))}` : ''}
-                    {c.practice_areas ? ` — ${arrayToCsv(csvToArray(c.practice_areas))}` : ''}
+        {/* My list (with delete) */}
+        <div style={{ ...box, marginTop: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>My recent candidates</div>
+          {rows.length === 0 ? (
+            <div style={{ color:'#a1a1aa', fontSize: 13 }}>No candidates yet.</div>
+          ) : (
+            <div style={{ display:'grid', gap:8 }}>
+              {rows.map(c => (
+                <div key={c.id} style={{ ...box }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>
+                        {c.name}
+                      </div>
+                      <div style={{ color:'#a1a1aa', fontSize: 12, marginTop: 2 }}>
+                        {[c.titles, c.law, [c.city, c.state].filter(Boolean).join(', '), `${c.years||0} yrs`]
+                          .filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <button onClick={() => del(c.id)} style={{ fontSize: 12 }}>Delete</button>
                   </div>
-                  <div style={{ fontSize: 12, color: '#b6beca' }}>
-                    {[c.city, c.state].filter(Boolean).join(', ')} • {c.years ?? '-'} yrs
-                    {c.years_in_recent_role != null
-                      ? ` • ${c.years_in_recent_role} yrs recent role`
-                      : ''}
-                  </div>
+                  {c.salary ? <div style={{ fontSize:12, marginTop:6 }}>Salary: ${c.salary}</div> : null}
+                  <div style={{ fontSize:12 }}>Contract: {c.contract ? (`Yes${c.hourly ? `, $${c.hourly}/hr` : ''}`) : 'No'}</div>
                 </div>
-                <button onClick={() => deleteCandidate(c.id)} style={{ ...btnGhost }}>
-                  Delete
-                </button>
-              </div>
-              {c.notes ? (
-                <div
-                  style={{
-                    marginTop: 8,
-                    background: 'rgba(23,25,32,.9)',
-                    border: '1px solid rgba(255,255,255,.12)',
-                    borderRadius: 10,
-                    padding: 10,
-                    color: '#e8eaed',
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Candidate Notes</div>
-                  {c.notes}
-                </div>
-              ) : null}
+              ))}
             </div>
-          ))}
-          {!rows.length ? <div style={{ color: '#b6beca' }}>No candidates yet.</div> : null}
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Client view (filters + sliders + email + expandable notes)
-// ───────────────────────────────────────────────────────────────────────────────
-function ClientView({ email, onLogout }) {
-  const [todayCount, setTodayCount] = useState(0);
-  const [rows, setRows] = useState([]);
-  const [err, setErr] = useState('');
-  const [amEmail, setAmEmail] = useState(''); // salesperson email tied to this client
+/* -------------------------------------------------------
+   Client UI (count today + filters + list w/ expand + email)
+------------------------------------------------------- */
+function ClientUI({ user, onLogout }) {
+  const [amEmail, setAmEmail] = useState(user.amEmail || '');
+  useEffect(() => {
+    if (amEmail) return;
+    sb.from('profiles').select('account_manager_email').eq('id', user.id).single()
+      .then(({ data }) => setAmEmail(data?.account_manager_email || ''));
+  }, []);
 
-  // Filters
   const [q, setQ] = useState('');
-  const [titlesFilter, setTitlesFilter] = useState('');
-  const [lawFilter, setLawFilter] = useState('');
-  const [cityFilter, setCityFilter] = useState('');
-  const [stateFilter, setStateFilter] = useState('');
   const [minYears, setMinYears] = useState(0);
   const [maxYears, setMaxYears] = useState(50);
   const [minSalary, setMinSalary] = useState(0);
-  const [maxSalary, setMaxSalary] = useState(300000);
-  const [contractOnly, setContractOnly] = useState(false);
+  const [maxSalary, setMaxSalary] = useState(500000);
+  const [rows, setRows] = useState([]);
+  const [countToday, setCountToday] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
 
-  // Load profile to get client's salesperson email
-  useEffect(() => {
-    (async () => {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('account_manager_email')
-        .eq('email', email)
-        .single();
-      setAmEmail(prof?.account_manager_email || '');
-    })();
-  }, [email]);
+  async function refresh() {
+    try {
+      setLoading(true); setErr('');
+      // fetch recent — we’ll filter client-side so we don’t depend on specific DB columns beyond the basics
+      const { data, error } = await sb.from('candidates')
+        .select('id,name,titles,law,years,city,state,salary,contract,hourly,notes,date_entered,created_at')
+        .order('date_entered', { ascending: false })
+        .limit(500);
+      if (error) { setErr('Error loading candidates'); return; }
+      setRows(data || []);
 
-  async function loadAll() {
-    setErr('');
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-
-    const startISO = `${yyyy}-${mm}-${dd}T00:00:00.000Z`;
-    const endISO = `${yyyy}-${mm}-${dd}T23:59:59.999Z`;
-
-    const { count: cnt } = await supabase
-      .from('candidates')
-      .select('id', { count: 'exact', head: true })
-      .gte('date_entered', startISO)
-      .lte('date_entered', endISO);
-    if (typeof cnt === 'number') setTodayCount(cnt);
-
-    const { data, error } = await supabase
-      .from('candidates')
-      .select(
-        'id,name,titles,practice_areas,years,city,state,salary,contract,hourly,notes,date_entered,years_in_recent_role'
-      )
-      .order('date_entered', { ascending: false })
-      .limit(300);
-
-    if (error) setErr('Error loading client view.');
-    else setRows(data || []);
+      // count today
+      const { count } = await sb.from('candidates')
+        .select('id', { count:'exact', head:true })
+        .gte('date_entered', startOfTodayISO())
+        .lte('date_entered', endOfTodayISO());
+      setCountToday(count || 0);
+    } finally { setLoading(false); }
   }
-
-  useEffect(() => {
-    loadAll();
-  }, []);
+  useEffect(() => { refresh(); }, []);
 
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const titlesTokens = csvToArray(titlesFilter).map((x) => x.toLowerCase());
-    const lawTokens = csvToArray(lawFilter).map((x) => x.toLowerCase());
-    const cityTok = cityFilter.trim().toLowerCase();
-    const stateTok = stateFilter.trim().toLowerCase();
+    const text = q.trim().toLowerCase();
+    const loY = clamp(minYears, 0, 50);
+    const hiY = clamp(maxYears, 0, 50);
+    const loS = clamp(minSalary, 0, 1_000_000);
+    const hiS = clamp(maxSalary, 0, 1_000_000);
 
-    return rows.filter((r) => {
-      const blob = [r.name, r.titles, r.practice_areas, r.city, r.state, r.notes]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      if (s && !blob.includes(s)) return false;
-
-      if (titlesTokens.length) {
-        const roles = csvToArray(r.titles).map((x) => x.toLowerCase());
-        const match = roles.some((role) => titlesTokens.some((t) => role.includes(t)));
-        if (!match) return false;
+    return rows.filter(c => {
+      // text
+      if (text) {
+        const blob = [
+          c.name, c.titles, c.law, c.city, c.state, c.notes
+        ].map(x => String(x || '').toLowerCase()).join(' ');
+        if (!blob.includes(text)) return false;
       }
-
-      if (lawTokens.length) {
-        const areas = csvToArray(r.practice_areas).map((x) => x.toLowerCase());
-        const match = areas.some((area) => lawTokens.some((t) => area.includes(t)));
-        if (!match) return false;
-      }
-
-      if (cityTok && !String(r.city || '').toLowerCase().includes(cityTok)) return false;
-      if (stateTok && !String(r.state || '').toLowerCase().includes(stateTok)) return false;
-
-      const yrs = Number(r.years) || 0;
-      if (yrs < minYears || yrs > maxYears) return false;
-
-      const sal = Number(r.salary) || 0;
-      if (sal < minSalary || sal > maxSalary) return false;
-
-      if (contractOnly && !r.contract) return false;
-
+      // ranges
+      if (loY && (c.years || 0) < loY) return false;
+      if (hiY && (c.years || 0) > hiY) return false;
+      if (loS && (c.salary || 0) < loS) return false;
+      if (hiS && (c.salary || 0) > hiS) return false;
       return true;
     });
-  }, [
-    rows,
-    q,
-    titlesFilter,
-    lawFilter,
-    cityFilter,
-    stateFilter,
-    minYears,
-    maxYears,
-    minSalary,
-    maxSalary,
-    contractOnly,
-  ]);
+  }, [rows, q, minYears, maxYears, minSalary, maxSalary]);
 
   return (
-    <div style={{ padding: 16 }}>
-      <RangeStyles />
-      <div style={{ ...glass, padding: 14, maxWidth: 1200, margin: '10px auto' }}>
+    <div style={{ minHeight: '100vh', padding: 16 }}>
+      <div style={{ ...box, maxWidth: 1200, margin: '0 auto' }}>
         <Header title="Client workspace" onLogout={onLogout} />
 
-        {/* Stats + search */}
-        <div
-          style={{
-            ...glass,
-            padding: 14,
-            display: 'grid',
-            gridTemplateColumns: '1fr 280px auto',
-            gap: 10,
-            alignItems: 'center',
-            marginTop: 10,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12, color: '#b6beca' }}>Candidates added today</div>
-            <div style={{ fontWeight: 800, fontSize: 40, marginTop: -2 }}>{todayCount}</div>
+        {/* Top: count & search */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap: 8, alignItems:'center', marginTop: 8 }}>
+          <div style={{ ...box }}>
+            <div style={{ color:'#a1a1aa', fontSize:12 }}>Candidates added today</div>
+            <div style={{ fontSize: 36, fontWeight: 800, lineHeight: 1 }}>{countToday}</div>
           </div>
-
-          <input
-            style={input}
-            placeholder="Search name/city/state/notes/titles/law"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button onClick={loadAll} style={btn}>
-            Refresh
-          </button>
+          <div style={{ display:'flex', gap:8 }}>
+            <input
+              placeholder="Search name/city/state/title/law/notes"
+              value={q} onChange={e => setQ(e.target.value)}
+              style={{
+                width: 340, padding: 10, borderRadius: 8,
+                background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937'
+              }}
+            />
+            <button onClick={refresh}>Refresh</button>
+          </div>
         </div>
 
         {/* Filters */}
-        <div style={{ ...glass, padding: 14, marginTop: 10 }}>
+        <div style={{ ...box, marginTop: 12 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Filters</div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
-              gap: 10,
-            }}
-          >
-            <L label="Titles (CSV)">
-              <input
-                style={input}
-                value={titlesFilter}
-                onChange={(e) => setTitlesFilter(e.target.value)}
-                placeholder="Attorney, Paralegal"
-              />
-            </L>
-            <L label="Type of Law (CSV)">
-              <input
-                style={input}
-                value={lawFilter}
-                onChange={(e) => setLawFilter(e.target.value)}
-                placeholder="Litigation, Immigration"
-              />
-            </L>
-            <L label="City">
-              <input style={input} value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} />
-            </L>
-            <L label="State">
-              <input style={input} value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} />
-            </L>
-            <L label="Years of experience">
-              <DualSlider
-                min={0}
-                max={50}
-                low={minYears}
-                high={maxYears}
-                onChange={(lo, hi) => {
-                  setMinYears(lo);
-                  setMaxYears(hi);
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6 }}>
-                <span>{minYears} yrs</span>
-                <span>{maxYears} yrs</span>
-              </div>
-            </L>
-            <L label="Salary range ($)">
-              <DualSlider
-                min={0}
-                max={300000}
-                low={minSalary}
-                high={maxSalary}
-                onChange={(lo, hi) => {
-                  setMinSalary(lo);
-                  setMaxSalary(hi);
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6 }}>
-                <span>${minSalary.toLocaleString()}</span>
-                <span>${maxSalary.toLocaleString()}</span>
-              </div>
-            </L>
-            <L label=" ">
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={contractOnly}
-                  onChange={(e) => setContractOnly(e.target.checked)}
-                />
-                Contract only
-              </label>
-            </L>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+            <div>
+              <div style={{ color:'#a1a1aa', fontSize:12, marginBottom:6 }}>Years of experience</div>
+              <Slider min={0} max={50} valueLow={minYears} valueHigh={maxYears}
+                      onChange={(lo,hi)=>{ setMinYears(lo); setMaxYears(hi); }} />
+            </div>
+            <div>
+              <div style={{ color:'#a1a1aa', fontSize:12, marginBottom:6 }}>Salary</div>
+              <Slider min={0} max={500000} step={1000} valueLow={minSalary} valueHigh={maxSalary}
+                      onChange={(lo,hi)=>{ setMinSalary(lo); setMaxSalary(hi); }} format={v=>`$${v.toLocaleString()}`} />
+            </div>
           </div>
         </div>
 
-        {/* Results */}
-        <div style={{ ...glass, padding: 14, marginTop: 10 }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>Recent candidates (read-only)</div>
-          {err ? <div style={{ color: '#f87171', marginBottom: 8 }}>{err}</div> : null}
-
-          {filtered.map((c) => (
-            <ClientCandidateRow key={c.id} c={c} amEmail={amEmail} clientEmail={email} />
-          ))}
-          {!filtered.length ? <div style={{ color: '#b6beca' }}>No candidates found.</div> : null}
+        {/* List */}
+        <div style={{ ...box, marginTop: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Recent candidates (read-only)</div>
+          {err ? <div style={{ color:'#f87171', fontSize:12, marginBottom:8 }}>{err}</div> : null}
+          {loading ? <div style={{ color:'#a1a1aa' }}>Loading…</div> : null}
+          {filtered.length === 0 ? (
+            <div style={{ color:'#a1a1aa', fontSize: 13 }}>No candidates found.</div>
+          ) : (
+            <div style={{ display:'grid', gap:8 }}>
+              {filtered.map(c => <ClientCard key={c.id} c={c} amEmail={amEmail} />)}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// A row with inline header + buttons + expandable notes
-function ClientCandidateRow({ c, amEmail, clientEmail }) {
+function ClientCard({ c, amEmail }) {
   const [open, setOpen] = useState(false);
-  const titlesCsv = arrayToCsv(csvToArray(c.titles));
-  const lawCsv = arrayToCsv(csvToArray(c.practice_areas));
-  const when = c.date_entered ? new Date(c.date_entered) : null;
+  const line = [
+    c.titles, c.law
+  ].filter(Boolean).join(' · ');
+  const loc = [c.city, c.state].filter(Boolean).join(', ');
+
+  const mailto = (() => {
+    const to = amEmail || 'info@youragency.com';
+    const subj = `Request candidate details – ${c.name || ''}`;
+    const body = [
+      `Hello,`,
+      ``,
+      `I'm interested in this candidate:`,
+      `• Name: ${c.name || ''}`,
+      `• Title(s): ${c.titles || ''}`,
+      `• Type of law: ${c.law || ''}`,
+      `• Location: ${loc || ''}`,
+      `• Years: ${c.years ?? ''}`,
+      ``,
+      `Sent from Talent Connector`
+    ].join('\n');
+    return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  })();
 
   return (
-    <div style={{ ...glass, padding: 12, marginBottom: 10 }}>
-      {/* Header line: Name — Titles — Type of Law */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+    <div style={{ ...box }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
         <div>
-          <div style={{ fontWeight: 700 }}>
-            {c.name}
-            {titlesCsv ? ` — ${titlesCsv}` : ''}
-            {lawCsv ? ` — ${lawCsv}` : ''}
-          </div>
-          <div style={{ fontSize: 12, color: '#b6beca' }}>
-            {[c.city, c.state].filter(Boolean).join(', ')} • {c.years ?? '-'} yrs
-            {c.years_in_recent_role != null ? ` • ${c.years_in_recent_role} yrs recent role` : ''}
-            {when ? ` • ${when.toLocaleDateString()}` : ''}
+          <div style={{ fontWeight: 600 }}>{c.name}</div>
+          <div style={{ color:'#a1a1aa', fontSize: 12, marginTop: 2 }}>
+            {[line, loc, `${c.years||0} yrs`].filter(Boolean).join(' · ')}
           </div>
         </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'start', flexWrap: 'wrap' }}>
-          <button onClick={() => setOpen((v) => !v)} style={btnGhost}>
-            Additional information
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => setOpen(v => !v)} style={{ fontSize: 12 }}>
+            {open ? 'Hide info' : 'Additional information'}
           </button>
-          <a
-            href={buildContactMailto(c, amEmail, clientEmail)}
-            style={{ ...btn, textDecoration: 'none', display: 'inline-block' }}
-          >
-            Email for more information
-          </a>
+          <a href={mailto} style={{
+            display:'inline-block', padding:'8px 12px', fontSize:12,
+            borderRadius:8, background:'#2563eb', color:'#fff', textDecoration:'none'
+          }}>Email for more information</a>
         </div>
       </div>
 
-      {/* Notes (expanded only by button) */}
-      {open && c.notes ? (
-        <div
-          style={{
-            marginTop: 10,
-            background: 'rgba(23,25,32,.9)',
-            border: '1px solid rgba(255,255,255,.12)',
-            borderRadius: 10,
-            padding: 10,
-            color: '#e8eaed',
-            whiteSpace: 'pre-wrap',
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Candidate Notes</div>
-          {c.notes}
+      {open ? (
+        <div style={{
+          marginTop: 8, padding: 10, borderRadius: 8,
+          background: '#0e1726', border: '1px solid #233262', fontSize: 13
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Notes</div>
+          <div>{c.notes || '—'}</div>
+          <div style={{ marginTop: 6, color:'#a1a1aa' }}>
+            Salary: {c.salary ? `$${c.salary.toLocaleString()}` : '—'} ·
+            {' '}Contract: {c.contract ? (`Yes${c.hourly ? `, $${c.hourly}/hr` : ''}`) : 'No'}
+          </div>
         </div>
       ) : null}
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Reusable pieces
-// ───────────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------
+   Little UI atoms
+------------------------------------------------------- */
 function Header({ title, onLogout }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
       <div style={{ fontWeight: 800, fontSize: 20 }}>{title}</div>
-      <button onClick={onLogout} style={{ ...btnGhost, background: '#1f2937' }}>
-        Log out
-      </button>
+      <button onClick={onLogout}>Log out</button>
     </div>
   );
 }
-
-function L({ label: text, children }) {
+function Field({ label, value, onChange, placeholder }) {
   return (
-    <label>
-      <div style={label}>{text}</div>
-      {children}
+    <label style={{ display:'block', fontSize:12, color:'#a1a1aa', marginTop:6 }}>
+      {label}
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+             style={{ width:'100%', padding:10, borderRadius:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', marginTop:6 }}/>
+    </label>
+  );
+}
+function Num({ label, value, onChange }) {
+  return (
+    <label style={{ display:'block', fontSize:12, color:'#a1a1aa', marginTop:6 }}>
+      {label}
+      <input type="number" value={value} onChange={e => onChange(e.target.value)}
+             style={{ width:'100%', padding:10, borderRadius:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', marginTop:6 }}/>
+    </label>
+  );
+}
+function Area({ label, value, onChange, placeholder }) {
+  return (
+    <label style={{ display:'block', fontSize:12, color:'#a1a1aa', marginTop:10 }}>
+      {label}
+      <textarea rows={4} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+                style={{ width:'100%', padding:10, borderRadius:8, background:'#111827', color:'#e5e5e5', border:'1px solid #1f2937', marginTop:6 }}/>
     </label>
   );
 }
 
-function SkylineBG() {
-  const [failed, setFailed] = useState(false);
-  if (failed || !NYC_URL) return null;
+/* Dual-thumb slider (no external deps) */
+function Slider({ min, max, step=1, valueLow, valueHigh, onChange, format }) {
+  const lo = clamp(valueLow, min, max);
+  const hi = clamp(valueHigh, min, max);
+  const pct = v => ((v - min) / (max - min)) * 100;
+
   return (
-    <img
-      src={NYC_URL}
-      alt=""
-      aria-hidden="true"
-      onError={() => setFailed(true)}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-        filter: 'grayscale(0.1) contrast(1.08) brightness(0.95)',
-        zIndex: -1,
-      }}
-    />
+    <div>
+      <div style={{ position:'relative', height: 28 }}>
+        <div style={{
+          position:'absolute', left:0, right:0, top:12, height:4,
+          background:'#1f2937', borderRadius: 999
+        }}/>
+        <div style={{
+          position:'absolute', left:`${pct(lo)}%`, right:`${100 - pct(hi)}%`, top:12, height:4,
+          background:'#4f46e5', borderRadius: 999
+        }}/>
+        <input type="range" min={min} max={max} step={step} value={lo}
+               onChange={e => onChange(Math.min(Number(e.target.value), hi), hi)}
+               style={{ position:'absolute', left:0, right:0, top:0, width:'100%', height:28, appearance:'none', background:'transparent' }}/>
+        <input type="range" min={min} max={max} step={step} value={hi}
+               onChange={e => onChange(lo, Math.max(Number(e.target.value), lo))}
+               style={{ position:'absolute', left:0, right:0, top:0, width:'100%', height:28, appearance:'none', background:'transparent' }}/>
+      </div>
+      <div style={{ display:'flex', justifyContent:'space-between', marginTop:6, fontSize:12 }}>
+        <span>{format ? format(lo) : lo}</span>
+        <span>{format ? format(hi) : hi}</span>
+      </div>
+    </div>
   );
 }
