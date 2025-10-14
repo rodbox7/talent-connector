@@ -2,16 +2,6 @@
 import React from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
 
-/**
- * Full page with:
- * - Login (Supabase-first; tabs for recruiter/client/admin)
- * - Recruiter workspace with aligned grid form and "My recent candidates"
- * - Simple Admin/Client placeholders (kept minimal so deploy stays stable)
- *
- * The recruiter form writes to public.candidates with columns:
- * name, titles_csv, law_csv, years, city, state, salary, contract, notes, created_by
- */
-
 const NYC_BG =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
@@ -23,11 +13,9 @@ export default function Page() {
   const [err, setErr] = React.useState('');
 
   React.useEffect(() => {
-    // Restore existing session (edge-safe)
     (async () => {
       const { data } = await sb.auth.getSession();
       if (data?.session?.user) {
-        // fetch profile to get role
         const { data: prof } = await sb
           .from('profiles')
           .select('id,email,role,org,account_manager_email')
@@ -58,7 +46,7 @@ export default function Page() {
       password: pwd,
     });
     if (authErr || !auth?.user) {
-      setErr('Invalid credentials.');
+      setErr(authErr?.message || 'Invalid credentials.');
       return;
     }
     const { data: prof, error: profErr } = await sb
@@ -93,7 +81,6 @@ export default function Page() {
     setMode('recruiter');
   }
 
-  // Shared chrome
   const page = {
     minHeight: '100vh',
     background: '#0a0a0a',
@@ -117,7 +104,6 @@ export default function Page() {
     background: 'rgba(8, 10, 16, .88)',
     boxShadow: '0 8px 24px rgba(0,0,0,.35)',
   };
-  const title = { fontSize: 20, fontWeight: 800, marginBottom: 8 };
   const logoutBtn = {
     padding: '8px 12px',
     borderRadius: 10,
@@ -303,7 +289,7 @@ function RecruiterWorkspace({ user }) {
   async function loadMine() {
     const { data, error } = await sb
       .from('candidates')
-      .select('id,name,city,state,years,salary,contract,notes,created_at,titles_csv,law_csv')
+      .select('id,name,city,state,years,salary,contract,hourly,notes,created_at,titles_csv,law_csv')
       .eq('created_by', user.id)
       .order('created_at', { ascending: false })
       .limit(15);
@@ -315,20 +301,32 @@ function RecruiterWorkspace({ user }) {
   }, []);
 
   async function handleAdd(rec) {
+    // Normalize numbers & blanks → null to satisfy DB types.
+    const yearsNum = Number.isFinite(Number(rec.years)) ? Number(rec.years) : null;
+    const salaryNum = Number.isFinite(Number(rec.salary)) ? Number(rec.salary) : null;
+    const hourlyNum =
+      rec.contract && Number.isFinite(Number(rec.hourly)) ? Number(rec.hourly) : null;
+
     const payload = {
-      name: rec.name,
-      titles_csv: rec.titles,
-      law_csv: rec.law,
-      years: rec.years,
-      city: rec.city,
-      state: rec.state,
-      salary: rec.salary,
-      contract: rec.contract,
-      notes: rec.notes,
+      name: rec.name || null,
+      titles_csv: rec.titles || null,
+      law_csv: rec.law || null,
+      years: yearsNum,
+      city: rec.city || null,
+      state: rec.state || null,
+      salary: salaryNum,
+      contract: !!rec.contract,
+      hourly: hourlyNum, // <- NEW
+      notes: rec.notes || null,
       created_by: user.id,
     };
-    const { data, error } = await sb.from('candidates').insert(payload).select('id');
-    if (error) throw error;
+
+    const { error } = await sb.from('candidates').insert(payload);
+    if (error) {
+      console.error('Insert error:', error);
+      throw new Error(error.message || 'Insert failed');
+    }
+
     setFlash('Candidate added');
     await loadMine();
     setTimeout(() => setFlash(''), 1500);
@@ -358,8 +356,9 @@ function RecruiterWorkspace({ user }) {
             <div key={c.id} style={row}>
               <div style={{ fontWeight: 700 }}>{c.name}</div>
               <div style={{ fontSize: 12, color: '#9ca3af' }}>
-                {(c.city || '-')}, {(c.state || '-')}&nbsp; •&nbsp; {String(c.years || 0)} yrs • Salary:{' '}
+                {(c.city || '-')}, {(c.state || '-')}&nbsp; •&nbsp; {String(c.years ?? 0)} yrs • Salary:{' '}
                 {c.salary ? `$${c.salary}` : '-'} • Contract: {c.contract ? 'Yes' : 'No'}
+                {c.contract && c.hourly ? ` • Hourly: $${c.hourly}` : ''}
               </div>
               {c.titles_csv || c.law_csv ? (
                 <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>
@@ -391,7 +390,6 @@ function RecruiterWorkspace({ user }) {
   );
 }
 
-/* === Clean, aligned version (no JSX comments) === */
 function RecruiterAddForm({ onAdd }) {
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
@@ -401,6 +399,7 @@ function RecruiterAddForm({ onAdd }) {
   const [state, setState] = React.useState('');
   const [salary, setSalary] = React.useState('');
   const [contract, setContract] = React.useState(false);
+  const [hourly, setHourly] = React.useState(''); // <- NEW
   const [notes, setNotes] = React.useState('');
   const [flash, setFlash] = React.useState('');
   const [err, setErr] = React.useState('');
@@ -431,8 +430,10 @@ function RecruiterAddForm({ onAdd }) {
     setFlash('');
     setErr('');
 
-    const yearsNum = Number(years) || 0;
-    const salaryNum = Number(salary) || 0;
+    const yearsNum = Number.isFinite(Number(years)) ? Number(years) : null;
+    const salaryNum = Number.isFinite(Number(salary)) ? Number(salary) : null;
+    const hourlyNum =
+      contract && Number.isFinite(Number(hourly)) ? Number(hourly) : null;
 
     if (!name.trim()) {
       setErr('Please enter a full name.');
@@ -442,14 +443,15 @@ function RecruiterAddForm({ onAdd }) {
     try {
       await onAdd({
         name: name.trim(),
-        titles,
-        law,
+        titles: titles?.trim() || null,
+        law: law?.trim() || null,
         years: yearsNum,
-        city: city.trim(),
-        state: state.trim(),
+        city: city?.trim() || null,
+        state: state?.trim() || null,
         salary: salaryNum,
         contract: !!contract,
-        notes: String(notes || '').trim(),
+        hourly: hourlyNum,
+        notes: notes?.trim() || null,
       });
 
       setName('');
@@ -460,12 +462,13 @@ function RecruiterAddForm({ onAdd }) {
       setState('');
       setSalary('');
       setContract(false);
+      setHourly('');
       setNotes('');
       setFlash('Candidate added');
       setTimeout(() => setFlash(''), 1200);
     } catch (e) {
       console.error(e);
-      setErr('Database error adding candidate.');
+      setErr(e.message || 'Database error adding candidate.');
     }
   }
 
@@ -515,7 +518,7 @@ function RecruiterAddForm({ onAdd }) {
         </div>
 
         <div style={{ gridColumn: 'span 4' }}>
-          <div style={label}>Salary desired</div>
+          <div style={label}>Salary desired (annual)</div>
           <input
             type="number"
             value={salary}
@@ -537,7 +540,21 @@ function RecruiterAddForm({ onAdd }) {
           </label>
         </div>
 
-        <div style={{ gridColumn: 'span 4' }} />
+        {/* Hourly rate appears only when contract is checked */}
+        {contract ? (
+          <div style={{ gridColumn: 'span 4' }}>
+            <div style={label}>Hourly rate (if contract)</div>
+            <input
+              type="number"
+              value={hourly}
+              onChange={(e) => setHourly(e.target.value)}
+              placeholder="e.g., 85"
+              style={input}
+            />
+          </div>
+        ) : (
+          <div style={{ gridColumn: 'span 4' }} />
+        )}
 
         <div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
           <div style={label}>Candidate Notes</div>
