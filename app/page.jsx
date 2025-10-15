@@ -1,223 +1,354 @@
 'use client';
-import React, { useState } from 'react';
-import { supabase as sb } from '../lib/supabaseClient';
 
-const NYC =
-  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
+import React from 'react';
+import { supabase } from '../lib/supabaseClient';
 
-const shell = {
-  minHeight: '100vh',
-  width: '100%',
-  backgroundImage: `url("${NYC}")`,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial',
-  display: 'grid',
-  placeItems: 'center',
-  padding: 16,
-};
-const card = {
-  width: '100%',
-  maxWidth: 520,
-  background: 'rgba(0,0,0,.78)',
-  color: '#e5e7eb',
-  border: '1px solid rgba(255,255,255,.1)',
-  borderRadius: 14,
-  padding: 18,
-  boxShadow: '0 8px 28px rgba(0,0,0,.45)',
-};
-const h1 = { fontSize: 20, fontWeight: 800, marginBottom: 4 };
-const sub = { fontSize: 12, color: '#9ca3af', marginBottom: 12 };
-const label = { fontSize: 12, color: '#9ca3af', marginBottom: 4 };
-const input = {
-  width: '100%',
-  padding: '10px 12px',
-  background: 'rgba(17,24,39,.9)',
-  border: '1px solid rgba(255,255,255,.08)',
-  color: '#e5e7eb',
-  borderRadius: 10,
-  outline: 'none',
-};
-const tabs = { display: 'grid', gridTemplateColumns: 'repeat(3,120px)', gap: 10, marginTop: 2 };
-const tab = (active) => ({
-  padding: '10px 12px',
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,.08)',
-  background: active ? 'rgba(31,41,55,.9)' : 'rgba(17,24,39,.85)',
-  color: '#e5e7eb',
-  fontWeight: 600,
-  cursor: 'pointer',
-  textAlign: 'center',
-});
-const btn = {
-  padding: '10px 14px',
-  borderRadius: 10,
-  background: '#4f46e5',
-  color: 'white',
-  border: '1px solid rgba(255,255,255,.1)',
-  fontWeight: 700,
-  cursor: 'pointer',
-};
-const logLine = (ok) => ({
-  fontSize: 12,
-  padding: '6px 8px',
-  borderRadius: 8,
-  background: ok ? 'rgba(16,185,129,.08)' : 'rgba(248,113,113,.08)',
-  color: ok ? '#93e2b7' : '#fca5a5',
-  border: `1px solid ${ok ? 'rgba(16,185,129,.25)' : 'rgba(248,113,113,.25)'}`,
-});
+/**
+ * Drop-in login + role-routing page
+ * - Background image on all screens
+ * - Centered login card
+ * - No debug panels
+ * - Role tabs (Recruiter / Client / Admin)
+ * - Supabase Auth sign-in + fetch profile from public.profiles
+ * - Enforces selected tab matches profile.role
+ * - On success, shows the correct workspace shell with a Logout button
+ *
+ * Assumes you have:
+ * - table public.profiles (id UUID PK == auth.users.id, email, role, org, account_manager_email)
+ * - NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY set correctly
+ */
 
 export default function Page() {
-  const [mode, setMode] = useState('recruiter'); // recruiter | client | admin
-  const [email, setEmail] = useState('');
-  const [pwd, setPwd] = useState('');
+  const [mode, setMode] = React.useState<'recruiter' | 'client' | 'admin'>('recruiter');
+  const [email, setEmail] = React.useState('');
+  const [pwd, setPwd] = React.useState('');
+  const [err, setErr] = React.useState('');
+  const [user, setUser] = React.useState<null | {
+    id: string;
+    email: string;
+    role: 'recruiter' | 'client' | 'admin';
+    org?: string | null;
+    amEmail?: string | null;
+  }>(null);
 
-  const [steps, setSteps] = useState([]);
-  const [who, setWho] = useState(null);
+  // Try to restore a session (optional)
+  React.useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const sessionUser = data.session?.user;
+      if (!sessionUser) return;
 
-  function push(ok, msg, extra) {
-    setSteps((s) => [...s, { ok, msg, extra }]);
-  }
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id,email,role,org,account_manager_email')
+        .eq('id', sessionUser.id)
+        .single();
+
+      if (prof?.id) {
+        setUser({
+          id: prof.id,
+          email: prof.email,
+          role: prof.role,
+          org: prof.org ?? null,
+          amEmail: prof.account_manager_email ?? null,
+        });
+      }
+    })();
+  }, []);
 
   async function login() {
-    setSteps([]);
-    setWho(null);
-
     try {
-      const e = email.trim().toLowerCase();
-      push(true, `Starting login for ${e} as ${mode}`);
+      setErr('');
+      const e = String(email || '').trim().toLowerCase();
+      if (!e.includes('@')) {
+        setErr('Enter a valid email.');
+        return;
+      }
+      if (!pwd) {
+        setErr('Enter your password.');
+        return;
+      }
 
-      // 0) quick env sanity
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      push(!!url && hasKey, `Env check: url ok=${!!url}, key ok=${hasKey}`);
-
-      // 1) Auth
-      const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
+      // 1) Supabase password sign-in
+      const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
         email: e,
         password: pwd,
       });
       if (authErr) {
-        push(false, `Auth error: ${authErr.message}`);
+        setErr(authErr.message || 'Login failed.');
         return;
       }
-      push(true, `Auth OK: user ${auth.user.id}`);
+      if (!auth?.user?.id) {
+        setErr('Login failed (no user).');
+        return;
+      }
 
-      // 2) Profile by id
-      let { data: prof, error: pErr } = await sb
+      // 2) Fetch profile row by auth user id
+      const { data: prof, error: profErr } = await supabase
         .from('profiles')
         .select('id,email,role,org,account_manager_email')
         .eq('id', auth.user.id)
         .single();
 
-      if (pErr || !prof) {
-        push(false, `Profile by id failed, trying by email: ${pErr?.message || 'not found'}`);
-
-        // 3) Fallback profile by email
-        const { data: byEmail, error: e2 } = await sb
-          .from('profiles')
-          .select('id,email,role,org,account_manager_email')
-          .eq('email', e)
-          .single();
-
-        if (e2 || !byEmail) {
-          push(false, `Profile by email failed: ${e2?.message || 'not found'}`);
-          push(false, 'Fix: create profile row for this email or align profiles.id to auth.users.id');
-          return;
-        }
-        prof = byEmail;
-        push(true, `Profile by email OK: id ${prof.id}`);
-      } else {
-        push(true, `Profile by id OK: id ${prof.id}`);
-      }
-
-      if (mode !== prof.role) {
-        push(false, `Role mismatch. Account role is ${prof.role}. Use the ${prof.role} tab.`);
+      if (profErr || !prof?.id) {
+        setErr(
+          'Login OK, but your profile was not found. Ask an admin to create/repair your profile.'
+        );
         return;
       }
 
-      setWho(prof);
-      push(true, 'Login complete ✔');
-    } catch (err) {
-      push(false, `Unexpected error: ${String(err?.message || err)}`);
-      console.error(err);
+      // 3) Enforce the role tab
+      const profileRole = String(prof.role) as 'recruiter' | 'client' | 'admin';
+      if (profileRole !== mode) {
+        setErr(
+          `This account is a ${profileRole}. Switch to the "${profileRole}" tab or ask admin to change your role.`
+        );
+        return;
+      }
+
+      // 4) Success → stash user → render workspace
+      setUser({
+        id: prof.id,
+        email: prof.email,
+        role: profileRole,
+        org: prof.org ?? null,
+        amEmail: prof.account_manager_email ?? null,
+      });
+    } catch (e: any) {
+      setErr(e?.message || 'Unexpected error logging in.');
     }
   }
 
-  return (
-    <div style={shell}>
-      <div style={card}>
-        <div style={h1}>Talent Connector</div>
-        <div style={sub}>Invitation-only access</div>
+  async function logout() {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+      setEmail('');
+      setPwd('');
+      setMode('recruiter');
+      setErr('');
+    }
+  }
 
-        <div style={tabs}>
-          <button style={tab(mode === 'recruiter')} onClick={() => setMode('recruiter')}>
+  // ---------- Shared styles ----------
+  const wrap: React.CSSProperties = {
+    minHeight: '100vh',
+    display: 'grid',
+    placeItems: 'center',
+    color: '#e5e5e5',
+    fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+    position: 'relative',
+    overflow: 'hidden',
+  };
+
+  const bg: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    backgroundImage:
+      'url(https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'grayscale(15%) brightness(45%)',
+    zIndex: 0,
+  };
+
+  const glass: React.CSSProperties = {
+    width: '100%',
+    maxWidth: 540,
+    background: 'rgba(14, 17, 24, 0.82)',
+    border: '1px solid rgba(148,163,184,0.16)',
+    borderRadius: 16,
+    padding: 20,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+    zIndex: 1,
+    backdropFilter: 'blur(3px)',
+  };
+
+  const pill = (active: boolean): React.CSSProperties => ({
+    padding: '10px 16px',
+    borderRadius: 10,
+    border: '1px solid rgba(148,163,184,0.16)',
+    background: active ? 'rgba(55,65,81,0.7)' : 'rgba(17,24,39,0.7)',
+    color: '#e5e5e5',
+    fontWeight: 600,
+    cursor: 'pointer',
+  });
+
+  const input: React.CSSProperties = {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    border: '1px solid rgba(148,163,184,0.16)',
+    background: 'rgba(17,24,39,0.85)',
+    color: '#e5e5e5',
+    outline: 'none',
+  };
+
+  const btn: React.CSSProperties = {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    border: '1px solid rgba(99,102,241,0.6)',
+    background: 'linear-gradient(90deg, #6366f1, #4f46e5)',
+    color: '#fff',
+    fontWeight: 700,
+    cursor: 'pointer',
+  };
+
+  // ---------- Role workspaces (thin shells) ----------
+  if (user?.role === 'recruiter') {
+    return (
+      <div style={wrap}>
+        <div style={bg} />
+        <Shell title="Recruiter workspace" onLogout={logout}>
+          {/* Put your recruiter add/list UI component here */}
+          <p style={{ opacity: 0.8, marginTop: 6 }}>
+            Minimal placeholder for <b>recruiter</b>. (Your add/list UI goes here.)
+          </p>
+        </Shell>
+      </div>
+    );
+  }
+
+  if (user?.role === 'client') {
+    return (
+      <div style={wrap}>
+        <div style={bg} />
+        <Shell title="Client workspace" onLogout={logout}>
+          {/* Put your client search/list UI component here */}
+          <p style={{ opacity: 0.8, marginTop: 6 }}>
+            Minimal placeholder for <b>client</b>. (Read-only search UI goes here.)
+          </p>
+        </Shell>
+      </div>
+    );
+  }
+
+  if (user?.role === 'admin') {
+    return (
+      <div style={wrap}>
+        <div style={bg} />
+        <Shell title="Admin workspace" onLogout={logout}>
+          {/* Put your admin users/invite UI component here */}
+          <p style={{ opacity: 0.8, marginTop: 6 }}>
+            Minimal placeholder for <b>admin</b>. (Users/invite UI goes here.)
+          </p>
+        </Shell>
+      </div>
+    );
+  }
+
+  // ---------- Login screen ----------
+  return (
+    <div style={wrap}>
+      <div style={bg} />
+      <div style={glass}>
+        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Talent Connector</div>
+        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 12 }}>Invitation-only access</div>
+
+        {/* Role tabs */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          <button style={pill(mode === 'recruiter')} onClick={() => setMode('recruiter')}>
             Recruiter
           </button>
-          <button style={tab(mode === 'client')} onClick={() => setMode('client')}>
+          <button style={pill(mode === 'client')} onClick={() => setMode('client')}>
             Client
           </button>
-          <button style={tab(mode === 'admin')} onClick={() => setMode('admin')}>
+          <button style={pill(mode === 'admin')} onClick={() => setMode('admin')}>
             Admin
           </button>
         </div>
 
-        <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-          <div>
-            <div style={label}>Email</div>
-            <input
-              style={input}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-            />
-          </div>
-          <div>
-            <div style={label}>Password</div>
-            <input
-              style={input}
-              type="password"
-              value={pwd}
-              onChange={(e) => setPwd(e.target.value)}
-              placeholder="Your password"
-            />
-          </div>
-          <div>
-            <button style={btn} onClick={login}>
-              Log in
-            </button>
-          </div>
+        <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
+          Email
+        </label>
+        <input
+          type="email"
+          placeholder="name@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ ...input, marginBottom: 12 }}
+          autoComplete="email"
+        />
 
-          {steps.length ? (
-            <div style={{ display: 'grid', gap: 6 }}>
-              {steps.map((s, i) => (
-                <div key={i} style={logLine(s.ok)}>
-                  {s.ok ? '✔ ' : '✖ '} {s.msg}
-                  {s.extra ? <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>{s.extra}</pre> : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
+        <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
+          Password
+        </label>
+        <input
+          type="password"
+          placeholder="your password"
+          value={pwd}
+          onChange={(e) => setPwd(e.target.value)}
+          style={{ ...input, marginBottom: 14 }}
+          autoComplete="current-password"
+        />
 
-          {who ? (
-            <pre
-              style={{
-                marginTop: 6,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontSize: 12,
-                background: 'rgba(17,24,39,.9)',
-                border: '1px solid rgba(255,255,255,.08)',
-                borderRadius: 10,
-                padding: 10,
-              }}
-            >
-{JSON.stringify(who, null, 2)}
-            </pre>
-          ) : null}
-        </div>
+        <button style={btn} onClick={login}>
+          Log in
+        </button>
+
+        {err ? (
+          <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>{err}</div>
+        ) : (
+          <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 10 }}>
+            Tip: make sure your email has a row in <code>public.profiles</code> with the correct role.
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** Small framed “glass” shell for the role workspaces */
+function Shell({
+  title,
+  onLogout,
+  children,
+}: {
+  title: string;
+  onLogout: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        width: 'min(1100px, 92vw)',
+        background: 'rgba(14,17,24,0.82)',
+        border: '1px solid rgba(148,163,184,0.16)',
+        borderRadius: 16,
+        padding: 18,
+        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+        backdropFilter: 'blur(3px)',
+        zIndex: 1,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
+        <div style={{ fontWeight: 800, fontSize: 20 }}>{title}</div>
+        <button
+          onClick={onLogout}
+          style={{
+            padding: '8px 14px',
+            borderRadius: 10,
+            border: '1px solid rgba(148,163,184,0.16)',
+            background: 'rgba(31,41,55,0.7)',
+            color: '#e5e5e5',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Log out
+        </button>
+      </div>
+      {children}
     </div>
   );
 }
