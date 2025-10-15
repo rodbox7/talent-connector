@@ -4,34 +4,23 @@ import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Drop-in login + role-routing page
- * - Background image on all screens
+ * Login + role-routing page (pure JS)
+ * - NYC background
  * - Centered login card
- * - No debug panels
  * - Role tabs (Recruiter / Client / Admin)
  * - Supabase Auth sign-in + fetch profile from public.profiles
  * - Enforces selected tab matches profile.role
- * - On success, shows the correct workspace shell with a Logout button
- *
- * Assumes you have:
- * - table public.profiles (id UUID PK == auth.users.id, email, role, org, account_manager_email)
- * - NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY set correctly
+ * - Minimal shells for each workspace + Logout
  */
 
 export default function Page() {
-  const [mode, setMode] = React.useState<'recruiter' | 'client' | 'admin'>('recruiter');
+  const [mode, setMode] = React.useState('recruiter'); // 'recruiter' | 'client' | 'admin'
   const [email, setEmail] = React.useState('');
   const [pwd, setPwd] = React.useState('');
   const [err, setErr] = React.useState('');
-  const [user, setUser] = React.useState<null | {
-    id: string;
-    email: string;
-    role: 'recruiter' | 'client' | 'admin';
-    org?: string | null;
-    amEmail?: string | null;
-  }>(null);
+  const [user, setUser] = React.useState(null); // { id, email, role, org, amEmail }
 
-  // Try to restore a session (optional)
+  // Try to restore an existing session
   React.useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -44,11 +33,11 @@ export default function Page() {
         .eq('id', sessionUser.id)
         .single();
 
-      if (prof?.id) {
+      if (prof && prof.id) {
         setUser({
           id: prof.id,
           email: prof.email,
-          role: prof.role,
+          role: String(prof.role),
           org: prof.org ?? null,
           amEmail: prof.account_manager_email ?? null,
         });
@@ -97,8 +86,8 @@ export default function Page() {
         return;
       }
 
-      // 3) Enforce the role tab
-      const profileRole = String(prof.role) as 'recruiter' | 'client' | 'admin';
+      // 3) Enforce role tab
+      const profileRole = String(prof.role);
       if (profileRole !== mode) {
         setErr(
           `This account is a ${profileRole}. Switch to the "${profileRole}" tab or ask admin to change your role.`
@@ -114,7 +103,7 @@ export default function Page() {
         org: prof.org ?? null,
         amEmail: prof.account_manager_email ?? null,
       });
-    } catch (e: any) {
+    } catch (e) {
       setErr(e?.message || 'Unexpected error logging in.');
     }
   }
@@ -132,7 +121,7 @@ export default function Page() {
   }
 
   // ---------- Shared styles ----------
-  const wrap: React.CSSProperties = {
+  const wrap = {
     minHeight: '100vh',
     display: 'grid',
     placeItems: 'center',
@@ -142,7 +131,7 @@ export default function Page() {
     overflow: 'hidden',
   };
 
-  const bg: React.CSSProperties = {
+  const bg = {
     position: 'fixed',
     inset: 0,
     backgroundImage:
@@ -153,7 +142,7 @@ export default function Page() {
     zIndex: 0,
   };
 
-  const glass: React.CSSProperties = {
+  const glass = {
     width: '100%',
     maxWidth: 540,
     background: 'rgba(14, 17, 24, 0.82)',
@@ -165,7 +154,7 @@ export default function Page() {
     backdropFilter: 'blur(3px)',
   };
 
-  const pill = (active: boolean): React.CSSProperties => ({
+  const pill = (active) => ({
     padding: '10px 16px',
     borderRadius: 10,
     border: '1px solid rgba(148,163,184,0.16)',
@@ -175,7 +164,7 @@ export default function Page() {
     cursor: 'pointer',
   });
 
-  const input: React.CSSProperties = {
+  const input = {
     width: '100%',
     padding: 12,
     borderRadius: 10,
@@ -185,7 +174,7 @@ export default function Page() {
     outline: 'none',
   };
 
-  const btn: React.CSSProperties = {
+  const btn = {
     width: '100%',
     padding: 12,
     borderRadius: 10,
@@ -196,13 +185,12 @@ export default function Page() {
     cursor: 'pointer',
   };
 
-  // ---------- Role workspaces (thin shells) ----------
-  if (user?.role === 'recruiter') {
+  // ---------- Role workspaces ----------
+  if (user && user.role === 'recruiter') {
     return (
       <div style={wrap}>
         <div style={bg} />
         <Shell title="Recruiter workspace" onLogout={logout}>
-          {/* Put your recruiter add/list UI component here */}
           <p style={{ opacity: 0.8, marginTop: 6 }}>
             Minimal placeholder for <b>recruiter</b>. (Your add/list UI goes here.)
           </p>
@@ -211,12 +199,11 @@ export default function Page() {
     );
   }
 
-  if (user?.role === 'client') {
+  if (user && user.role === 'client') {
     return (
       <div style={wrap}>
         <div style={bg} />
         <Shell title="Client workspace" onLogout={logout}>
-          {/* Put your client search/list UI component here */}
           <p style={{ opacity: 0.8, marginTop: 6 }}>
             Minimal placeholder for <b>client</b>. (Read-only search UI goes here.)
           </p>
@@ -225,12 +212,11 @@ export default function Page() {
     );
   }
 
-  if (user?.role === 'admin') {
+  if (user && user.role === 'admin') {
     return (
       <div style={wrap}>
         <div style={bg} />
         <Shell title="Admin workspace" onLogout={logout}>
-          {/* Put your admin users/invite UI component here */}
           <p style={{ opacity: 0.8, marginTop: 6 }}>
             Minimal placeholder for <b>admin</b>. (Users/invite UI goes here.)
           </p>
@@ -300,16 +286,8 @@ export default function Page() {
   );
 }
 
-/** Small framed “glass” shell for the role workspaces */
-function Shell({
-  title,
-  onLogout,
-  children,
-}: {
-  title: string;
-  onLogout: () => void;
-  children: React.ReactNode;
-}) {
+/** Simple “glass” shell for each role workspace */
+function Shell({ title, onLogout, children }) {
   return (
     <div
       style={{
