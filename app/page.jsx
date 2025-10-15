@@ -3,7 +3,7 @@
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-/* ======================= Shared styles (module scope) ======================= */
+/* ======================= Shared styles ======================= */
 const ST = {
   wrap: {
     minHeight: '100vh',
@@ -270,6 +270,14 @@ export default function Page() {
 
 /* ========================= Recruiter UI ========================= */
 function RecruiterUI({ user, cols }) {
+  const todayISODate = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const [form, setForm] = React.useState({
     name: '',
     titles_csv: '',
@@ -281,6 +289,7 @@ function RecruiterUI({ user, cols }) {
     contract: false,
     hourly: '',
     notes: '',
+    date_entered: todayISODate(), // NEW: visible "Date entered" field (yyyy-mm-dd)
   });
   const [flash, setFlash] = React.useState('');
   const [err, setErr] = React.useState('');
@@ -329,7 +338,13 @@ function RecruiterUI({ user, cols }) {
       };
       if (cols.titles_csv) payload.titles_csv = form.titles_csv.trim() || null;
       if (cols.law_csv) payload.law_csv = form.law_csv.trim() || null;
-      if (cols.date_entered) payload.date_entered = new Date().toISOString();
+
+      // If the column exists, save the chosen date; otherwise ignore.
+      if (cols.date_entered && form.date_entered) {
+        // store as ISO at midnight UTC for consistency
+        const dt = new Date(`${form.date_entered}T00:00:00.000Z`).toISOString();
+        payload.date_entered = dt;
+      }
 
       const { error } = await supabase.from('candidates').insert(payload);
       if (error) return setErr(`Database error adding candidate: ${error.message}`);
@@ -346,6 +361,7 @@ function RecruiterUI({ user, cols }) {
         contract: false,
         hourly: '',
         notes: '',
+        date_entered: todayISODate(),
       });
       await loadMine();
     } catch (e) {
@@ -451,6 +467,17 @@ function RecruiterUI({ user, cols }) {
             />
           </div>
         )}
+        {cols.date_entered && (
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={label}>Date entered</label>
+            <input
+              type="date"
+              style={ST.input}
+              value={form.date_entered}
+              onChange={(e) => up('date_entered', e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: 10 }}>
@@ -524,6 +551,122 @@ function RecruiterUI({ user, cols }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============ Two-thumb slider (single visual line using overlap) ============ */
+function RangeMinMax({ min, max, step, valueMin, valueMax, onChangeMin, onChangeMax }) {
+  // keep min <= max
+  function clampMin(v) {
+    const val = Math.min(Math.max(v, min), valueMax);
+    onChangeMin(val);
+  }
+  function clampMax(v) {
+    const val = Math.max(Math.min(v, max), valueMin);
+    onChangeMax(val);
+  }
+
+  const track = {
+    position: 'relative',
+    height: 22,
+  };
+  const base = {
+    position: 'absolute',
+    inset: 0,
+    WebkitAppearance: 'none',
+    appearance: 'none',
+    width: '100%',
+    background: 'transparent', // invisible track; we draw our own
+    pointerEvents: 'none', // allow top input to receive events, but…
+  };
+  const thumbable = {
+    pointerEvents: 'auto', // … thumbs remain interactive
+  };
+
+  // background track + selected range fill
+  const pctMin = ((valueMin - min) / (max - min)) * 100;
+  const pctMax = ((valueMax - min) / (max - min)) * 100;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        style={{
+          height: 4,
+          background: 'rgba(148,163,184,0.25)',
+          borderRadius: 999,
+          position: 'relative',
+          marginTop: 10,
+          marginBottom: 8,
+        }}
+      >
+        {/* fill */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `${pctMin}%`,
+            width: `${Math.max(0, pctMax - pctMin)}%`,
+            top: 0,
+            bottom: 0,
+            background: '#4f46e5',
+            borderRadius: 999,
+          }}
+        />
+      </div>
+
+      <div style={track}>
+        {/* lower thumb (under) */}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={valueMin}
+          onChange={(e) => clampMin(Number(e.target.value))}
+          style={{ ...base, zIndex: 2 }}
+        />
+        {/* upper thumb (on top) */}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={valueMax}
+          onChange={(e) => clampMax(Number(e.target.value))}
+          style={{ ...base, ...thumbable, zIndex: 3 }}
+        />
+      </div>
+
+      {/* Thumb styling (inline) */}
+      <style>{`
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: #2563eb;
+          border: 2px solid #93c5fd;
+          cursor: pointer;
+          margin-top: -6px;
+        }
+        input[type="range"]::-moz-range-thumb {
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: #2563eb;
+          border: 2px solid #93c5fd;
+          cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+          height: 4px;
+          background: transparent;
+        }
+        input[type="range"]::-moz-range-track {
+          height: 4px;
+          background: transparent;
+        }
+      `}</style>
     </div>
   );
 }
@@ -630,7 +773,7 @@ function ClientUI({ user, cols }) {
         </div>
       </div>
 
-      {/* Filters: single-line each (forced two equal columns, no wrap) */}
+      {/* Filters: each is a single visual line (two thumbs overlapped) */}
       <div
         style={{
           ...infoCard,
@@ -644,66 +787,30 @@ function ClientUI({ user, cols }) {
           <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
             Salary range (${minSalary.toLocaleString()} – ${maxSalary.toLocaleString()})
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 10,
-              alignItems: 'center',
-            }}
-          >
-            <input
-              type="range"
-              min={0}
-              max={400000}
-              step={5000}
-              value={minSalary}
-              onChange={(e) => setMinSalary(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
-            <input
-              type="range"
-              min={0}
-              max={400000}
-              step={5000}
-              value={maxSalary}
-              onChange={(e) => setMaxSalary(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
-          </div>
+          <RangeMinMax
+            min={0}
+            max={400000}
+            step={5000}
+            valueMin={minSalary}
+            valueMax={maxSalary}
+            onChangeMin={setMinSalary}
+            onChangeMax={setMaxSalary}
+          />
         </div>
 
         <div>
           <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
             Years of experience ({minYears} – {maxYears})
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 10,
-              alignItems: 'center',
-            }}
-          >
-            <input
-              type="range"
-              min={0}
-              max={50}
-              step={1}
-              value={minYears}
-              onChange={(e) => setMinYears(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
-            <input
-              type="range"
-              min={0}
-              max={50}
-              step={1}
-              value={maxYears}
-              onChange={(e) => setMaxYears(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
-          </div>
+          <RangeMinMax
+            min={0}
+            max={50}
+            step={1}
+            valueMin={minYears}
+            valueMax={maxYears}
+            onChangeMin={setMinYears}
+            onChangeMax={setMaxYears}
+          />
         </div>
       </div>
 
