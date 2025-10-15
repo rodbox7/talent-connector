@@ -3,10 +3,8 @@ import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * NOTE:
- * - This file focuses on the layout polish for the Recruiter form only.
- * - Data field names and insert payload are unchanged (no schema risk).
- * - If your env or auth helpers differ, keep those as-is elsewhere.
+ * Adds Client filters (City, State, Title, Type of Law) via selects.
+ * Recruiter UI and behavior preserved. Background + styling intact.
  */
 
 const NYC =
@@ -107,7 +105,7 @@ export default function Page() {
   const [err, setErr] = React.useState('');
   const [user, setUser] = React.useState(null);
 
-  // Minimal auth: Supabase email+password, then read profile from public.profiles
+  // Minimal auth
   async function login() {
     try {
       setErr('');
@@ -121,7 +119,6 @@ export default function Page() {
       });
       if (authErr) throw authErr;
 
-      // Profile
       const { data: prof, error: profErr } = await supabase
         .from('profiles')
         .select('id,email,role,org,account_manager_email')
@@ -160,7 +157,7 @@ export default function Page() {
     setErr('');
   }
 
-  // ---------- Recruiter form state (unchanged fields; layout only) ----------
+  // ---------- Recruiter form state (unchanged) ----------
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
@@ -173,7 +170,6 @@ export default function Page() {
   const [hourly, setHourly] = React.useState('');
   const [dateEntered, setDateEntered] = React.useState(() => {
     const d = new Date();
-    // yyyy-mm-dd for a date input
     return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
       .toISOString()
       .slice(0, 10);
@@ -183,7 +179,6 @@ export default function Page() {
   const [myRecent, setMyRecent] = React.useState([]);
   const [loadingList, setLoadingList] = React.useState(false);
 
-  // Load recent for recruiter
   React.useEffect(() => {
     if (!user || user.role !== 'recruiter') return;
     (async () => {
@@ -196,7 +191,6 @@ export default function Page() {
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
         .limit(25);
-
       if (!error && data) setMyRecent(data);
       setLoadingList(false);
     })();
@@ -230,7 +224,6 @@ export default function Page() {
       if (error) throw error;
 
       setAddMsg('Candidate added');
-      // Clear some fields but keep your preference for sticky tags
       setName('');
       setCity('');
       setState('');
@@ -241,7 +234,6 @@ export default function Page() {
       setHourly('');
       setNotes('');
 
-      // refresh list
       const { data, error: e2 } = await supabase
         .from('candidates')
         .select(
@@ -254,12 +246,176 @@ export default function Page() {
     } catch (e) {
       console.error(e);
       setAddMsg(
-        `Database error adding candidate${
-          e?.message ? `: ${e.message}` : ''
-        }`
+        `Database error adding candidate${e?.message ? `: ${e.message}` : ''}`
       );
     }
   }
+
+  // ---------- Client state (RESTORED + new filters) ----------
+  const [cCountToday, setCCountToday] = React.useState(0);
+  const [search, setSearch] = React.useState('');
+  const [minSalary, setMinSalary] = React.useState(0);
+  const [maxSalary, setMaxSalary] = React.useState(400000);
+  const [minYears, setMinYears] = React.useState(0);
+  const [maxYears, setMaxYears] = React.useState(50);
+  const [sortBy, setSortBy] = React.useState('date_desc');
+
+  // new: filter selects
+  const [cities, setCities] = React.useState([]);
+  const [states, setStates] = React.useState([]);
+  const [titleOptions, setTitleOptions] = React.useState([]);
+  const [lawOptions, setLawOptions] = React.useState([]);
+
+  const [fCity, setFCity] = React.useState('');
+  const [fState, setFState] = React.useState('');
+  const [fTitle, setFTitle] = React.useState('');
+  const [fLaw, setFLaw] = React.useState('');
+
+  const [clientRows, setClientRows] = React.useState([]);
+  const [clientLoading, setClientLoading] = React.useState(false);
+  const [clientErr, setClientErr] = React.useState('');
+  const [expandedId, setExpandedId] = React.useState(null);
+
+  const todayStartIso = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, []);
+
+  // Load today count
+  React.useEffect(() => {
+    if (!user || user.role !== 'client') return;
+    (async () => {
+      const { count } = await supabase
+        .from('candidates')
+        .select('id', { count: 'exact', head: true })
+        .gte('date_entered', todayStartIso);
+      setCCountToday(count || 0);
+    })();
+  }, [user, todayStartIso]);
+
+  // Load filter options (cities, states, titles, laws)
+  React.useEffect(() => {
+    if (!user || user.role !== 'client') return;
+
+    async function loadOptions() {
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('city,state,titles_csv,law_csv')
+          .limit(1000);
+
+        if (error) throw error;
+        const cset = new Set();
+        const sset = new Set();
+        const tset = new Set();
+        const lset = new Set();
+
+        for (const row of data || []) {
+          if (row.city) cset.add(row.city.trim());
+          if (row.state) sset.add(row.state.trim());
+
+          if (row.titles_csv) {
+            row.titles_csv
+              .split(',')
+              .map((x) => x.trim())
+              .filter(Boolean)
+              .forEach((x) => tset.add(x));
+          }
+          if (row.law_csv) {
+            row.law_csv
+              .split(',')
+              .map((x) => x.trim())
+              .filter(Boolean)
+              .forEach((x) => lset.add(x));
+          }
+        }
+
+        setCities(Array.from(cset).sort());
+        setStates(Array.from(sset).sort());
+        setTitleOptions(Array.from(tset).sort());
+        setLawOptions(Array.from(lset).sort());
+      } catch (e) {
+        console.error('loadOptions', e);
+      }
+    }
+
+    loadOptions();
+  }, [user]);
+
+  async function fetchClientRows() {
+    if (!user || user.role !== 'client') return;
+    setClientErr('');
+    setClientLoading(true);
+    try {
+      let q = supabase
+        .from('candidates')
+        .select(
+          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,notes,date_entered,created_at'
+        );
+
+      // Search
+      const qStr = search.trim();
+      if (qStr) {
+        const like = `%${qStr}%`;
+        q = q.or(
+          `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like}`
+        );
+      }
+
+      // Select filters
+      if (fCity) q = q.eq('city', fCity);
+      if (fState) q = q.eq('state', fState);
+      if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
+      if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
+
+      // Salary filter
+      if (minSalary != null) q = q.gte('salary', minSalary);
+      if (maxSalary != null) q = q.lte('salary', maxSalary);
+
+      // Years filter
+      if (minYears != null) q = q.gte('years', minYears);
+      if (maxYears != null) q = q.lte('years', maxYears);
+
+      // Sorting
+      switch (sortBy) {
+        case 'date_asc':
+          q = q.order('date_entered', { ascending: true, nullsFirst: false });
+          break;
+        case 'salary_desc':
+          q = q.order('salary', { ascending: false, nullsFirst: false });
+          break;
+        case 'salary_asc':
+          q = q.order('salary', { ascending: true, nullsFirst: true });
+          break;
+        case 'years_desc':
+          q = q.order('years', { ascending: false, nullsFirst: false });
+          break;
+        case 'years_asc':
+          q = q.order('years', { ascending: true, nullsFirst: true });
+          break;
+        case 'date_desc':
+        default:
+          q = q.order('date_entered', { ascending: false, nullsFirst: false });
+          break;
+      }
+
+      const { data, error } = await q.limit(200);
+      if (error) throw error;
+      setClientRows(data || []);
+    } catch (e) {
+      console.error(e);
+      setClientErr('Error loading client view.');
+    }
+    setClientLoading(false);
+  }
+
+  React.useEffect(() => {
+    if (user?.role === 'client') {
+      fetchClientRows();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // ---------- Layout ----------
   const pageWrap = {
@@ -283,7 +439,7 @@ export default function Page() {
     padding: '40px 16px',
   };
 
-  // ---------- Logged-out (login) ----------
+  // ---------- Logged-out ----------
   if (!user) {
     return (
       <div style={pageWrap}>
@@ -299,17 +455,10 @@ export default function Page() {
             >
               Talent Connector
             </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: '#9CA3AF',
-                marginBottom: 12,
-              }}
-            >
+            <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
               Invitation-only access
             </div>
 
-            {/* tabs */}
             <div
               style={{
                 display: 'grid',
@@ -372,7 +521,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Recruiter UI (new grid layout, same fields) ----------
+  // ---------- Recruiter UI (unchanged layout you approved) ----------
   if (user.role === 'recruiter') {
     return (
       <div style={pageWrap}>
@@ -408,7 +557,7 @@ export default function Page() {
                 Add candidate
               </div>
 
-              {/* 3-col grid on wide screens, 1-col on mobile */}
+              {/* 3-col grid */}
               <div
                 style={{
                   display: 'grid',
@@ -618,12 +767,12 @@ export default function Page() {
     );
   }
 
-  // ---------- Client / Admin placeholders (unchanged) ----------
+  // ---------- Client UI (restored + new selects) ----------
   if (user.role === 'client') {
     return (
       <div style={pageWrap}>
         <div style={overlay}>
-          <div style={{ width: 'min(1100px, 100%)' }}>
+          <div style={{ width: 'min(1200px, 100%)' }}>
             <div
               style={{
                 display: 'flex',
@@ -642,14 +791,393 @@ export default function Page() {
                 Log out
               </Button>
             </div>
-            <Card>Minimal placeholder for client.</Card>
+
+            {/* Stat + Search/Filters */}
+            <Card style={{ marginTop: 10 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: 12,
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                    Candidates added today
+                  </div>
+                  <div style={{ fontSize: 40, lineHeight: 1, fontWeight: 800 }}>
+                    {cCountToday}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    gap: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Input
+                    placeholder="Search name/city/state/titles/type of law"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  <Button onClick={fetchClientRows}>Refresh</Button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div
+                style={{
+                  marginTop: 12,
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: 10,
+                  alignItems: 'center',
+                }}
+              >
+                {/* Salary */}
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ color: '#9CA3AF', fontSize: 12 }}>
+                    Salary range ($0 – $400,000)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input
+                      type="range"
+                      min={0}
+                      max={400000}
+                      step={1000}
+                      value={minSalary}
+                      onChange={(e) =>
+                        setMinSalary(Math.min(Number(e.target.value), maxSalary))
+                      }
+                    />
+                    <input
+                      type="range"
+                      min={0}
+                      max={400000}
+                      step={1000}
+                      value={maxSalary}
+                      onChange={(e) =>
+                        setMaxSalary(Math.max(Number(e.target.value), minSalary))
+                      }
+                    />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                    ${minSalary.toLocaleString()} – ${maxSalary.toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Years */}
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ color: '#9CA3AF', fontSize: 12 }}>
+                    Years of experience (0 – 50)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      value={minYears}
+                      onChange={(e) =>
+                        setMinYears(Math.min(Number(e.target.value), maxYears))
+                      }
+                    />
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      value={maxYears}
+                      onChange={(e) =>
+                        setMaxYears(Math.max(Number(e.target.value), minYears))
+                      }
+                    />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+                    {minYears} – {maxYears} years
+                  </div>
+                </div>
+
+                {/* Sort */}
+                <div>
+                  <Label>Sort by</Label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #1F2937',
+                      background: '#0F172A',
+                      color: '#E5E7EB',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="date_desc">Newest first</option>
+                    <option value="date_asc">Oldest first</option>
+                    <option value="salary_desc">Salary high → low</option>
+                    <option value="salary_asc">Salary low → high</option>
+                    <option value="years_desc">Experience high → low</option>
+                    <option value="years_asc">Experience low → high</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* NEW: Select filters row */}
+              <div
+                style={{
+                  marginTop: 12,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <Label>City</Label>
+                  <select
+                    value={fCity}
+                    onChange={(e) => setFCity(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #1F2937',
+                      background: '#0F172A',
+                      color: '#E5E7EB',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">Any</option>
+                    {cities.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>State</Label>
+                  <select
+                    value={fState}
+                    onChange={(e) => setFState(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #1F2937',
+                      background: '#0F172A',
+                      color: '#E5E7EB',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">Any</option>
+                    {states.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Title</Label>
+                  <select
+                    value={fTitle}
+                    onChange={(e) => setFTitle(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #1F2937',
+                      background: '#0F172A',
+                      color: '#E5E7EB',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">Any</option>
+                    {titleOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Type of Law</Label>
+                  <select
+                    value={fLaw}
+                    onChange={(e) => setFLaw(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #1F2937',
+                      background: '#0F172A',
+                      color: '#E5E7EB',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="">Any</option>
+                    {lawOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </Card>
+
+            {/* Results */}
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                Recent candidates (read-only)
+              </div>
+              {clientErr ? (
+                <div style={{ color: '#F87171', fontSize: 12 }}>{clientErr}</div>
+              ) : null}
+              {clientLoading ? (
+                <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
+              ) : clientRows.length === 0 ? (
+                <div style={{ fontSize: 14, color: '#9CA3AF' }}>
+                  No candidates found.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {clientRows.map((c) => {
+                    const titleLawLine = [
+                      c.titles_csv?.trim(),
+                      c.law_csv?.trim(),
+                    ]
+                      .filter(Boolean)
+                      .join(' • ');
+
+                    return (
+                      <div
+                        key={c.id}
+                        style={{
+                          border: '1px solid #1F2937',
+                          borderRadius: 12,
+                          padding: 12,
+                          background: '#0B1220',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr auto',
+                            gap: 10,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#E5E7EB' }}>
+                              {c.name || '—'}
+                            </div>
+                            <div
+                              style={{
+                                color: '#93C5FD',
+                                fontSize: 13,
+                                marginTop: 2,
+                              }}
+                            >
+                              {titleLawLine || '—'}
+                            </div>
+                            <div
+                              style={{ color: '#9CA3AF', fontSize: 12, marginTop: 2 }}
+                            >
+                              {c.city || '—'}, {c.state || '—'}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                              <Tag>
+                                {c.years != null ? `${c.years} yrs` : 'yrs —'}
+                              </Tag>
+                              <Tag>
+                                {c.salary
+                                  ? `$${c.salary.toLocaleString()}`
+                                  : 'salary —'}
+                              </Tag>
+                              {c.contract ? <Tag>contract</Tag> : null}
+                              {c.hourly ? <Tag>${c.hourly}/hr</Tag> : null}
+                              <Tag>
+                                {c.date_entered
+                                  ? new Date(c.date_entered).toLocaleDateString()
+                                  : new Date(c.created_at).toLocaleDateString()}
+                              </Tag>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              justifyContent: 'flex-end',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <Button
+                              onClick={() =>
+                                setExpandedId(expandedId === c.id ? null : c.id)
+                              }
+                              style={{
+                                background: '#111827',
+                                border: '1px solid #1F2937',
+                              }}
+                            >
+                              Additional information
+                            </Button>
+                            <a
+                              href={`mailto:${user.amEmail || ''}?subject=Candidate%20inquiry:%20${encodeURIComponent(
+                                c.name || 'Candidate'
+                              )}`}
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <Button
+                                style={{
+                                  background: '#0E7490',
+                                  border: '1px solid #164E63',
+                                }}
+                              >
+                                Email for more information
+                              </Button>
+                            </a>
+                          </div>
+                        </div>
+
+                        {expandedId === c.id ? (
+                          <div
+                            style={{
+                              marginTop: 10,
+                              paddingTop: 10,
+                              borderTop: '1px solid #1F2937',
+                              color: '#E5E7EB',
+                              whiteSpace: 'pre-wrap',
+                              fontSize: 13,
+                            }}
+                          >
+                            {c.notes || 'No additional notes.'}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
           </div>
         </div>
       </div>
     );
   }
 
-  // admin
+  // ---------- Admin placeholder ----------
   return (
     <div style={pageWrap}>
       <div style={overlay}>
