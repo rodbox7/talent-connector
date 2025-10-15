@@ -58,60 +58,89 @@ const btn = {
   fontWeight: 700,
   cursor: 'pointer',
 };
+const logLine = (ok) => ({
+  fontSize: 12,
+  padding: '6px 8px',
+  borderRadius: 8,
+  background: ok ? 'rgba(16,185,129,.08)' : 'rgba(248,113,113,.08)',
+  color: ok ? '#93e2b7' : '#fca5a5',
+  border: `1px solid ${ok ? 'rgba(16,185,129,.25)' : 'rgba(248,113,113,.25)'}`,
+});
 
 export default function Page() {
   const [mode, setMode] = useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
-  const [msg, setMsg] = useState('');
+
+  const [steps, setSteps] = useState([]);
   const [who, setWho] = useState(null);
 
-  async function login() {
-    try {
-      setMsg('');
-      setWho(null);
+  function push(ok, msg, extra) {
+    setSteps((s) => [...s, { ok, msg, extra }]);
+  }
 
+  async function login() {
+    setSteps([]);
+    setWho(null);
+
+    try {
+      const e = email.trim().toLowerCase();
+      push(true, `Starting login for ${e} as ${mode}`);
+
+      // 0) quick env sanity
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const hasKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      push(!!url && hasKey, `Env check: url ok=${!!url}, key ok=${hasKey}`);
+
+      // 1) Auth
       const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: e,
         password: pwd,
       });
       if (authErr) {
-        setMsg(authErr.message || 'Invalid credentials');
+        push(false, `Auth error: ${authErr.message}`);
         return;
       }
+      push(true, `Auth OK: user ${auth.user.id}`);
 
-      // 1) try by auth id
+      // 2) Profile by id
       let { data: prof, error: pErr } = await sb
         .from('profiles')
         .select('id,email,role,org,account_manager_email')
         .eq('id', auth.user.id)
         .single();
 
-      // 2) fallback by email (in case id mismatch)
       if (pErr || !prof) {
+        push(false, `Profile by id failed, trying by email: ${pErr?.message || 'not found'}`);
+
+        // 3) Fallback profile by email
         const { data: byEmail, error: e2 } = await sb
           .from('profiles')
           .select('id,email,role,org,account_manager_email')
-          .eq('email', email.trim().toLowerCase())
+          .eq('email', e)
           .single();
 
         if (e2 || !byEmail) {
-          setMsg('Login ok, but profile not found. Ask Admin to add your profile.');
+          push(false, `Profile by email failed: ${e2?.message || 'not found'}`);
+          push(false, 'Fix: create profile row for this email or align profiles.id to auth.users.id');
           return;
         }
         prof = byEmail;
+        push(true, `Profile by email OK: id ${prof.id}`);
+      } else {
+        push(true, `Profile by id OK: id ${prof.id}`);
       }
 
       if (mode !== prof.role) {
-        setMsg(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
+        push(false, `Role mismatch. Account role is ${prof.role}. Use the ${prof.role} tab.`);
         return;
       }
 
       setWho(prof);
-      setMsg('Logged in ✔');
-    } catch (e) {
-      console.error(e);
-      setMsg('Login error.');
+      push(true, 'Login complete ✔');
+    } catch (err) {
+      push(false, `Unexpected error: ${String(err?.message || err)}`);
+      console.error(err);
     }
   }
 
@@ -160,8 +189,15 @@ export default function Page() {
             </button>
           </div>
 
-          {msg ? (
-            <div style={{ fontSize: 12, color: msg.includes('✔') ? '#93e2b7' : '#f87171' }}>{msg}</div>
+          {steps.length ? (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {steps.map((s, i) => (
+                <div key={i} style={logLine(s.ok)}>
+                  {s.ok ? '✔ ' : '✖ '} {s.msg}
+                  {s.extra ? <pre style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>{s.extra}</pre> : null}
+                </div>
+              ))}
+            </div>
           ) : null}
 
           {who ? (
