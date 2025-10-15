@@ -1,74 +1,162 @@
 'use client';
-import React from 'react';
+
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase as sb } from '../lib/supabaseClient';
 
-const NYC_BG =
+/** ─────────────────────────────────────────────────────────────────────────────
+ * Talent Connector – single file page
+ * - NYC background on all screens
+ * - Login tabs (Recruiter / Client / Admin)
+ * - Supabase-first auth with resilient profile fetch (id -> email fallback)
+ * - Recruiter: add candidate + recent list
+ * - Client: today count + recent list with text search
+ * - Admin: placeholder (users managed via Supabase)
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const NYC =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
-export default function Page() {
-  const [user, setUser] = React.useState(null);
-  const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
-  const [email, setEmail] = React.useState('');
-  const [pwd, setPwd] = React.useState('');
-  const [err, setErr] = React.useState('');
+const shell = {
+  minHeight: '100vh',
+  width: '100%',
+  backgroundImage: `url("${NYC}")`,
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  color: '#e5e7eb',
+  fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial',
+  display: 'flex',
+  justifyContent: 'center',
+  padding: '40px 16px',
+};
 
-  React.useEffect(() => {
-    (async () => {
-      const { data } = await sb.auth.getSession();
-      if (data?.session?.user) {
-        const { data: prof } = await sb
+const sheet = {
+  width: '100%',
+  maxWidth: 1180,
+  background: 'rgba(0,0,0,.72)',
+  backdropFilter: 'blur(2px)',
+  border: '1px solid rgba(255,255,255,.09)',
+  borderRadius: 16,
+  padding: 20,
+  boxShadow: '0 8px 28px rgba(0,0,0,.45)',
+};
+
+const h1 = { fontSize: 22, fontWeight: 800, margin: '2px 0 12px 0' };
+const sub = { fontSize: 12, color: '#9ca3af', marginBottom: 12 };
+const row = { display: 'flex', gap: 10, alignItems: 'center' };
+const tabs = { display: 'grid', gridTemplateColumns: 'repeat(3,120px)', gap: 10, marginTop: 2 };
+const tab = (active) => ({
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,.08)',
+  background: active ? 'rgba(31,41,55,.85)' : 'rgba(17,24,39,.85)',
+  color: '#e5e7eb',
+  fontWeight: 600,
+  cursor: 'pointer',
+  textAlign: 'center',
+});
+
+const label = { fontSize: 12, color: '#9ca3af', marginBottom: 4 };
+const input = {
+  width: '100%',
+  padding: '10px 12px',
+  background: 'rgba(17,24,39,.85)',
+  border: '1px solid rgba(255,255,255,.08)',
+  color: '#e5e7eb',
+  borderRadius: 10,
+  outline: 'none',
+};
+const btn = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  background: '#4f46e5',
+  color: 'white',
+  border: '1px solid rgba(255,255,255,.1)',
+  fontWeight: 700,
+  cursor: 'pointer',
+};
+const btnGhost = {
+  padding: '8px 12px',
+  borderRadius: 10,
+  background: 'rgba(31,41,55,.85)',
+  color: '#e5e7eb',
+  border: '1px solid rgba(255,255,255,.1)',
+  cursor: 'pointer',
+};
+const section = {
+  background: 'rgba(0,0,0,.70)',
+  border: '1px solid rgba(255,255,255,.08)',
+  borderRadius: 14,
+  padding: 16,
+};
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Auth + session
+──────────────────────────────────────────────────────────────────────────── */
+
+export default function Page() {
+  const [mode, setMode] = useState('recruiter'); // recruiter | client | admin
+  const [email, setEmail] = useState('');
+  const [pwd, setPwd] = useState('');
+  const [err, setErr] = useState('');
+  const [user, setUser] = useState(null); // {id,email,role,org,amEmail}
+
+  // resilient login: id first, email fallback
+  async function login() {
+    try {
+      setErr('');
+      const e = String(email).trim().toLowerCase();
+      if (!e.includes('@')) {
+        setErr('Enter a valid email');
+        return;
+      }
+
+      const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
+        email: e,
+        password: pwd,
+      });
+      if (authErr) {
+        setErr(authErr.message || 'Invalid credentials');
+        return;
+      }
+
+      // primary: by auth.user.id
+      let { data: prof, error: profErr } = await sb
+        .from('profiles')
+        .select('id,email,role,org,account_manager_email')
+        .eq('id', auth.user.id)
+        .single();
+
+      // fallback: by email
+      if (profErr || !prof) {
+        const { data: byEmail, error: e2 } = await sb
           .from('profiles')
           .select('id,email,role,org,account_manager_email')
-          .eq('id', data.session.user.id)
+          .eq('email', e)
           .single();
-        if (prof) {
-          setUser({
-            id: prof.id,
-            email: prof.email,
-            role: prof.role,
-            org: prof.org || '',
-            amEmail: prof.account_manager_email || '',
-          });
-        }
-      }
-    })();
-  }, []);
 
-  async function login() {
-    setErr('');
-    const e = String(email).trim().toLowerCase();
-    if (!e.includes('@')) {
-      setErr('Enter a valid email');
-      return;
+        if (e2 || !byEmail) {
+          setErr('Login ok, but profile not found. Ask Admin to add your profile.');
+          return;
+        }
+        prof = byEmail;
+      }
+
+      if (mode !== prof.role) {
+        setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
+        return;
+      }
+
+      setUser({
+        id: prof.id,
+        email: prof.email,
+        role: prof.role,
+        org: prof.org || '',
+        amEmail: prof.account_manager_email || '',
+      });
+    } catch (ex) {
+      console.error(ex);
+      setErr('Login error. Please try again.');
     }
-    const { data: auth, error: authErr } = await sb.auth.signInWithPassword({
-      email: e,
-      password: pwd,
-    });
-    if (authErr || !auth?.user) {
-      setErr(authErr?.message || 'Invalid credentials.');
-      return;
-    }
-    const { data: prof, error: profErr } = await sb
-      .from('profiles')
-      .select('id,email,role,org,account_manager_email')
-      .eq('id', auth.user.id)
-      .single();
-    if (profErr || !prof) {
-      setErr('Login ok, but no profile found. Ask admin to add your profile.');
-      return;
-    }
-    if (prof.role !== mode) {
-      setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
-      return;
-    }
-    setUser({
-      id: prof.id,
-      email: prof.email,
-      role: prof.role,
-      org: prof.org || '',
-      amEmail: prof.account_manager_email || '',
-    });
   }
 
   async function logout() {
@@ -81,512 +169,526 @@ export default function Page() {
     setMode('recruiter');
   }
 
-  const page = {
-    minHeight: '100vh',
-    background: '#0a0a0a',
-    color: '#e5e5e5',
-    fontFamily: 'system-ui, Arial',
-    position: 'relative',
-    overflow: 'hidden',
-  };
-  const container = {
-    width: '100%',
-    maxWidth: 1160,
-    margin: '0 auto',
-    padding: 20,
-    position: 'relative',
-    zIndex: 2,
-  };
-  const glass = {
-    border: '1px solid rgba(255,255,255,.10)',
-    borderRadius: 14,
-    padding: 16,
-    background: 'rgba(8, 10, 16, .88)',
-    boxShadow: '0 8px 24px rgba(0,0,0,.35)',
-  };
-  const logoutBtn = {
-    padding: '8px 12px',
-    borderRadius: 10,
-    fontSize: 13,
-    background: '#1f2937',
-    color: '#e5e5e5',
-    border: '1px solid rgba(255,255,255,.12)',
-  };
+  /* ──────────────────────────────────────────────────────────────────────────
+     Recruiter – add candidate + list
+  ─────────────────────────────────────────────────────────────────────────── */
 
-  return (
-    <div style={page}>
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundImage: `url(${NYC_BG})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'grayscale(0.1) contrast(1.08) brightness(0.95)',
-          opacity: 0.9,
-        }}
-      />
-      <div style={container}>
-        {!user ? (
-          <LoginCard
-            mode={mode}
-            setMode={setMode}
-            email={email}
-            setEmail={setEmail}
-            pwd={pwd}
-            setPwd={setPwd}
-            onLogin={login}
-            err={err}
-          />
-        ) : user.role === 'recruiter' ? (
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ ...glass, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 800 }}>
-                Recruiter workspace
-                <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 8 }}>({user.email})</span>
-              </div>
-              <button onClick={logout} style={logoutBtn}>
-                Log out
-              </button>
-            </div>
-            <RecruiterWorkspace user={user} />
-          </div>
-        ) : user.role === 'client' ? (
-          <div style={{ ...glass, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 800 }}>Client workspace</div>
-              <div style={{ fontSize: 12, color: '#9ca3af' }}>Read-only view.</div>
-            </div>
-            <button onClick={logout} style={logoutBtn}>
-              Log out
-            </button>
-          </div>
-        ) : (
-          <div style={{ ...glass, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 800 }}>Admin workspace</div>
-              <div style={{ fontSize: 12, color: '#9ca3af' }}>Minimal placeholder.</div>
-            </div>
-            <button onClick={logout} style={logoutBtn}>
-              Log out
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+  const [cName, setCName] = useState('');
+  const [cTitles, setCTitles] = useState(''); // CSV string
+  const [cLaw, setCLaw] = useState(''); // CSV string
+  const [cYears, setCYears] = useState('');
+  const [cCity, setCCity] = useState('');
+  const [cState, setCState] = useState('');
+  const [cSalary, setCSalary] = useState('');
+  const [cContract, setCContract] = useState(false);
+  const [cHourly, setCHourly] = useState('');
+  const [cNotes, setCNotes] = useState('');
+  const [cRecentYears, setCRecentYears] = useState(''); // recent_role_years
+  const [cYearsInRecent, setCYearsInRecent] = useState(''); // years_in_recent_role
+  const [addFlash, setAddFlash] = useState('');
 
-function LoginCard({ mode, setMode, email, setEmail, pwd, setPwd, onLogin, err }) {
-  const card = {
-    width: '100%',
-    maxWidth: 560,
-    margin: '8vh auto 0',
-    border: '1px solid rgba(255,255,255,.10)',
-    borderRadius: 16,
-    padding: 18,
-    background: 'rgba(8, 10, 16, .90)',
-    boxShadow: '0 18px 36px rgba(0,0,0,.45)',
-  };
-  const input = {
-    width: '100%',
-    padding: 10,
-    borderRadius: 10,
-    background: '#0f172a',
-    color: '#e5e5eb',
-    border: '1px solid #1f2937',
-  };
-  const label = { fontSize: 12, color: '#9ca3af', marginBottom: 6 };
+  const [myRecent, setMyRecent] = useState([]);
+  const [loadingMy, setLoadingMy] = useState(false);
 
-  return (
-    <div style={card}>
-      <div style={{ textAlign: 'center', fontWeight: 800, fontSize: 18 }}>Talent Connector - Powered by Beacon Hill Legal</div>
-      <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', marginBottom: 12 }}>Invitation-only access</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-        <button
-          onClick={() => setMode('recruiter')}
-          style={{
-            padding: 10,
-            borderRadius: 10,
-            background: mode === 'recruiter' ? '#1f2937' : '#111827',
-            color: '#e5e5e5',
-            border: '1px solid rgba(255,255,255,.12)',
-          }}
-        >
-          Recruiter
-        </button>
-        <button
-          onClick={() => setMode('client')}
-          style={{
-            padding: 10,
-            borderRadius: 10,
-            background: mode === 'client' ? '#1f2937' : '#111827',
-            color: '#e5e5e5',
-            border: '1px solid rgba(255,255,255,.12)',
-          }}
-        >
-          Client
-        </button>
-        <button
-          onClick={() => setMode('admin')}
-          style={{
-            padding: 10,
-            borderRadius: 10,
-            background: mode === 'admin' ? '#1f2937' : '#111827',
-            color: '#e5e5e5',
-            border: '1px solid rgba(255,255,255,.12)',
-          }}
-        >
-          Admin
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div>
-          <div style={label}>Email</div>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            placeholder="name@company.com"
-            style={input}
-          />
-        </div>
-        <div>
-          <div style={label}>Password</div>
-          <input
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-            type="password"
-            placeholder="your password"
-            style={input}
-          />
-        </div>
-        <button
-          onClick={onLogin}
-          style={{
-            padding: 12,
-            borderRadius: 10,
-            background: '#4f46e5',
-            color: 'white',
-            border: '1px solid rgba(255,255,255,.12)',
-            fontWeight: 600,
-          }}
-        >
-          Log in
-        </button>
-        {err ? <div style={{ fontSize: 12, color: '#fca5a5' }}>{err}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function RecruiterWorkspace({ user }) {
-  const [recent, setRecent] = React.useState([]);
-  const [flash, setFlash] = React.useState('');
-
-  async function loadMine() {
-    const { data, error } = await sb
-      .from('candidates')
-      .select('id,name,city,state,years,salary,contract,hourly,notes,created_at,titles_csv,law_csv')
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false })
-      .limit(15);
-    if (!error && Array.isArray(data)) setRecent(data);
-  }
-
-  React.useEffect(() => {
-    loadMine();
-  }, []);
-
-  async function handleAdd(rec) {
-    // Normalize numbers & blanks → null to satisfy DB types.
-    const yearsNum = Number.isFinite(Number(rec.years)) ? Number(rec.years) : null;
-    const salaryNum = Number.isFinite(Number(rec.salary)) ? Number(rec.salary) : null;
-    const hourlyNum =
-      rec.contract && Number.isFinite(Number(rec.hourly)) ? Number(rec.hourly) : null;
-
-    const payload = {
-      name: rec.name || null,
-      titles_csv: rec.titles || null,
-      law_csv: rec.law || null,
-      years: yearsNum,
-      city: rec.city || null,
-      state: rec.state || null,
-      salary: salaryNum,
-      contract: !!rec.contract,
-      hourly: hourlyNum, // <- NEW
-      notes: rec.notes || null,
-      created_by: user.id,
-    };
-
-    const { error } = await sb.from('candidates').insert(payload);
-    if (error) {
-      console.error('Insert error:', error);
-      throw new Error(error.message || 'Insert failed');
-    }
-
-    setFlash('Candidate added');
-    await loadMine();
-    setTimeout(() => setFlash(''), 1500);
-  }
-
-  const panel = {
-    border: '1px solid rgba(255,255,255,.10)',
-    borderRadius: 14,
-    padding: 16,
-    background: 'rgba(8, 10, 16, .88)',
-    boxShadow: '0 8px 24px rgba(0,0,0,.35)',
-  };
-  const row = { padding: 10, borderBottom: '1px solid rgba(255,255,255,.06)' };
-
-  return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <RecruiterAddForm onAdd={handleAdd} />
-      <div style={panel}>
-        <div style={{ fontWeight: 800, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-          <span>My recent candidates</span>
-          {flash ? <span style={{ fontSize: 12, color: '#a7f3d0' }}>{flash}</span> : null}
-        </div>
-        {!recent.length ? (
-          <div style={{ fontSize: 13, color: '#9ca3af' }}>No candidates yet.</div>
-        ) : (
-          recent.map((c) => (
-            <div key={c.id} style={row}>
-              <div style={{ fontWeight: 700 }}>{c.name}</div>
-              <div style={{ fontSize: 12, color: '#9ca3af' }}>
-                {(c.city || '-')}, {(c.state || '-')}&nbsp; •&nbsp; {String(c.years ?? 0)} yrs • Salary:{' '}
-                {c.salary ? `$${c.salary}` : '-'} • Contract: {c.contract ? 'Yes' : 'No'}
-                {c.contract && c.hourly ? ` • Hourly: $${c.hourly}` : ''}
-              </div>
-              {c.titles_csv || c.law_csv ? (
-                <div style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>
-                  {c.titles_csv ? `Titles: ${c.titles_csv}` : ''}
-                  {c.titles_csv && c.law_csv ? ' • ' : ''}
-                  {c.law_csv ? `Law: ${c.law_csv}` : ''}
-                </div>
-              ) : null}
-              {c.notes ? (
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 12,
-                    color: '#e5e7eb',
-                    background: '#0d1b2a',
-                    border: '1px solid #1e3a8a',
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  {c.notes}
-                </div>
-              ) : null}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RecruiterAddForm({ onAdd }) {
-  const [name, setName] = React.useState('');
-  const [titles, setTitles] = React.useState('');
-  const [law, setLaw] = React.useState('');
-  const [years, setYears] = React.useState('');
-  const [city, setCity] = React.useState('');
-  const [state, setState] = React.useState('');
-  const [salary, setSalary] = React.useState('');
-  const [contract, setContract] = React.useState(false);
-  const [hourly, setHourly] = React.useState(''); // <- NEW
-  const [notes, setNotes] = React.useState('');
-  const [flash, setFlash] = React.useState('');
-  const [err, setErr] = React.useState('');
-
-  const panel = {
-    border: '1px solid rgba(255,255,255,.10)',
-    borderRadius: 14,
-    padding: 16,
-    background: 'rgba(8, 10, 16, .88)',
-    boxShadow: '0 8px 24px rgba(0,0,0,.35)',
-  };
-  const label = { fontSize: 12, color: '#9ca3af', marginBottom: 6 };
-  const input = {
-    width: '100%',
-    padding: 10,
-    borderRadius: 10,
-    background: '#0f172a',
-    color: '#e5e7eb',
-    border: '1px solid #1f2937',
-  };
-  const grid = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(12, minmax(0,1fr))',
-    gap: 12,
-  };
-
-  async function submit() {
-    setFlash('');
-    setErr('');
-
-    const yearsNum = Number.isFinite(Number(years)) ? Number(years) : null;
-    const salaryNum = Number.isFinite(Number(salary)) ? Number(salary) : null;
-    const hourlyNum =
-      contract && Number.isFinite(Number(hourly)) ? Number(hourly) : null;
-
-    if (!name.trim()) {
-      setErr('Please enter a full name.');
-      return;
-    }
-
+  async function addCandidate() {
+    setAddFlash('');
+    if (!user) return;
     try {
-      await onAdd({
-        name: name.trim(),
-        titles: titles?.trim() || null,
-        law: law?.trim() || null,
-        years: yearsNum,
-        city: city?.trim() || null,
-        state: state?.trim() || null,
-        salary: salaryNum,
-        contract: !!contract,
-        hourly: hourlyNum,
-        notes: notes?.trim() || null,
-      });
+      const payload = {
+        name: cName.trim(),
+        title_csv: cTitles.trim(),
+        law_csv: cLaw.trim(),
+        years: cYears ? Number(cYears) : null,
+        city: cCity.trim() || null,
+        state: cState.trim() || null,
+        salary: cSalary ? Number(cSalary) : null,
+        contract: Boolean(cContract),
+        hourly: cContract && cHourly ? Number(cHourly) : null,
+        notes: cNotes.trim() || null,
+        recent_role_years: cRecentYears ? Number(cRecentYears) : null,
+        years_in_recent_role: cYearsInRecent ? Number(cYearsInRecent) : null,
+        created_by: user.id,
+        date_entered: new Date().toISOString(),
+      };
 
-      setName('');
-      setTitles('');
-      setLaw('');
-      setYears('');
-      setCity('');
-      setState('');
-      setSalary('');
-      setContract(false);
-      setHourly('');
-      setNotes('');
-      setFlash('Candidate added');
-      setTimeout(() => setFlash(''), 1200);
+      const { error } = await sb.from('candidates').insert(payload);
+      if (error) throw error;
+
+      setAddFlash('Candidate added');
+      // reset a few inputs but keep notes / law / titles handy
+      setCName('');
+      setCYears('');
+      setCCity('');
+      setCState('');
+      setCSalary('');
+      setCContract(false);
+      setCHourly('');
+      setCRecentYears('');
+      setCYearsInRecent('');
+
+      // refresh my list
+      await loadMyRecent();
     } catch (e) {
       console.error(e);
-      setErr(e.message || 'Database error adding candidate.');
+      setAddFlash('Database error adding candidate');
     }
   }
 
-  return (
-    <div style={panel}>
-      <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Add candidate</div>
+  async function loadMyRecent() {
+    if (!user) return;
+    setLoadingMy(true);
+    try {
+      const { data, error } = await sb
+        .from('candidates')
+        .select(
+          'id,name,title_csv,law_csv,city,state,years,salary,contract,hourly,notes,date_entered'
+        )
+        .eq('created_by', user.id)
+        .order('date_entered', { ascending: false })
+        .limit(10);
+      if (!error) setMyRecent(data || []);
+    } finally {
+      setLoadingMy(false);
+    }
+  }
 
-      <div style={grid}>
-        <div style={{ gridColumn: 'span 4' }}>
-          <div style={label}>Full name</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} style={input} />
-        </div>
+  useEffect(() => {
+    if (user?.role === 'recruiter') {
+      loadMyRecent();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role]);
 
-        <div style={{ gridColumn: 'span 4' }}>
-          <div style={label}>Titles (e.g., Attorney, Paralegal)</div>
-          <input
-            value={titles}
-            onChange={(e) => setTitles(e.target.value)}
-            placeholder="Attorney, Paralegal"
-            style={input}
-          />
-        </div>
+  /* ──────────────────────────────────────────────────────────────────────────
+     Client – today count + list with text search
+  ─────────────────────────────────────────────────────────────────────────── */
 
-        <div style={{ gridColumn: 'span 4' }}>
-          <div style={label}>Type of Law (e.g., Litigation, Immigration)</div>
-          <input
-            value={law}
-            onChange={(e) => setLaw(e.target.value)}
-            placeholder="Litigation, Immigration"
-            style={input}
-          />
-        </div>
+  const [clientQuery, setClientQuery] = useState('');
+  const [clientRows, setClientRows] = useState([]);
+  const [clientLoadErr, setClientLoadErr] = useState('');
+  const [todayCount, setTodayCount] = useState(0);
 
-        <div style={{ gridColumn: 'span 3' }}>
-          <div style={label}>Years of experience</div>
-          <input type="number" value={years} onChange={(e) => setYears(e.target.value)} style={input} />
-        </div>
+  async function loadClient() {
+    setClientLoadErr('');
+    try {
+      // today count
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { count: cnt } = await sb
+        .from('candidates')
+        .select('id', { count: 'exact', head: true })
+        .gte('date_entered', start.toISOString());
+      setTodayCount(cnt || 0);
 
-        <div style={{ gridColumn: 'span 5' }}>
-          <div style={label}>City</div>
-          <input value={city} onChange={(e) => setCity(e.target.value)} style={input} />
-        </div>
+      // recent list with optional search
+      let q = sb
+        .from('candidates')
+        .select(
+          'id,name,title_csv,law_csv,city,state,years,salary,contract,hourly,notes,date_entered'
+        )
+        .order('date_entered', { ascending: false })
+        .limit(50);
 
-        <div style={{ gridColumn: 'span 4' }}>
-          <div style={label}>State</div>
-          <input value={state} onChange={(e) => setState(e.target.value)} style={input} />
-        </div>
+      const t = clientQuery.trim();
+      if (t) {
+        // simple OR search across a few text columns
+        q = q.or(
+          ['name.ilike.%' + t + '%',
+           'city.ilike.%' + t + '%',
+           'state.ilike.%' + t + '%',
+           'title_csv.ilike.%' + t + '%',
+           'law_csv.ilike.%' + t + '%'
+          ].join(',')
+        );
+      }
 
-        <div style={{ gridColumn: 'span 4' }}>
-          <div style={label}>Salary desired (annual)</div>
-          <input
-            type="number"
-            value={salary}
-            onChange={(e) => setSalary(e.target.value)}
-            placeholder="e.g., 120000"
-            style={input}
-          />
-        </div>
+      const { data, error } = await q;
+      if (error) throw error;
+      setClientRows(data || []);
+    } catch (e) {
+      console.error(e);
+      setClientLoadErr('Error loading client view.');
+      setClientRows([]);
+    }
+  }
 
-        <div style={{ gridColumn: 'span 4', display: 'flex', alignItems: 'end' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#e5e7eb' }}>
-            <input
-              type="checkbox"
-              checked={contract}
-              onChange={(e) => setContract(e.target.checked)}
-              style={{ width: 16, height: 16 }}
-            />
-            Available for contract
-          </label>
-        </div>
+  useEffect(() => {
+    if (user?.role === 'client') {
+      loadClient();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
 
-        {/* Hourly rate appears only when contract is checked */}
-        {contract ? (
-          <div style={{ gridColumn: 'span 4' }}>
-            <div style={label}>Hourly rate (if contract)</div>
-            <input
-              type="number"
-              value={hourly}
-              onChange={(e) => setHourly(e.target.value)}
-              placeholder="e.g., 85"
-              style={input}
-            />
+  /* ──────────────────────────────────────────────────────────────────────────
+     Render: Login
+  ─────────────────────────────────────────────────────────────────────────── */
+
+  if (!user) {
+    return (
+      <div style={shell}>
+        <div style={{ ...sheet, maxWidth: 700 }}>
+          <div style={h1}>Talent Connector - Powered by Beacon Hill Legal</div>
+          <div style={sub}>Invitation-only access</div>
+
+          <div style={tabs}>
+            <button style={tab(mode === 'recruiter')} onClick={() => setMode('recruiter')}>
+              Recruiter
+            </button>
+            <button style={tab(mode === 'client')} onClick={() => setMode('client')}>
+              Client
+            </button>
+            <button style={tab(mode === 'admin')} onClick={() => setMode('admin')}>
+              Admin
+            </button>
           </div>
-        ) : (
-          <div style={{ gridColumn: 'span 4' }} />
-        )}
 
-        <div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
-          <div style={label}>Candidate Notes</div>
-          <textarea
-            rows={5}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Short summary: strengths, availability, fit notes."
-            style={{ ...input, resize: 'vertical' }}
-          />
+          <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+            <div>
+              <div style={label}>Email</div>
+              <input
+                style={input}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@company.com"
+              />
+            </div>
+            <div>
+              <div style={label}>Password</div>
+              <input
+                style={input}
+                type="password"
+                value={pwd}
+                onChange={(e) => setPwd(e.target.value)}
+                placeholder="Your password"
+              />
+            </div>
+            <div>
+              <button style={btn} onClick={login}>
+                Log in
+              </button>
+            </div>
+            {err ? <div style={{ color: '#f87171', fontSize: 12 }}>{err}</div> : null}
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 12 }}>
-        <button
-          onClick={submit}
-          style={{
-            padding: '10px 14px',
-            fontSize: 13,
-            borderRadius: 10,
-            background: '#4f46e5',
-            color: 'white',
-            border: '1px solid rgba(255,255,255,.08)',
-            boxShadow: '0 6px 18px rgba(79,70,229,.35)',
-          }}
-        >
-          Add candidate
-        </button>
+  /* ──────────────────────────────────────────────────────────────────────────
+     Render: Admin
+  ─────────────────────────────────────────────────────────────────────────── */
 
-        {flash ? <div style={{ fontSize: 13, color: '#a7f3d0' }}>{flash}</div> : null}
-        {err ? <div style={{ fontSize: 13, color: '#fca5a5' }}>{err}</div> : null}
+  if (user.role === 'admin') {
+    return (
+      <div style={shell}>
+        <div style={sheet}>
+          <div style={{ ...row, justifyContent: 'space-between' }}>
+            <div>
+              <div style={h1}>Admin workspace</div>
+              <div style={sub}>
+                Minimal placeholder for <b>admin</b>. (Users are managed in Supabase.)
+              </div>
+            </div>
+            <button style={btnGhost} onClick={logout}>
+              Log out
+            </button>
+          </div>
+
+          <div style={section}>
+            <div style={{ fontSize: 13, color: '#9ca3af' }}>
+              Nothing fancy here yet—just confirming admin login works with the new profile
+              fallback.
+            </div>
+          </div>
+        </div>
       </div>
+    );
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────────
+     Render: Recruiter
+  ─────────────────────────────────────────────────────────────────────────── */
+
+  if (user.role === 'recruiter') {
+    return (
+      <div style={shell}>
+        <div style={sheet}>
+          <div style={{ ...row, justifyContent: 'space-between' }}>
+            <div>
+              <div style={h1}>Recruiter workspace</div>
+              <div style={sub}>Add candidates (your recent entries appear below).</div>
+            </div>
+            <button style={btnGhost} onClick={logout}>
+              Log out
+            </button>
+          </div>
+
+          <div style={{ ...section, marginBottom: 14 }}>
+            {/* Form grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(12, 1fr)',
+                gap: 10,
+              }}
+            >
+              <div style={{ gridColumn: 'span 4' }}>
+                <div style={label}>Full name</div>
+                <input style={input} value={cName} onChange={(e) => setCName(e.target.value)} />
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <div style={label}>Titles (CSV)</div>
+                <input
+                  style={input}
+                  value={cTitles}
+                  onChange={(e) => setCTitles(e.target.value)}
+                  placeholder="Attorney, Paralegal"
+                />
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <div style={label}>Type of Law (CSV)</div>
+                <input
+                  style={input}
+                  value={cLaw}
+                  onChange={(e) => setCLaw(e.target.value)}
+                  placeholder="Litigation, Immigration"
+                />
+              </div>
+
+              <div style={{ gridColumn: 'span 3' }}>
+                <div style={label}>Years of experience</div>
+                <input
+                  style={input}
+                  type="number"
+                  value={cYears}
+                  onChange={(e) => setCYears(e.target.value)}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <div style={label}>City</div>
+                <input style={input} value={cCity} onChange={(e) => setCCity(e.target.value)} />
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <div style={label}>State</div>
+                <input style={input} value={cState} onChange={(e) => setCState(e.target.value)} />
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <div style={label}>Salary desired</div>
+                <input
+                  style={input}
+                  type="number"
+                  value={cSalary}
+                  onChange={(e) => setCSalary(e.target.value)}
+                />
+              </div>
+
+              <div style={{ gridColumn: 'span 3', display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                <label style={{ ...label, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={cContract}
+                    onChange={(e) => setCContract(e.target.checked)}
+                  />
+                  Available for contract
+                </label>
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                {cContract ? (
+                  <>
+                    <div style={label}>Hourly rate</div>
+                    <input
+                      style={input}
+                      type="number"
+                      value={cHourly}
+                      onChange={(e) => setCHourly(e.target.value)}
+                    />
+                  </>
+                ) : null}
+              </div>
+
+              <div style={{ gridColumn: 'span 3' }}>
+                <div style={label}>Years in recent role</div>
+                <input
+                  style={input}
+                  type="number"
+                  value={cYearsInRecent}
+                  onChange={(e) => setCYearsInRecent(e.target.value)}
+                />
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <div style={label}>Recent role years (overall)</div>
+                <input
+                  style={input}
+                  type="number"
+                  value={cRecentYears}
+                  onChange={(e) => setCRecentYears(e.target.value)}
+                />
+              </div>
+
+              <div style={{ gridColumn: 'span 12' }}>
+                <div style={label}>Candidate Notes</div>
+                <textarea
+                  style={{ ...input, minHeight: 120, resize: 'vertical' }}
+                  value={cNotes}
+                  onChange={(e) => setCNotes(e.target.value)}
+                  placeholder="Short summary: strengths, availability, fit notes."
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button style={btn} onClick={addCandidate}>
+                Add candidate
+              </button>
+              {addFlash ? (
+                <span style={{ fontSize: 12, color: addFlash.includes('error') ? '#f87171' : '#93e2b7' }}>
+                  {addFlash}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div style={section}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>My recent candidates</div>
+            {loadingMy ? (
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>Loading…</div>
+            ) : myRecent.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>No candidates yet.</div>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {myRecent.map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      background: 'rgba(17,24,39,.85)',
+                      border: '1px solid rgba(255,255,255,.08)',
+                      borderRadius: 10,
+                      padding: 12,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>
+                      {r.name}{' '}
+                      <span style={{ color: '#9ca3af', fontWeight: 400 }}>
+                        · {r.title_csv || '—'} · {r.law_csv || '—'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                      {r.city || '—'}, {r.state || '—'} · {r.years ?? '—'} yrs ·{' '}
+                      {r.contract ? `Contract $${r.hourly ?? '—'}/hr` : `Salary $${r.salary ?? '—'}`}
+                    </div>
+                    {r.notes ? (
+                      <div style={{ fontSize: 12, marginTop: 6, whiteSpace: 'pre-wrap' }}>{r.notes}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────────
+     Render: Client
+  ─────────────────────────────────────────────────────────────────────────── */
+
+  return (
+    <div style={shell}>
+      <div style={sheet}>
+        <div style={{ ...row, justifyContent: 'space-between' }}>
+          <div>
+            <div style={h1}>Client workspace</div>
+            <div style={sub}>Read-only access to recent candidates.</div>
+          </div>
+          <button style={btnGhost} onClick={logout}>
+            Log out
+          </button>
+        </div>
+
+        <div style={{ ...section, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>Candidates added today</div>
+              <div style={{ fontSize: 40, lineHeight: '42px', fontWeight: 800 }}>{todayCount}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                style={{ ...input, width: 360 }}
+                placeholder="Search name/city/state/title/law"
+                value={clientQuery}
+                onChange={(e) => setClientQuery(e.target.value)}
+              />
+              <button style={btnGhost} onClick={loadClient}>
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={section}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Recent candidates (read-only)</div>
+          {clientLoadErr ? (
+            <div style={{ fontSize: 12, color: '#f87171' }}>{clientLoadErr}</div>
+          ) : clientRows.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#9ca3af' }}>No candidates found.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {clientRows.map((r) => (
+                <ClientRow key={r.id} row={r} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Small row component so client list can expand for notes */
+function ClientRow({ row }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      style={{
+        background: 'rgba(17,24,39,.85)',
+        border: '1px solid rgba(255,255,255,.08)',
+        borderRadius: 10,
+        padding: 12,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 800 }}>
+            {row.name}{' '}
+            <span style={{ color: '#9ca3af', fontWeight: 400 }}>
+              · {row.title_csv || '—'} · {row.law_csv || '—'}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: '#9ca3af' }}>
+            {row.city || '—'}, {row.state || '—'} · {row.years ?? '—'} yrs ·{' '}
+            {row.contract ? `Contract $${row.hourly ?? '—'}/hr` : `Salary $${row.salary ?? '—'}`}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={btnGhost} onClick={() => setOpen((v) => !v)}>
+            {open ? 'Hide notes' : 'Additional information'}
+          </button>
+          {/* "Email for more information" simply opens default mail client to AM or generic */}
+          <a
+            style={{ ...btnGhost, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+            href={`mailto:sales@youragency.com?subject=Candidate%20inquiry:%20${encodeURIComponent(
+              row.name || ''
+            )}`}
+          >
+            Email for more information
+          </a>
+        </div>
+      </div>
+      {open && row.notes ? (
+        <div style={{ fontSize: 12, marginTop: 8, whiteSpace: 'pre-wrap' }}>{row.notes}</div>
+      ) : null}
     </div>
   );
 }
