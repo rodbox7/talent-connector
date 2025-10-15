@@ -3,20 +3,81 @@
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-/**
- * Full UI:
- * - NYC background, centered cards
- * - Login with role tabs
- * - Recruiter: add candidate (+ delete your own), list your 20 most recent
- * - Client: shows candidates added today, search, salary/years sliders,
- *           expandable notes, “Email for more info”
- * - Admin: minimal placeholder
- *
- * Table detection: checks for optional columns in `public.candidates`:
- *   titles_csv, law_csv, date_entered
- * Then uses those columns only if they exist (no schema errors).
- */
+/* ======================= Shared styles (module scope) ======================= */
+const ST = {
+  wrap: {
+    minHeight: '100vh',
+    display: 'grid',
+    placeItems: 'center',
+    color: '#e5e5e5',
+    fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bg: {
+    position: 'fixed',
+    inset: 0,
+    backgroundImage:
+      'url(https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'grayscale(15%) brightness(45%)',
+    zIndex: 0,
+  },
+  glass: {
+    width: '100%',
+    maxWidth: 1040,
+    background: 'rgba(14, 17, 24, 0.86)',
+    border: '1px solid rgba(148,163,184,0.16)',
+    borderRadius: 16,
+    padding: 18,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+    zIndex: 1,
+    backdropFilter: 'blur(3px)',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 540,
+    background: 'rgba(14, 17, 24, 0.86)',
+    border: '1px solid rgba(148,163,184,0.16)',
+    borderRadius: 16,
+    padding: 20,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+    zIndex: 1,
+    backdropFilter: 'blur(3px)',
+  },
+  pill(active) {
+    return {
+      padding: '10px 16px',
+      borderRadius: 10,
+      border: '1px solid rgba(148,163,184,0.16)',
+      background: active ? 'rgba(55,65,81,0.7)' : 'rgba(17,24,39,0.7)',
+      color: '#e5e5e5',
+      fontWeight: 600,
+      cursor: 'pointer',
+    };
+  },
+  input: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    border: '1px solid rgba(148,163,184,0.16)',
+    background: 'rgba(17,24,39,0.9)',
+    color: '#e5e5e5',
+    outline: 'none',
+  },
+  btn: {
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: '1px solid rgba(99,102,241,0.6)',
+    background: 'linear-gradient(90deg, #6366f1, #4f46e5)',
+    color: '#fff',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+};
 
+/* =============================== Main page =============================== */
 export default function Page() {
   const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = React.useState('');
@@ -24,16 +85,16 @@ export default function Page() {
   const [err, setErr] = React.useState('');
   const [user, setUser] = React.useState(null); // { id, email, role, org, amEmail }
 
-  // Optional candidates columns we’ll auto-detect
+  // Optional candidates columns auto-detection
   const [cols, setCols] = React.useState({
     titles_csv: false,
     law_csv: false,
     date_entered: false,
   });
 
-  // Detect optional columns once (after we have a session)
   async function detectCandidateColumns() {
     try {
+      // Safe: if not allowed, we fail silently and keep defaults
       const { data: colData } = await supabase
         .from('information_schema.columns')
         .select('column_name')
@@ -49,11 +110,10 @@ export default function Page() {
         });
       }
     } catch {
-      // ignore: we'll just default to false
+      /* ignore */
     }
   }
 
-  // Try to restore an existing session
   React.useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -83,26 +143,15 @@ export default function Page() {
     try {
       setErr('');
       const e = String(email || '').trim().toLowerCase();
-      if (!e.includes('@')) {
-        setErr('Enter a valid email.');
-        return;
-      }
-      if (!pwd) {
-        setErr('Enter your password.');
-        return;
-      }
+      if (!e.includes('@')) return setErr('Enter a valid email.');
+      if (!pwd) return setErr('Enter your password.');
+
       const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
         email: e,
         password: pwd,
       });
-      if (authErr) {
-        setErr(authErr.message || 'Login failed.');
-        return;
-      }
-      if (!auth?.user?.id) {
-        setErr('Login failed (no user).');
-        return;
-      }
+      if (authErr) return setErr(authErr.message || 'Login failed.');
+      if (!auth?.user?.id) return setErr('Login failed (no user).');
 
       const { data: prof, error: profErr } = await supabase
         .from('profiles')
@@ -110,29 +159,20 @@ export default function Page() {
         .eq('id', auth.user.id)
         .single();
 
-      if (profErr || !prof?.id) {
-        setErr(
-          'Login OK, but your profile was not found. Ask an admin to create/repair your profile.'
-        );
-        return;
-      }
+      if (profErr || !prof?.id)
+        return setErr('Login OK, but your profile was not found. Ask an admin to create it.');
 
-      const profileRole = String(prof.role);
-      if (profileRole !== mode) {
-        setErr(
-          `This account is a ${profileRole}. Switch to the "${profileRole}" tab or ask admin to change your role.`
-        );
-        return;
-      }
+      const r = String(prof.role);
+      if (r !== mode)
+        return setErr(`This account is a ${r}. Switch to the "${r}" tab or ask admin to change it.`);
 
       setUser({
         id: prof.id,
         email: prof.email,
-        role: profileRole,
+        role: r,
         org: prof.org ?? null,
         amEmail: prof.account_manager_email ?? null,
       });
-
       await detectCandidateColumns();
     } catch (e) {
       setErr(e?.message || 'Unexpected error logging in.');
@@ -151,82 +191,11 @@ export default function Page() {
     }
   }
 
-  // ---------- Shared styles ----------
-  const wrap = {
-    minHeight: '100vh',
-    display: 'grid',
-    placeItems: 'center',
-    color: '#e5e5e5',
-    fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-    position: 'relative',
-    overflow: 'hidden',
-  };
-  const bg = {
-    position: 'fixed',
-    inset: 0,
-    backgroundImage:
-      'url(https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg)',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    filter: 'grayscale(15%) brightness(45%)',
-    zIndex: 0,
-  };
-  const glass = {
-    width: '100%',
-    maxWidth: 1040,
-    background: 'rgba(14, 17, 24, 0.86)',
-    border: '1px solid rgba(148,163,184,0.16)',
-    borderRadius: 16,
-    padding: 18,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-    zIndex: 1,
-    backdropFilter: 'blur(3px)',
-  };
-  const card = {
-    width: '100%',
-    maxWidth: 540,
-    background: 'rgba(14, 17, 24, 0.86)',
-    border: '1px solid rgba(148,163,184,0.16)',
-    borderRadius: 16,
-    padding: 20,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-    zIndex: 1,
-    backdropFilter: 'blur(3px)',
-  };
-  const pill = (active) => ({
-    padding: '10px 16px',
-    borderRadius: 10,
-    border: '1px solid rgba(148,163,184,0.16)',
-    background: active ? 'rgba(55,65,81,0.7)' : 'rgba(17,24,39,0.7)',
-    color: '#e5e5e5',
-    fontWeight: 600,
-    cursor: 'pointer',
-  });
-  const input = {
-    width: '100%',
-    padding: 12,
-    borderRadius: 10,
-    border: '1px solid rgba(148,163,184,0.16)',
-    background: 'rgba(17,24,39,0.9)',
-    color: '#e5e5e5',
-    outline: 'none',
-  };
-  const btn = {
-    padding: '10px 14px',
-    borderRadius: 10,
-    border: '1px solid rgba(99,102,241,0.6)',
-    background: 'linear-gradient(90deg, #6366f1, #4f46e5)',
-    color: '#fff',
-    fontWeight: 700,
-    cursor: 'pointer',
-  };
-
-  // ---------- Role workspaces ----------
   if (user && user.role === 'recruiter') {
     return (
-      <div style={wrap}>
-        <div style={bg} />
-        <div style={glass}>
+      <div style={ST.wrap}>
+        <div style={ST.bg} />
+        <div style={ST.glass}>
           <Header title="Recruiter workspace" onLogout={logout} />
           <RecruiterUI user={user} cols={cols} />
         </div>
@@ -236,9 +205,9 @@ export default function Page() {
 
   if (user && user.role === 'client') {
     return (
-      <div style={wrap}>
-        <div style={bg} />
-        <div style={glass}>
+      <div style={ST.wrap}>
+        <div style={ST.bg} />
+        <div style={ST.glass}>
           <Header title="Client workspace" onLogout={logout} />
           <ClientUI user={user} cols={cols} />
         </div>
@@ -248,9 +217,9 @@ export default function Page() {
 
   if (user && user.role === 'admin') {
     return (
-      <div style={wrap}>
-        <div style={bg} />
-        <div style={glass}>
+      <div style={ST.wrap}>
+        <div style={ST.bg} />
+        <div style={ST.glass}>
           <Header title="Admin workspace" onLogout={logout} />
           <p style={{ opacity: 0.8 }}>
             Minimal placeholder for <b>admin</b>. (User management can be re-added here.)
@@ -260,23 +229,21 @@ export default function Page() {
     );
   }
 
-  // ---------- Login screen ----------
   return (
-    <div style={wrap}>
-      <div style={bg} />
-      <div style={card}>
+    <div style={ST.wrap}>
+      <div style={ST.bg} />
+      <div style={ST.card}>
         <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Talent Connector</div>
         <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 12 }}>Invitation-only access</div>
 
-        {/* Role tabs */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-          <button style={pill(mode === 'recruiter')} onClick={() => setMode('recruiter')}>
+          <button style={ST.pill(mode === 'recruiter')} onClick={() => setMode('recruiter')}>
             Recruiter
           </button>
-          <button style={pill(mode === 'client')} onClick={() => setMode('client')}>
+          <button style={ST.pill(mode === 'client')} onClick={() => setMode('client')}>
             Client
           </button>
-          <button style={pill(mode === 'admin')} onClick={() => setMode('admin')}>
+          <button style={ST.pill(mode === 'admin')} onClick={() => setMode('admin')}>
             Admin
           </button>
         </div>
@@ -289,7 +256,7 @@ export default function Page() {
           placeholder="name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ ...input, marginBottom: 12 }}
+          style={{ ...ST.input, marginBottom: 12 }}
           autoComplete="email"
         />
 
@@ -301,11 +268,11 @@ export default function Page() {
           placeholder="your password"
           value={pwd}
           onChange={(e) => setPwd(e.target.value)}
-          style={{ ...input, marginBottom: 14 }}
+          style={{ ...ST.input, marginBottom: 14 }}
           autoComplete="current-password"
         />
 
-        <button style={{ ...btn, width: '100%' }} onClick={login}>
+        <button style={{ ...ST.btn, width: '100%' }} onClick={login}>
           Log in
         </button>
 
@@ -313,7 +280,7 @@ export default function Page() {
           <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>{err}</div>
         ) : (
           <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 10 }}>
-            Tip: make sure your email has a row in <code>public.profiles</code> with the correct role.
+            Tip: ensure your email exists in <code>public.profiles</code> with the correct role.
           </div>
         )}
       </div>
@@ -367,12 +334,8 @@ function RecruiterUI({ user, cols }) {
       setErr('');
       setFlash('');
 
-      if (!form.name.trim()) {
-        setErr('Name is required.');
-        return;
-      }
+      if (!form.name.trim()) return setErr('Name is required.');
 
-      // build payload with safe columns only
       const payload = {
         name: form.name.trim(),
         years: form.years ? Number(form.years) : null,
@@ -389,10 +352,7 @@ function RecruiterUI({ user, cols }) {
       if (cols.date_entered) payload.date_entered = new Date().toISOString();
 
       const { error } = await supabase.from('candidates').insert(payload);
-      if (error) {
-        setErr(`Database error adding candidate: ${error.message}`);
-        return;
-      }
+      if (error) return setErr(`Database error adding candidate: ${error.message}`);
 
       setFlash('Candidate added');
       setForm({
@@ -416,11 +376,8 @@ function RecruiterUI({ user, cols }) {
   async function deleteCandidate(id) {
     try {
       const { error } = await supabase.from('candidates').delete().eq('id', id);
-      if (error) {
-        setErr(`Delete failed: ${error.message}`);
-      } else {
-        setMine((m) => m.filter((x) => x.id !== id));
-      }
+      if (error) setErr(`Delete failed: ${error.message}`);
+      else setMine((m) => m.filter((x) => x.id !== id));
     } catch (e) {
       setErr(e?.message || 'Unexpected error.');
     }
@@ -436,13 +393,13 @@ function RecruiterUI({ user, cols }) {
       <div style={{ ...row, marginBottom: 10 }}>
         <div style={{ gridColumn: 'span 4' }}>
           <label style={label}>Full name</label>
-          <input style={input} value={form.name} onChange={(e) => up('name', e.target.value)} />
+          <input style={ST.input} value={form.name} onChange={(e) => up('name', e.target.value)} />
         </div>
         {cols.titles_csv && (
           <div style={{ gridColumn: 'span 4' }}>
             <label style={label}>Titles (CSV)</label>
             <input
-              style={input}
+              style={ST.input}
               placeholder="Attorney, Paralegal"
               value={form.titles_csv}
               onChange={(e) => up('titles_csv', e.target.value)}
@@ -453,7 +410,7 @@ function RecruiterUI({ user, cols }) {
           <div style={{ gridColumn: 'span 4' }}>
             <label style={label}>Type of Law (CSV)</label>
             <input
-              style={input}
+              style={ST.input}
               placeholder="Litigation, Immigration"
               value={form.law_csv}
               onChange={(e) => up('law_csv', e.target.value)}
@@ -466,7 +423,7 @@ function RecruiterUI({ user, cols }) {
         <div style={{ gridColumn: 'span 3' }}>
           <label style={label}>Years of experience</label>
           <input
-            style={input}
+            style={ST.input}
             type="number"
             value={form.years}
             onChange={(e) => up('years', e.target.value)}
@@ -474,16 +431,16 @@ function RecruiterUI({ user, cols }) {
         </div>
         <div style={{ gridColumn: 'span 3' }}>
           <label style={label}>City</label>
-          <input style={input} value={form.city} onChange={(e) => up('city', e.target.value)} />
+          <input style={ST.input} value={form.city} onChange={(e) => up('city', e.target.value)} />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
           <label style={label}>State</label>
-          <input style={input} value={form.state} onChange={(e) => up('state', e.target.value)} />
+          <input style={ST.input} value={form.state} onChange={(e) => up('state', e.target.value)} />
         </div>
         <div style={{ gridColumn: 'span 3' }}>
           <label style={label}>Salary desired</label>
           <input
-            style={input}
+            style={ST.input}
             type="number"
             value={form.salary}
             onChange={(e) => up('salary', e.target.value)}
@@ -507,7 +464,7 @@ function RecruiterUI({ user, cols }) {
           <div style={{ gridColumn: 'span 3' }}>
             <label style={label}>Hourly rate</label>
             <input
-              style={input}
+              style={ST.input}
               type="number"
               value={form.hourly}
               onChange={(e) => up('hourly', e.target.value)}
@@ -519,7 +476,7 @@ function RecruiterUI({ user, cols }) {
       <div style={{ marginBottom: 10 }}>
         <label style={label}>Candidate Notes</label>
         <textarea
-          style={{ ...input, minHeight: 120 }}
+          style={{ ...ST.input, minHeight: 120 }}
           placeholder="Short summary: strengths, availability, fit notes."
           value={form.notes}
           onChange={(e) => up('notes', e.target.value)}
@@ -527,7 +484,7 @@ function RecruiterUI({ user, cols }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button style={btn} onClick={addCandidate}>
+        <button style={ST.btn} onClick={addCandidate}>
           Add candidate
         </button>
         <div style={{ fontSize: 12 }}>
@@ -571,7 +528,7 @@ function RecruiterUI({ user, cols }) {
                 <button
                   onClick={() => deleteCandidate(c.id)}
                   style={{
-                    ...btn,
+                    ...ST.btn,
                     background: 'rgba(220,38,38,0.9)',
                     border: '1px solid rgba(220,38,38,0.6)',
                   }}
@@ -606,13 +563,13 @@ function ClientUI({ user, cols }) {
   function toggleOpen(id) {
     setOpenId((x) => (x === id ? null : id));
   }
-
-  // compute start-of-day in UTC string
   function todayStartISO() {
     const now = new Date();
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)
+    );
     return start.toISOString();
-  }
+    }
 
   async function loadTodayCount() {
     try {
@@ -623,10 +580,7 @@ function ClientUI({ user, cols }) {
         .from('candidates')
         .select('*', { count: 'exact', head: true })
         .gte(col, from);
-      if (error) {
-        setErr(error.message);
-        return;
-      }
+      if (error) return setErr(error.message);
       setTodayCount(count || 0);
     } catch (e) {
       setErr(e?.message || 'Error loading count.');
@@ -637,19 +591,12 @@ function ClientUI({ user, cols }) {
     try {
       setErr('');
       let q = supabase.from('candidates').select('*');
-
-      // Salary/years filters
       q = q.gte('salary', minSalary).lte('salary', maxSalary);
       q = q.gte('years', minYears).lte('years', maxYears);
 
-      // Search across name/city/state and optional CSVs
       if (search.trim()) {
         const s = `%${search.trim()}%`;
-        const ors = [
-          `name.ilike.${s}`,
-          `city.ilike.${s}`,
-          `state.ilike.${s}`,
-        ];
+        const ors = [`name.ilike.${s}`, `city.ilike.${s}`, `state.ilike.${s}`];
         if (cols.titles_csv) ors.push(`titles_csv.ilike.${s}`);
         if (cols.law_csv) ors.push(`law_csv.ilike.${s}`);
         q = q.or(ors.join(','));
@@ -658,10 +605,7 @@ function ClientUI({ user, cols }) {
       q = q.order(cols.date_entered ? 'date_entered' : 'created_at', { ascending: false }).limit(50);
 
       const { data, error } = await q;
-      if (error) {
-        setErr(error.message);
-        return;
-      }
+      if (error) return setErr(error.message);
       setList(Array.isArray(data) ? data : []);
     } catch (e) {
       setErr(e?.message || 'Error loading candidates.');
@@ -695,18 +639,17 @@ function ClientUI({ user, cols }) {
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input
-            style={{ ...input, width: 360 }}
+            style={{ ...ST.input, width: 360 }}
             placeholder="Search name/city/state/title/type-of-law"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <button style={btn} onClick={loadList}>
+          <button style={ST.btn} onClick={loadList}>
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Filters */}
       <div
         style={{
           ...infoCard,
@@ -773,7 +716,6 @@ function ClientUI({ user, cols }) {
         <div style={{ color: '#f87171', fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>{err}</div>
       )}
 
-      {/* Results */}
       <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
         {list.length === 0 ? (
           <div style={{ fontSize: 13, color: '#9ca3af' }}>No candidates found.</div>
@@ -790,7 +732,6 @@ function ClientUI({ user, cols }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <div>
-                  {/* One line: Name · Title · Type of Law */}
                   <div style={{ fontWeight: 800 }}>
                     {c.name}
                     <span style={{ fontWeight: 500, color: '#9ca3af' }}>
@@ -806,11 +747,11 @@ function ClientUI({ user, cols }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={btn} onClick={() => toggleOpen(c.id)}>
+                  <button style={ST.btn} onClick={() => toggleOpen(c.id)}>
                     {openId === c.id ? 'Hide details' : 'Additional information'}
                   </button>
                   <a
-                    style={{ ...btn, textDecoration: 'none', display: 'inline-block' }}
+                    style={{ ...ST.btn, textDecoration: 'none', display: 'inline-block' }}
                     href={
                       user?.amEmail
                         ? `mailto:${user.amEmail}?subject=Candidate%20Inquiry:%20${encodeURIComponent(
