@@ -3,14 +3,15 @@
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-/* ======================= Shared styles ======================= */
+/* ---------- shared look ---------- */
 const ST = {
   wrap: {
     minHeight: '100vh',
     display: 'grid',
     placeItems: 'center',
     color: '#e5e5e5',
-    fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+    fontFamily:
+      'system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, sans-serif',
     position: 'relative',
     overflow: 'hidden',
   },
@@ -24,10 +25,10 @@ const ST = {
     filter: 'grayscale(15%) brightness(45%)',
     zIndex: 0,
   },
-  glass: {
+  shell: {
     width: '100%',
-    maxWidth: 1040,
-    background: 'rgba(14, 17, 24, 0.86)',
+    maxWidth: 1100,
+    background: 'rgba(14,17,24,0.86)',
     border: '1px solid rgba(148,163,184,0.16)',
     borderRadius: 16,
     padding: 18,
@@ -37,8 +38,8 @@ const ST = {
   },
   card: {
     width: '100%',
-    maxWidth: 540,
-    background: 'rgba(14, 17, 24, 0.86)',
+    maxWidth: 520,
+    background: 'rgba(14,17,24,0.86)',
     border: '1px solid rgba(148,163,184,0.16)',
     borderRadius: 16,
     padding: 20,
@@ -53,7 +54,7 @@ const ST = {
       border: '1px solid rgba(148,163,184,0.16)',
       background: active ? 'rgba(55,65,81,0.7)' : 'rgba(17,24,39,0.7)',
       color: '#e5e5e5',
-      fontWeight: 600,
+      fontWeight: 700,
       cursor: 'pointer',
     };
   },
@@ -72,7 +73,7 @@ const ST = {
     border: '1px solid rgba(99,102,241,0.6)',
     background: 'linear-gradient(90deg, #6366f1, #4f46e5)',
     color: '#fff',
-    fontWeight: 700,
+    fontWeight: 800,
     cursor: 'pointer',
   },
   chip: {
@@ -85,41 +86,40 @@ const ST = {
   },
 };
 
-/* =============================== Main page =============================== */
+/* ---------- page ---------- */
 export default function Page() {
-  const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
+  const [tab, setTab] = React.useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = React.useState('');
   const [pwd, setPwd] = React.useState('');
+  const [user, setUser] = React.useState(null); // { id,email,role,org,amEmail }
   const [err, setErr] = React.useState('');
-  const [user, setUser] = React.useState(null); // { id, email, role, org, amEmail }
 
-  // Optional candidates columns auto-detection
-  const [cols, setCols] = React.useState({
-    titles_csv: false,
-    law_csv: false,
-    date_entered: false,
+  // detect optional candidate columns
+  const [candCols, setCandCols] = React.useState({
+    titles_csv: true, // show fields regardless; insert will omit missing cols
+    law_csv: true,
+    date_entered: true,
   });
 
-  async function detectCandidateColumns() {
-    try {
-      const { data: colData } = await supabase
-        .from('information_schema.columns')
-        .select('column_name')
-        .eq('table_schema', 'public')
-        .eq('table_name', 'candidates');
-
-      if (Array.isArray(colData)) {
-        const names = new Set(colData.map((c) => c.column_name));
-        setCols({
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('information_schema.columns')
+          .select('column_name')
+          .eq('table_schema', 'public')
+          .eq('table_name', 'candidates');
+        const names = new Set((data || []).map((c) => c.column_name));
+        setCandCols({
           titles_csv: names.has('titles_csv'),
           law_csv: names.has('law_csv'),
           date_entered: names.has('date_entered'),
         });
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
-  }
+    })();
+  }, []);
 
   async function login() {
     try {
@@ -133,31 +133,26 @@ export default function Page() {
         password: pwd,
       });
       if (authErr) return setErr(authErr.message || 'Login failed.');
-      if (!auth?.user?.id) return setErr('Login failed (no user).');
 
       const { data: prof, error: profErr } = await supabase
         .from('profiles')
         .select('id,email,role,org,account_manager_email')
         .eq('id', auth.user.id)
         .single();
+      if (profErr || !prof) return setErr('Login OK, but profile not found.');
 
-      if (profErr || !prof?.id)
-        return setErr('Login OK, but your profile was not found. Ask an admin to create it.');
-
-      const r = String(prof.role);
-      if (r !== mode)
-        return setErr(`This account is a ${r}. Switch to the "${r}" tab or ask admin to change it.`);
+      if (prof.role !== tab)
+        return setErr(`This account is a ${prof.role}. Switch to the "${prof.role}" tab.`);
 
       setUser({
         id: prof.id,
         email: prof.email,
-        role: r,
+        role: prof.role,
         org: prof.org ?? null,
         amEmail: prof.account_manager_email ?? null,
       });
-      await detectCandidateColumns();
     } catch (e) {
-      setErr(e?.message || 'Unexpected error logging in.');
+      setErr(e?.message || 'Unexpected login error.');
     }
   }
 
@@ -168,44 +163,30 @@ export default function Page() {
       setUser(null);
       setEmail('');
       setPwd('');
-      setMode('recruiter');
+      setTab('recruiter');
       setErr('');
     }
   }
 
-  if (user && user.role === 'recruiter') {
+  if (user?.role === 'recruiter') {
     return (
-      <div style={ST.wrap}>
-        <div style={ST.bg} />
-        <div style={ST.glass}>
-          <Header title="Recruiter workspace" onLogout={logout} />
-          <RecruiterUI user={user} cols={cols} />
-        </div>
-      </div>
+      <Frame title="Recruiter workspace" onLogout={logout}>
+        <Recruiter user={user} cols={candCols} />
+      </Frame>
     );
   }
-
-  if (user && user.role === 'client') {
+  if (user?.role === 'client') {
     return (
-      <div style={ST.wrap}>
-        <div style={ST.bg} />
-        <div style={ST.glass}>
-          <Header title="Client workspace" onLogout={logout} />
-          <ClientUI user={user} cols={cols} />
-        </div>
-      </div>
+      <Frame title="Client workspace" onLogout={logout}>
+        <Client user={user} cols={candCols} />
+      </Frame>
     );
   }
-
-  if (user && user.role === 'admin') {
+  if (user?.role === 'admin') {
     return (
-      <div style={ST.wrap}>
-        <div style={ST.bg} />
-        <div style={ST.glass}>
-          <Header title="Admin workspace" onLogout={logout} />
-          <AdminUI />
-        </div>
-      </div>
+      <Frame title="Admin workspace" onLogout={logout}>
+        <Admin />
+      </Frame>
     );
   }
 
@@ -213,69 +194,54 @@ export default function Page() {
     <div style={ST.wrap}>
       <div style={ST.bg} />
       <div style={ST.card}>
-        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Talent Connector</div>
+        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>Talent Connector</div>
         <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 12 }}>Invitation-only access</div>
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-          <button style={ST.pill(mode === 'recruiter')} onClick={() => setMode('recruiter')}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <button style={ST.pill(tab === 'recruiter')} onClick={() => setTab('recruiter')}>
             Recruiter
           </button>
-          <button style={ST.pill(mode === 'client')} onClick={() => setMode('client')}>
+          <button style={ST.pill(tab === 'client')} onClick={() => setTab('client')}>
             Client
           </button>
-          <button style={ST.pill(mode === 'admin')} onClick={() => setMode('admin')}>
+          <button style={ST.pill(tab === 'admin')} onClick={() => setTab('admin')}>
             Admin
           </button>
         </div>
 
-        <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
-          Email
-        </label>
+        <label style={label}>Email</label>
         <input
+          style={{ ...ST.input, marginBottom: 10 }}
           type="email"
           placeholder="name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ ...ST.input, marginBottom: 12 }}
-          autoComplete="email"
         />
-
-        <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
-          Password
-        </label>
+        <label style={label}>Password</label>
         <input
+          style={{ ...ST.input, marginBottom: 12 }}
           type="password"
           placeholder="your password"
           value={pwd}
           onChange={(e) => setPwd(e.target.value)}
-          style={{ ...ST.input, marginBottom: 14 }}
-          autoComplete="current-password"
         />
-
         <button style={{ ...ST.btn, width: '100%' }} onClick={login}>
           Log in
         </button>
-
-        {err ? (
-          <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>{err}</div>
-        ) : (
-          <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 10 }}>
-            Tip: ensure your email exists in <code>public.profiles</code> with the correct role.
-          </div>
-        )}
+        {err && <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 10 }}>{err}</div>}
       </div>
     </div>
   );
 }
 
-/* ========================= Recruiter UI ========================= */
-function RecruiterUI({ user, cols }) {
-  const todayISODate = () => {
+/* ---------- recruiter ---------- */
+function Recruiter({ user, cols }) {
+  const todayISO = () => {
     const d = new Date();
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
   };
 
   const [form, setForm] = React.useState({
@@ -289,28 +255,25 @@ function RecruiterUI({ user, cols }) {
     contract: false,
     hourly: '',
     notes: '',
-    date_entered: todayISODate(), // NEW: visible "Date entered" field (yyyy-mm-dd)
+    date_entered: todayISO(),
   });
-  const [flash, setFlash] = React.useState('');
-  const [err, setErr] = React.useState('');
   const [mine, setMine] = React.useState([]);
+  const [msg, setMsg] = React.useState('');
+  const [err, setErr] = React.useState('');
 
   function up(k, v) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
   async function loadMine() {
-    try {
-      let q = supabase
-        .from('candidates')
-        .select('*')
-        .eq('created_by', user.id)
-        .order(cols.date_entered ? 'date_entered' : 'created_at', { ascending: false })
-        .limit(20);
-
-      const { data, error } = await q;
-      if (!error && Array.isArray(data)) setMine(data);
-    } catch {}
+    const orderCol = cols.date_entered ? 'date_entered' : 'created_at';
+    const { data } = await supabase
+      .from('candidates')
+      .select('*')
+      .eq('created_by', user.id)
+      .order(orderCol, { ascending: false })
+      .limit(30);
+    setMine(Array.isArray(data) ? data : []);
   }
 
   React.useEffect(() => {
@@ -321,8 +284,7 @@ function RecruiterUI({ user, cols }) {
   async function addCandidate() {
     try {
       setErr('');
-      setFlash('');
-
+      setMsg('');
       if (!form.name.trim()) return setErr('Name is required.');
 
       const payload = {
@@ -338,18 +300,13 @@ function RecruiterUI({ user, cols }) {
       };
       if (cols.titles_csv) payload.titles_csv = form.titles_csv.trim() || null;
       if (cols.law_csv) payload.law_csv = form.law_csv.trim() || null;
-
-      // If the column exists, save the chosen date; otherwise ignore.
-      if (cols.date_entered && form.date_entered) {
-        // store as ISO at midnight UTC for consistency
-        const dt = new Date(`${form.date_entered}T00:00:00.000Z`).toISOString();
-        payload.date_entered = dt;
-      }
+      if (cols.date_entered && form.date_entered)
+        payload.date_entered = new Date(`${form.date_entered}T00:00:00.000Z`).toISOString();
 
       const { error } = await supabase.from('candidates').insert(payload);
       if (error) return setErr(`Database error adding candidate: ${error.message}`);
 
-      setFlash('Candidate added');
+      setMsg('Candidate added');
       setForm({
         name: '',
         titles_csv: '',
@@ -361,7 +318,7 @@ function RecruiterUI({ user, cols }) {
         contract: false,
         hourly: '',
         notes: '',
-        date_entered: todayISODate(),
+        date_entered: todayISO(),
       });
       await loadMine();
     } catch (e) {
@@ -369,52 +326,43 @@ function RecruiterUI({ user, cols }) {
     }
   }
 
-  async function deleteCandidate(id) {
-    try {
-      const { error } = await supabase.from('candidates').delete().eq('id', id);
-      if (error) setErr(`Delete failed: ${error.message}`);
-      else setMine((m) => m.filter((x) => x.id !== id));
-    } catch (e) {
-      setErr(e?.message || 'Unexpected error.');
-    }
+  async function del(id) {
+    const { error } = await supabase.from('candidates').delete().eq('id', id);
+    if (!error) setMine((m) => m.filter((x) => x.id !== id));
   }
 
-  const label = { display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 };
   const row = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 10 };
-
   return (
-    <div>
-      <div style={{ fontWeight: 800, marginBottom: 8 }}>Add candidate</div>
+    <>
+      <div style={{ fontWeight: 900, marginBottom: 8 }}>Add candidate</div>
 
+      {/* Row 1 */}
       <div style={{ ...row, marginBottom: 10 }}>
         <div style={{ gridColumn: 'span 4' }}>
           <label style={label}>Full name</label>
           <input style={ST.input} value={form.name} onChange={(e) => up('name', e.target.value)} />
         </div>
-        {cols.titles_csv && (
-          <div style={{ gridColumn: 'span 4' }}>
-            <label style={label}>Titles (CSV)</label>
-            <input
-              style={ST.input}
-              placeholder="Attorney, Paralegal"
-              value={form.titles_csv}
-              onChange={(e) => up('titles_csv', e.target.value)}
-            />
-          </div>
-        )}
-        {cols.law_csv && (
-          <div style={{ gridColumn: 'span 4' }}>
-            <label style={label}>Type of Law (CSV)</label>
-            <input
-              style={ST.input}
-              placeholder="Litigation, Immigration"
-              value={form.law_csv}
-              onChange={(e) => up('law_csv', e.target.value)}
-            />
-          </div>
-        )}
+        <div style={{ gridColumn: 'span 4' }}>
+          <label style={label}>Title(s) (CSV)</label>
+          <input
+            style={ST.input}
+            placeholder="Attorney, Paralegal"
+            value={form.titles_csv}
+            onChange={(e) => up('titles_csv', e.target.value)}
+          />
+        </div>
+        <div style={{ gridColumn: 'span 4' }}>
+          <label style={label}>Type of Law (CSV)</label>
+          <input
+            style={ST.input}
+            placeholder="Litigation, Immigration"
+            value={form.law_csv}
+            onChange={(e) => up('law_csv', e.target.value)}
+          />
+        </div>
       </div>
 
+      {/* Row 2 */}
       <div style={{ ...row, marginBottom: 10 }}>
         <div style={{ gridColumn: 'span 3' }}>
           <label style={label}>Years of experience</label>
@@ -444,8 +392,9 @@ function RecruiterUI({ user, cols }) {
         </div>
       </div>
 
+      {/* Row 3 */}
       <div style={{ ...row, marginBottom: 10, alignItems: 'center' }}>
-        <div style={{ gridColumn: 'span 3', display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ gridColumn: 'span 3', display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             id="contract"
             type="checkbox"
@@ -467,23 +416,21 @@ function RecruiterUI({ user, cols }) {
             />
           </div>
         )}
-        {cols.date_entered && (
-          <div style={{ gridColumn: 'span 3' }}>
-            <label style={label}>Date entered</label>
-            <input
-              type="date"
-              style={ST.input}
-              value={form.date_entered}
-              onChange={(e) => up('date_entered', e.target.value)}
-            />
-          </div>
-        )}
+        <div style={{ gridColumn: 'span 3' }}>
+          <label style={label}>Date entered</label>
+          <input
+            style={ST.input}
+            type="date"
+            value={form.date_entered}
+            onChange={(e) => up('date_entered', e.target.value)}
+          />
+        </div>
       </div>
 
       <div style={{ marginBottom: 10 }}>
-        <label style={label}>Candidate Notes</label>
+        <label style={label}>Candidate notes</label>
         <textarea
-          style={{ ...ST.input, minHeight: 120 }}
+          style={{ ...ST.input, minHeight: 110 }}
           placeholder="Short summary: strengths, availability, fit notes."
           value={form.notes}
           onChange={(e) => up('notes', e.target.value)}
@@ -495,16 +442,16 @@ function RecruiterUI({ user, cols }) {
           Add candidate
         </button>
         <div style={{ fontSize: 12 }}>
-          {flash && <span style={{ color: '#93e2b7' }}>{flash}</span>}{' '}
+          {msg && <span style={{ color: '#93e2b7' }}>{msg}</span>}
           {err && <span style={{ color: '#f87171' }}>{err}</span>}
         </div>
       </div>
 
       <hr style={{ borderColor: 'rgba(148,163,184,0.15)', margin: '16px 0' }} />
 
-      <div style={{ fontWeight: 800, marginBottom: 8 }}>My recent candidates</div>
+      <div style={{ fontWeight: 900, marginBottom: 8 }}>My recent candidates</div>
       {mine.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#9ca3af' }}>No candidates yet.</div>
+        <div style={{ color: '#9ca3af', fontSize: 13 }}>No candidates yet.</div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {mine.map((c) => (
@@ -514,32 +461,31 @@ function RecruiterUI({ user, cols }) {
                 border: '1px solid rgba(148,163,184,0.16)',
                 borderRadius: 10,
                 padding: 10,
-                background: 'rgba(17,24,39,0.7)',
+                background: 'rgba(17,24,39,0.72)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <div>
-                  <div style={{ fontWeight: 700 }}>
-                    {c.name}{' '}
-                    <span style={{ color: '#9ca3af', fontWeight: 400 }}>
-                      {cols.titles_csv && c.titles_csv ? ` · ${c.titles_csv}` : ''}
-                      {cols.law_csv && c.law_csv ? ` · ${c.law_csv}` : ''}
+                  <div style={{ fontWeight: 800 }}>
+                    {c.name}
+                    <span style={{ color: '#9ca3af', fontWeight: 500 }}>
+                      {c.titles_csv ? ` · ${c.titles_csv}` : ''}
+                      {c.law_csv ? ` · ${c.law_csv}` : ''}
                     </span>
                   </div>
-                  <div style={{ color: '#9ca3af', fontSize: 12 }}>
+                  <div style={{ fontSize: 12, color: '#9ca3af' }}>
                     {c.city || '-'}, {c.state || '-'} · {c.years ?? 0} yrs · $
                     {c.salary ? c.salary.toLocaleString() : '—'}{' '}
                     {c.contract ? ` · $${c.hourly || '—'}/hr` : ''}
                   </div>
                 </div>
                 <button
-                  onClick={() => deleteCandidate(c.id)}
+                  onClick={() => del(c.id)}
                   style={{
                     ...ST.btn,
                     background: 'rgba(220,38,38,0.9)',
                     border: '1px solid rgba(220,38,38,0.6)',
                   }}
-                  title="Delete"
                 >
                   Delete
                 </button>
@@ -551,141 +497,45 @@ function RecruiterUI({ user, cols }) {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-/* ============ Two-thumb slider (single visual line using overlap) ============ */
-function RangeMinMax({ min, max, step, valueMin, valueMax, onChangeMin, onChangeMax }) {
-  // keep min <= max
-  function clampMin(v) {
-    const val = Math.min(Math.max(v, min), valueMax);
-    onChangeMin(val);
-  }
-  function clampMax(v) {
-    const val = Math.max(Math.min(v, max), valueMin);
-    onChangeMax(val);
-  }
+/* ---------- client ---------- */
+function Client({ user, cols }) {
+  // individual filters
+  const [nameQ, setNameQ] = React.useState('');
+  const [titleQ, setTitleQ] = React.useState('');
+  const [lawQ, setLawQ] = React.useState('');
+  const [cityQ, setCityQ] = React.useState('');
+  const [stateQ, setStateQ] = React.useState('');
+  const [onlyContract, setOnlyContract] = React.useState(false);
 
-  const track = {
-    position: 'relative',
-    height: 22,
-  };
-  const base = {
-    position: 'absolute',
-    inset: 0,
-    WebkitAppearance: 'none',
-    appearance: 'none',
-    width: '100%',
-    background: 'transparent', // invisible track; we draw our own
-    pointerEvents: 'none', // allow top input to receive events, but…
-  };
-  const thumbable = {
-    pointerEvents: 'auto', // … thumbs remain interactive
-  };
-
-  // background track + selected range fill
-  const pctMin = ((valueMin - min) / (max - min)) * 100;
-  const pctMax = ((valueMax - min) / (max - min)) * 100;
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div
-        style={{
-          height: 4,
-          background: 'rgba(148,163,184,0.25)',
-          borderRadius: 999,
-          position: 'relative',
-          marginTop: 10,
-          marginBottom: 8,
-        }}
-      >
-        {/* fill */}
-        <div
-          style={{
-            position: 'absolute',
-            left: `${pctMin}%`,
-            width: `${Math.max(0, pctMax - pctMin)}%`,
-            top: 0,
-            bottom: 0,
-            background: '#4f46e5',
-            borderRadius: 999,
-          }}
-        />
-      </div>
-
-      <div style={track}>
-        {/* lower thumb (under) */}
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={valueMin}
-          onChange={(e) => clampMin(Number(e.target.value))}
-          style={{ ...base, zIndex: 2 }}
-        />
-        {/* upper thumb (on top) */}
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={valueMax}
-          onChange={(e) => clampMax(Number(e.target.value))}
-          style={{ ...base, ...thumbable, zIndex: 3 }}
-        />
-      </div>
-
-      {/* Thumb styling (inline) */}
-      <style>{`
-        input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          height: 16px;
-          width: 16px;
-          border-radius: 50%;
-          background: #2563eb;
-          border: 2px solid #93c5fd;
-          cursor: pointer;
-          margin-top: -6px;
-        }
-        input[type="range"]::-moz-range-thumb {
-          height: 16px;
-          width: 16px;
-          border-radius: 50%;
-          background: #2563eb;
-          border: 2px solid #93c5fd;
-          cursor: pointer;
-        }
-        input[type="range"]::-webkit-slider-runnable-track {
-          height: 4px;
-          background: transparent;
-        }
-        input[type="range"]::-moz-range-track {
-          height: 4px;
-          background: transparent;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-/* ========================= Client UI ========================= */
-function ClientUI({ user, cols }) {
-  const [search, setSearch] = React.useState('');
+  // two-thumb sliders
   const [minSalary, setMinSalary] = React.useState(0);
   const [maxSalary, setMaxSalary] = React.useState(400000);
   const [minYears, setMinYears] = React.useState(0);
   const [maxYears, setMaxYears] = React.useState(50);
+
+  // sorting
+  const orderableCols = [
+    cols.date_entered ? 'date_entered' : 'created_at',
+    'salary',
+    'years',
+    'name',
+  ];
+  const [sortBy, setSortBy] = React.useState(orderableCols[0]);
+  const [sortDir, setSortDir] = React.useState('desc'); // asc | desc
+
   const [list, setList] = React.useState([]);
   const [todayCount, setTodayCount] = React.useState(0);
-  const [err, setErr] = React.useState('');
   const [openId, setOpenId] = React.useState(null);
+  const [err, setErr] = React.useState('');
 
   function toggleOpen(id) {
     setOpenId((x) => (x === id ? null : id));
   }
+
   function todayStartISO() {
     const now = new Date();
     const start = new Date(
@@ -694,38 +544,39 @@ function ClientUI({ user, cols }) {
     return start.toISOString();
   }
 
-  async function loadTodayCount() {
-    try {
-      setErr('');
-      const col = cols.date_entered ? 'date_entered' : 'created_at';
-      const from = todayStartISO();
-      const { count, error } = await supabase
-        .from('candidates')
-        .select('*', { count: 'exact', head: true })
-        .gte(col, from);
-      if (error) return setErr(error.message);
-      setTodayCount(count || 0);
-    } catch (e) {
-      setErr(e?.message || 'Error loading count.');
-    }
+  async function loadToday() {
+    const col = cols.date_entered ? 'date_entered' : 'created_at';
+    const from = todayStartISO();
+    const { count } = await supabase
+      .from('candidates')
+      .select('*', { count: 'exact', head: true })
+      .gte(col, from);
+    setTodayCount(count || 0);
   }
 
-  async function loadList() {
+  async function load() {
     try {
       setErr('');
       let q = supabase.from('candidates').select('*');
+
+      // sliders
       q = q.gte('salary', minSalary).lte('salary', maxSalary);
       q = q.gte('years', minYears).lte('years', maxYears);
 
-      if (search.trim()) {
-        const s = `%${search.trim()}%`;
-        const ors = [`name.ilike.${s}`, `city.ilike.${s}`, `state.ilike.${s}`];
-        if (cols.titles_csv) ors.push(`titles_csv.ilike.${s}`);
-        if (cols.law_csv) ors.push(`law_csv.ilike.${s}`);
-        q = q.or(ors.join(','));
-      }
+      // booleans
+      if (onlyContract) q = q.eq('contract', true);
 
-      q = q.order(cols.date_entered ? 'date_entered' : 'created_at', { ascending: false }).limit(50);
+      // text filters (ILIKE)
+      const ors = [];
+      if (nameQ.trim()) ors.push(`name.ilike.%${nameQ.trim()}%`);
+      if (titleQ.trim() && cols.titles_csv) ors.push(`titles_csv.ilike.%${titleQ.trim()}%`);
+      if (lawQ.trim() && cols.law_csv) ors.push(`law_csv.ilike.%${lawQ.trim()}%`);
+      if (cityQ.trim()) ors.push(`city.ilike.%${cityQ.trim()}%`);
+      if (stateQ.trim()) ors.push(`state.ilike.%${stateQ.trim()}%`);
+      if (ors.length) q = q.or(ors.join(','));
+
+      // ordering
+      q = q.order(sortBy, { ascending: sortDir === 'asc' }).limit(75);
 
       const { data, error } = await q;
       if (error) return setErr(error.message);
@@ -736,88 +587,154 @@ function ClientUI({ user, cols }) {
   }
 
   React.useEffect(() => {
-    loadTodayCount();
-    loadList();
+    loadToday();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const infoCard = {
+  const panel = {
     border: '1px solid rgba(148,163,184,0.16)',
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     background: 'rgba(17,24,39,0.72)',
   };
 
-  const topRow = { display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' };
-
   return (
-    <div>
-      <div style={topRow}>
-        <div style={{ ...infoCard, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#9ca3af' }}>Candidates added today</div>
-            <div style={{ fontSize: 28, fontWeight: 800 }}>{todayCount}</div>
-          </div>
+    <>
+      {/* top summary + refresh */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'end' }}>
+        <div style={panel}>
+          <div style={{ fontSize: 12, color: '#9ca3af' }}>Candidates added today</div>
+          <div style={{ fontSize: 28, fontWeight: 900 }}>{todayCount}</div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input
-            style={{ ...ST.input, width: 360 }}
-            placeholder="Search name/city/state/title/type-of-law"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button style={ST.btn} onClick={loadList}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select
+            style={ST.input}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            title="Sort by"
+          >
+            {orderableCols.map((c) => (
+              <option key={c} value={c}>
+                Sort by: {c}
+              </option>
+            ))}
+          </select>
+          <select
+            style={ST.input}
+            value={sortDir}
+            onChange={(e) => setSortDir(e.target.value)}
+            title="Direction"
+          >
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+          <button style={ST.btn} onClick={load}>
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Filters: each is a single visual line (two thumbs overlapped) */}
-      <div
-        style={{
-          ...infoCard,
-          marginTop: 12,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 16,
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
-            Salary range (${minSalary.toLocaleString()} – ${maxSalary.toLocaleString()})
-          </div>
-          <RangeMinMax
-            min={0}
-            max={400000}
-            step={5000}
-            valueMin={minSalary}
-            valueMax={maxSalary}
-            onChangeMin={setMinSalary}
-            onChangeMax={setMaxSalary}
+      {/* filters */}
+      <div style={{ ...panel, marginTop: 12 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 10,
+            marginBottom: 8,
+          }}
+        >
+          <input
+            style={ST.input}
+            placeholder="Name"
+            value={nameQ}
+            onChange={(e) => setNameQ(e.target.value)}
+          />
+          <input
+            style={ST.input}
+            placeholder="Title (CSV contains)"
+            value={titleQ}
+            onChange={(e) => setTitleQ(e.target.value)}
+          />
+          <input
+            style={ST.input}
+            placeholder="Type of Law (CSV contains)"
+            value={lawQ}
+            onChange={(e) => setLawQ(e.target.value)}
+          />
+          <input
+            style={ST.input}
+            placeholder="City"
+            value={cityQ}
+            onChange={(e) => setCityQ(e.target.value)}
+          />
+          <input
+            style={ST.input}
+            placeholder="State"
+            value={stateQ}
+            onChange={(e) => setStateQ(e.target.value)}
           />
         </div>
 
-        <div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
-            Years of experience ({minYears} – {maxYears})
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 16,
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
+              Salary range (${minSalary.toLocaleString()} – ${maxSalary.toLocaleString()})
+            </div>
+            <TwoThumb
+              min={0}
+              max={400000}
+              step={5000}
+              valueMin={minSalary}
+              valueMax={maxSalary}
+              onChangeMin={setMinSalary}
+              onChangeMax={setMaxSalary}
+            />
           </div>
-          <RangeMinMax
-            min={0}
-            max={50}
-            step={1}
-            valueMin={minYears}
-            valueMax={maxYears}
-            onChangeMin={setMinYears}
-            onChangeMax={setMaxYears}
-          />
+
+          <div>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
+              Years of experience ({minYears} – {maxYears})
+            </div>
+            <TwoThumb
+              min={0}
+              max={50}
+              step={1}
+              valueMin={minYears}
+              valueMax={maxYears}
+              onChangeMin={setMinYears}
+              onChangeMax={setMaxYears}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={onlyContract}
+              onChange={(e) => setOnlyContract(e.target.checked)}
+            />
+            Contract only
+          </label>
+          <button style={ST.btn} onClick={load}>
+            Apply filters
+          </button>
         </div>
       </div>
 
-      {err && (
-        <div style={{ color: '#f87171', fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>{err}</div>
-      )}
+      {err && <div style={{ color: '#f87171', fontSize: 12, marginTop: 10 }}>{err}</div>}
 
+      {/* results */}
       <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
         {list.length === 0 ? (
           <div style={{ fontSize: 13, color: '#9ca3af' }}>No candidates found.</div>
@@ -829,14 +746,14 @@ function ClientUI({ user, cols }) {
                 border: '1px solid rgba(148,163,184,0.16)',
                 borderRadius: 12,
                 padding: 12,
-                background: 'rgba(17,24,39,0.7)',
+                background: 'rgba(17,24,39,0.72)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <div>
-                  <div style={{ fontWeight: 800 }}>
+                  <div style={{ fontWeight: 900 }}>
                     {c.name}
-                    <span style={{ fontWeight: 500, color: '#9ca3af' }}>
+                    <span style={{ color: '#9ca3af', fontWeight: 500 }}>
                       {c.titles_csv ? ` · ${c.titles_csv}` : ''}
                       {c.law_csv ? ` · ${c.law_csv}` : ''}
                     </span>
@@ -847,13 +764,12 @@ function ClientUI({ user, cols }) {
                     {c.contract ? ` · $${c.hourly || '—'}/hr` : ''}
                   </div>
                 </div>
-
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={ST.btn} onClick={() => toggleOpen(c.id)}>
+                  <button style={ST.btn} onClick={() => setOpenId((x) => (x === c.id ? null : c.id))}>
                     {openId === c.id ? 'Hide details' : 'Additional information'}
                   </button>
                   <a
-                    style={{ ...ST.btn, textDecoration: 'none', display: 'inline-block' }}
+                    style={{ ...ST.btn, textDecoration: 'none' }}
                     href={
                       user?.amEmail
                         ? `mailto:${user.amEmail}?subject=Candidate%20Inquiry:%20${encodeURIComponent(
@@ -866,7 +782,6 @@ function ClientUI({ user, cols }) {
                   </a>
                 </div>
               </div>
-
               {openId === c.id && c.notes && (
                 <div style={{ marginTop: 10, color: '#e5e5e5', fontSize: 13 }}>{c.notes}</div>
               )}
@@ -874,27 +789,22 @@ function ClientUI({ user, cols }) {
           ))
         )}
       </div>
-    </div>
+    </>
   );
 }
 
-/* ========================= Admin UI (simple directory) ========================= */
-function AdminUI() {
+/* ---------- admin (simple directory) ---------- */
+function Admin() {
   const [rows, setRows] = React.useState([]);
   const [err, setErr] = React.useState('');
 
   async function load() {
-    try {
-      setErr('');
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('email, role, org, account_manager_email')
-        .order('email', { ascending: true });
-      if (error) return setErr(error.message);
-      setRows(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setErr(e?.message || 'Error loading profiles.');
-    }
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email,role,org,account_manager_email')
+      .order('email', { ascending: true });
+    if (error) setErr(error.message);
+    else setRows(Array.isArray(data) ? data : []);
   }
 
   React.useEffect(() => {
@@ -902,14 +812,13 @@ function AdminUI() {
   }, []);
 
   return (
-    <div>
+    <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 800 }}>Directory</div>
+        <div style={{ fontWeight: 900 }}>Directory</div>
         <button style={ST.btn} onClick={load}>
           Refresh
         </button>
       </div>
-
       {err && <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div>}
 
       <div
@@ -918,7 +827,7 @@ function AdminUI() {
           border: '1px solid rgba(148,163,184,0.16)',
           borderRadius: 12,
           overflow: 'hidden',
-          background: 'rgba(17,24,39,0.7)',
+          background: 'rgba(17,24,39,0.72)',
         }}
       >
         <div
@@ -943,7 +852,7 @@ function AdminUI() {
         ) : (
           rows.map((r) => (
             <div
-              key={`${r.email}`}
+              key={r.email}
               style={{
                 display: 'grid',
                 gridTemplateColumns: '2fr 1fr 1fr 1.5fr',
@@ -953,44 +862,146 @@ function AdminUI() {
               }}
             >
               <div>{r.email}</div>
-              <div><span style={ST.chip}>{r.role}</span></div>
+              <div>
+                <span style={ST.chip}>{r.role}</span>
+              </div>
               <div>{r.org || '—'}</div>
               <div>{r.account_manager_email || '—'}</div>
             </div>
           ))
         )}
       </div>
+    </>
+  );
+}
+
+/* ---------- frame & helpers ---------- */
+function Frame({ title, onLogout, children }) {
+  return (
+    <div style={ST.wrap}>
+      <div style={ST.bg} />
+      <div style={ST.shell}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 900, fontSize: 20 }}>{title}</div>
+          <button
+            onClick={onLogout}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 10,
+              border: '1px solid rgba(148,163,184,0.16)',
+              background: 'rgba(31,41,55,0.7)',
+              color: '#e5e5e5',
+              fontWeight: 700,
+            }}
+          >
+            Log out
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
 
-/* ========================= Shared Header ========================= */
-function Header({ title, onLogout }) {
+const label = { display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 };
+
+/* ---------- two-thumb slider (both thumbs active) ---------- */
+function TwoThumb({ min, max, step, valueMin, valueMax, onChangeMin, onChangeMax }) {
+  const pctMin = ((valueMin - min) / (max - min)) * 100;
+  const pctMax = ((valueMax - min) / (max - min)) * 100;
+
+  const base = {
+    WebkitAppearance: 'none',
+    appearance: 'none',
+    width: '100%',
+    background: 'transparent',
+    outline: 'none',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: 24,
+    margin: 0,
+    pointerEvents: 'auto', // both sliders interactive
+  };
+
+  function clampMin(v) {
+    const nv = Math.min(Math.max(v, min), valueMax);
+    onChangeMin(nv);
+  }
+  function clampMax(v) {
+    const nv = Math.max(Math.min(v, max), valueMin);
+    onChangeMax(nv);
+  }
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        justifyContent: 'space-between',
-        marginBottom: 8,
-      }}
-    >
-      <div style={{ fontWeight: 800, fontSize: 20 }}>{title}</div>
-      <button
-        onClick={onLogout}
+    <div style={{ position: 'relative', height: 24 }}>
+      {/* track */}
+      <div
         style={{
-          padding: '8px 14px',
-          borderRadius: 10,
-          border: '1px solid rgba(148,163,184,0.16)',
-          background: 'rgba(31,41,55,0.7)',
-          color: '#e5e5e5',
-          cursor: 'pointer',
-          fontWeight: 600,
+          position: 'absolute',
+          top: 10,
+          left: 0,
+          right: 0,
+          height: 4,
+          borderRadius: 999,
+          background: 'rgba(148,163,184,0.25)',
         }}
-      >
-        Log out
-      </button>
+      />
+      {/* selected */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          height: 4,
+          left: `${pctMin}%`,
+          width: `${Math.max(0, pctMax - pctMin)}%`,
+          background: '#4f46e5',
+          borderRadius: 999,
+        }}
+      />
+
+      {/* lower thumb */}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={valueMin}
+        onChange={(e) => clampMin(Number(e.target.value))}
+        style={{ ...base, zIndex: 3 }}
+      />
+      {/* upper thumb */}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={valueMax}
+        onChange={(e) => clampMax(Number(e.target.value))}
+        style={{ ...base, zIndex: 4 }}
+      />
+
+      {/* thumb styles */}
+      <style>{`
+        input[type="range"]::-webkit-slider-thumb{
+          -webkit-appearance:none; appearance:none;
+          height:16px; width:16px; border-radius:50%;
+          background:#2563eb; border:2px solid #93c5fd; cursor:pointer; margin-top:-6px;
+        }
+        input[type="range"]::-moz-range-thumb{
+          height:16px; width:16px; border-radius:50%;
+          background:#2563eb; border:2px solid #93c5fd; cursor:pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track{ height:4px; background:transparent; }
+        input[type="range"]::-moz-range-track{ height:4px; background:transparent; }
+      `}</style>
     </div>
   );
 }
