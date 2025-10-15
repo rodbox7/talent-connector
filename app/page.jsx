@@ -3,8 +3,8 @@ import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Adds Client filters (City, State, Title, Type of Law) via selects.
- * Recruiter UI and behavior preserved. Background + styling intact.
+ * Client tab now includes extra sort options for hourly rate (high→low, low→high).
+ * Recruiter UI and styling preserved.
  */
 
 const NYC =
@@ -157,7 +157,7 @@ export default function Page() {
     setErr('');
   }
 
-  // ---------- Recruiter form state (unchanged) ----------
+  // ---------- Recruiter form state ----------
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
@@ -251,16 +251,18 @@ export default function Page() {
     }
   }
 
-  // ---------- Client state (RESTORED + new filters) ----------
+  // ---------- Client state ----------
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
   const [minSalary, setMinSalary] = React.useState(0);
   const [maxSalary, setMaxSalary] = React.useState(400000);
   const [minYears, setMinYears] = React.useState(0);
   const [maxYears, setMaxYears] = React.useState(50);
+
+  // NEW: add hourly sort options
   const [sortBy, setSortBy] = React.useState('date_desc');
 
-  // new: filter selects
+  // filter selects
   const [cities, setCities] = React.useState([]);
   const [states, setStates] = React.useState([]);
   const [titleOptions, setTitleOptions] = React.useState([]);
@@ -294,7 +296,7 @@ export default function Page() {
     })();
   }, [user, todayStartIso]);
 
-  // Load filter options (cities, states, titles, laws)
+  // Load filter options
   React.useEffect(() => {
     if (!user || user.role !== 'client') return;
 
@@ -393,6 +395,13 @@ export default function Page() {
           break;
         case 'years_asc':
           q = q.order('years', { ascending: true, nullsFirst: true });
+          break;
+        // NEW: hourly sorts
+        case 'hourly_desc':
+          q = q.order('hourly', { ascending: false, nullsFirst: false });
+          break;
+        case 'hourly_asc':
+          q = q.order('hourly', { ascending: true, nullsFirst: true });
           break;
         case 'date_desc':
         default:
@@ -521,7 +530,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Recruiter UI (unchanged layout you approved) ----------
+  // ---------- Recruiter UI ----------
   if (user.role === 'recruiter') {
     return (
       <div style={pageWrap}>
@@ -544,7 +553,7 @@ export default function Page() {
                 onClick={logout}
                 style={{
                   background: '#0B1220',
-                  border: '1px solid #1F2937',
+                  border: '1px solid '#1F2937',
                 }}
               >
                 Log out
@@ -767,7 +776,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Client UI (restored + new selects) ----------
+  // ---------- Client UI ----------
   if (user.role === 'client') {
     return (
       <div style={pageWrap}>
@@ -920,13 +929,15 @@ export default function Page() {
                     <option value="date_asc">Oldest first</option>
                     <option value="salary_desc">Salary high → low</option>
                     <option value="salary_asc">Salary low → high</option>
+                    <option value="hourly_desc">Hourly rate high → low</option>
+                    <option value="hourly_asc">Hourly rate low → high</option>
                     <option value="years_desc">Experience high → low</option>
                     <option value="years_asc">Experience low → high</option>
                   </select>
                 </div>
               </div>
 
-              {/* NEW: Select filters row */}
+              {/* Select filters row */}
               <div
                 style={{
                   marginTop: 12,
