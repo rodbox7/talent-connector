@@ -75,6 +75,14 @@ const ST = {
     fontWeight: 700,
     cursor: 'pointer',
   },
+  chip: {
+    padding: '4px 8px',
+    borderRadius: 999,
+    border: '1px solid rgba(148,163,184,0.16)',
+    background: 'rgba(31,41,55,0.7)',
+    color: '#e5e5e5',
+    fontSize: 12,
+  },
 };
 
 /* =============================== Main page =============================== */
@@ -94,7 +102,6 @@ export default function Page() {
 
   async function detectCandidateColumns() {
     try {
-      // Safe: if not allowed, we fail silently and keep defaults
       const { data: colData } = await supabase
         .from('information_schema.columns')
         .select('column_name')
@@ -113,31 +120,6 @@ export default function Page() {
       /* ignore */
     }
   }
-
-  React.useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const sessionUser = data.session?.user;
-      if (!sessionUser) return;
-
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('id,email,role,org,account_manager_email')
-        .eq('id', sessionUser.id)
-        .single();
-
-      if (prof && prof.id) {
-        setUser({
-          id: prof.id,
-          email: prof.email,
-          role: String(prof.role),
-          org: prof.org ?? null,
-          amEmail: prof.account_manager_email ?? null,
-        });
-        await detectCandidateColumns();
-      }
-    })();
-  }, []);
 
   async function login() {
     try {
@@ -221,9 +203,7 @@ export default function Page() {
         <div style={ST.bg} />
         <div style={ST.glass}>
           <Header title="Admin workspace" onLogout={logout} />
-          <p style={{ opacity: 0.8 }}>
-            Minimal placeholder for <b>admin</b>. (User management can be re-added here.)
-          </p>
+          <AdminUI />
         </div>
       </div>
     );
@@ -569,7 +549,7 @@ function ClientUI({ user, cols }) {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)
     );
     return start.toISOString();
-    }
+  }
 
   async function loadTodayCount() {
     try {
@@ -650,6 +630,7 @@ function ClientUI({ user, cols }) {
         </div>
       </div>
 
+      {/* Filters: single-line each (forced two equal columns, no wrap) */}
       <div
         style={{
           ...infoCard,
@@ -663,7 +644,14 @@ function ClientUI({ user, cols }) {
           <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
             Salary range (${minSalary.toLocaleString()} – ${maxSalary.toLocaleString()})
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+              alignItems: 'center',
+            }}
+          >
             <input
               type="range"
               min={0}
@@ -689,7 +677,14 @@ function ClientUI({ user, cols }) {
           <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
             Years of experience ({minYears} – {maxYears})
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+              alignItems: 'center',
+            }}
+          >
             <input
               type="range"
               min={0}
@@ -768,6 +763,92 @@ function ClientUI({ user, cols }) {
               {openId === c.id && c.notes && (
                 <div style={{ marginTop: 10, color: '#e5e5e5', fontSize: 13 }}>{c.notes}</div>
               )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ========================= Admin UI (simple directory) ========================= */
+function AdminUI() {
+  const [rows, setRows] = React.useState([]);
+  const [err, setErr] = React.useState('');
+
+  async function load() {
+    try {
+      setErr('');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('email, role, org, account_manager_email')
+        .order('email', { ascending: true });
+      if (error) return setErr(error.message);
+      setRows(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setErr(e?.message || 'Error loading profiles.');
+    }
+  }
+
+  React.useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontWeight: 800 }}>Directory</div>
+        <button style={ST.btn} onClick={load}>
+          Refresh
+        </button>
+      </div>
+
+      {err && <div style={{ color: '#f87171', fontSize: 12, marginTop: 8 }}>{err}</div>}
+
+      <div
+        style={{
+          marginTop: 10,
+          border: '1px solid rgba(148,163,184,0.16)',
+          borderRadius: 12,
+          overflow: 'hidden',
+          background: 'rgba(17,24,39,0.7)',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '2fr 1fr 1fr 1.5fr',
+            gap: 0,
+            padding: '10px 12px',
+            borderBottom: '1px solid rgba(148,163,184,0.16)',
+            color: '#9ca3af',
+            fontSize: 12,
+          }}
+        >
+          <div>Email</div>
+          <div>Role</div>
+          <div>Org</div>
+          <div>Sales contact</div>
+        </div>
+
+        {rows.length === 0 ? (
+          <div style={{ padding: 12, color: '#9ca3af', fontSize: 13 }}>No profiles.</div>
+        ) : (
+          rows.map((r) => (
+            <div
+              key={`${r.email}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 1fr 1fr 1.5fr',
+                gap: 0,
+                padding: '10px 12px',
+                borderTop: '1px solid rgba(148,163,184,0.12)',
+              }}
+            >
+              <div>{r.email}</div>
+              <div><span style={ST.chip}>{r.role}</span></div>
+              <div>{r.org || '—'}</div>
+              <div>{r.account_manager_email || '—'}</div>
             </div>
           ))
         )}
