@@ -907,12 +907,12 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== Dual-slider CSS ====== */
+    /* ====== Dual-slider CSS (inputs are absolutely positioned; thumbs have pointer events) ====== */
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
         position:absolute; left:0; right:0; top:-7px; height:18px; margin:0; outline:none;
-        touch-action:none;
+        pointer-events:auto; touch-action:none;
       }
       .dual-range::-webkit-slider-runnable-track { background:transparent; }
       .dual-range::-moz-range-track { background:transparent; }
@@ -926,25 +926,10 @@ export default function Page() {
       }
     `;
 
-    /* ====== Nearest-thumb z-index control ====== */
-    function useNearestThumbZ(min, max) {
-      const boxRef = React.useRef(null);
-      const [topIsLow, setTopIsLow] = React.useState(true);
-
-      const getX = (clientX) => {
-        const rect = boxRef.current?.getBoundingClientRect();
-        return rect ? Math.min(rect.right, Math.max(rect.left, clientX)) - rect.left : 0;
-      };
-      const pct = (v) => (boxRef.current ? ((v - min) / (max - min)) * boxRef.current.clientWidth : 0);
-
-      const onDown = (clientX, lowVal, highVal) => {
-        const x = getX(clientX);
-        const lowX = pct(lowVal);
-        const highX = pct(highVal);
-        setTopIsLow(Math.abs(x - lowX) <= Math.abs(x - highX));
-      };
-
-      return { boxRef, topIsLow, setTopIsLow, onDown };
+    /* Make the right (high) thumb on top by default; flip when grabbing the low thumb */
+    function useThumbStacking(defaultHighOnTop = true) {
+      const [topIsLow, setTopIsLow] = React.useState(!defaultHighOnTop);
+      return { topIsLow, setTopIsLow };
     }
 
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
@@ -952,7 +937,7 @@ export default function Page() {
 
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
-      const { boxRef, topIsLow, setTopIsLow, onDown } = useNearestThumbZ(min, max);
+      const { topIsLow, setTopIsLow } = useThumbStacking(true); // high on top initially
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
       const sel = {
@@ -969,20 +954,13 @@ export default function Page() {
       const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
       const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
 
-      const handleMouseDown = (e) => onDown(e.clientX, minSalary, maxSalary);
-      const handleTouchStart = (e) => onDown(e.touches[0].clientX, minSalary, maxSalary);
-
       return (
         <div>
           <Label>Salary range</Label>
-          <div
-            ref={boxRef}
-            style={trackBase}
-            onMouseDown={handleMouseDown}
-            onTouchStart={handleTouchStart}
-          >
+          <div style={trackBase}>
             <div style={rail} />
             <div style={sel} />
+            {/* LOW thumb (under by default) */}
             <input
               className="dual-range"
               type="range"
@@ -994,8 +972,9 @@ export default function Page() {
               onInput={onLow}
               onMouseDown={() => setTopIsLow(true)}
               onTouchStart={() => setTopIsLow(true)}
-              style={{ zIndex: topIsLow ? 5 : 4 }}
+              style={{ zIndex: topIsLow ? 6 : 5 }}
             />
+            {/* HIGH thumb (on top by default so it's always grabbable) */}
             <input
               className="dual-range"
               type="range"
@@ -1007,7 +986,7 @@ export default function Page() {
               onInput={onHigh}
               onMouseDown={() => setTopIsLow(false)}
               onTouchStart={() => setTopIsLow(false)}
-              style={{ zIndex: topIsLow ? 4 : 5 }}
+              style={{ zIndex: topIsLow ? 5 : 7 }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -1021,7 +1000,7 @@ export default function Page() {
 
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
-      const { boxRef, topIsLow, setTopIsLow, onDown } = useNearestThumbZ(min, max);
+      const { topIsLow, setTopIsLow } = useThumbStacking(true); // high on top initially
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
       const sel = {
@@ -1038,18 +1017,10 @@ export default function Page() {
       const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
       const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
 
-      const handleMouseDown = (e) => onDown(e.clientX, minYears, maxYears);
-      const handleTouchStart = (e) => onDown(e.touches[0].clientX, minYears, maxYears);
-
       return (
         <div>
           <Label>Years of experience</Label>
-          <div
-            ref={boxRef}
-            style={trackBase}
-            onMouseDown={handleMouseDown}
-            onTouchStart={handleTouchStart}
-          >
+          <div style={trackBase}>
             <div style={rail} />
             <div style={sel} />
             <input
@@ -1063,7 +1034,7 @@ export default function Page() {
               onInput={onLow}
               onMouseDown={() => setTopIsLow(true)}
               onTouchStart={() => setTopIsLow(true)}
-              style={{ zIndex: topIsLow ? 5 : 4 }}
+              style={{ zIndex: topIsLow ? 6 : 5 }}
             />
             <input
               className="dual-range"
@@ -1076,7 +1047,7 @@ export default function Page() {
               onInput={onHigh}
               onMouseDown={() => setTopIsLow(false)}
               onTouchStart={() => setTopIsLow(false)}
-              style={{ zIndex: topIsLow ? 4 : 5 }}
+              style={{ zIndex: topIsLow ? 5 : 7 }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -1243,7 +1214,7 @@ export default function Page() {
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <Button
                             onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                            style={{ background: '#111827', border: '1px solid '#1F2937' }}
                           >
                             Additional information
                           </Button>
