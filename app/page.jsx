@@ -1214,7 +1214,7 @@ export default function Page() {
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <Button
                             onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                            style={{ background: '#111827', border: '1px solid '#1F2937' }}
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
                           >
                             Additional information
                           </Button>
