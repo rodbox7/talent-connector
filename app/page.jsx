@@ -907,32 +907,42 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== DRAG-FRIENDLY dual-slider CSS (the fix) ====== */
+    /* ====== DRAG-FRIENDLY dual-slider CSS (updated) ====== */
     const sliderCss = `
-      .dual-range { 
-        -webkit-appearance:none; appearance:none; background:transparent; 
-        position:absolute; left:0; right:0; top:-7px; height:18px; width:100%; margin:0; 
-        pointer-events:none;             
-        touch-action:none;               
+      .dual-range{
+        -webkit-appearance:none; appearance:none; background:transparent;
+        position:absolute; left:0; right:0; top:-7px; height:18px; width:100%; margin:0;
+        touch-action:none;                  /* allow thumb dragging on touch */
       }
       .dual-range.low  { z-index:3; }
       .dual-range.high { z-index:4; }
       .dual-range::-webkit-slider-runnable-track { background:transparent; }
       .dual-range::-moz-range-track { background:transparent; }
-      .dual-range::-webkit-slider-thumb {
-        -webkit-appearance:none; width:18px; height:18px; border-radius:999px; 
-        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all; 
+      .dual-range::-webkit-slider-thumb{
+        -webkit-appearance:none; width:18px; height:18px; border-radius:999px;
+        background:#22d3ee; border:2px solid #0b0b0b;
       }
-      .dual-range::-moz-range-thumb {
-        width:18px; height:18px; border-radius:999px; 
-        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all;   
+      .dual-range::-moz-range-thumb{
+        width:18px; height:18px; border-radius:999px;
+        background:#22d3ee; border:2px solid #0b0b0b;
       }
     `;
 
     function SalarySlider() {
-      const min = 0,
-        max = 400000,
-        step = 5000;
+      const min = 0, max = 400000, step = 5000;
+      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
+
+      React.useEffect(() => {
+        if (!active) return;
+        const up = () => setActive(null);
+        window.addEventListener('mouseup', up);
+        window.addEventListener('touchend', up);
+        return () => {
+          window.removeEventListener('mouseup', up);
+          window.removeEventListener('touchend', up);
+        };
+      }, [active]);
+
       const pct = (v) => ((v - min) / (max - min)) * 100;
       const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
       const sel = {
@@ -945,17 +955,11 @@ export default function Page() {
         borderRadius: 999,
         pointerEvents: 'none',
       };
-      function clamp(v) {
-        return Math.min(max, Math.max(min, v));
-      }
-      function onLow(e) {
-        const val = clamp(Number(e.target.value));
-        setMinSalary(Math.min(val, maxSalary));
-      }
-      function onHigh(e) {
-        const val = clamp(Number(e.target.value));
-        setMaxSalary(Math.max(val, minSalary));
-      }
+      const clamp = (v) => Math.min(max, Math.max(min, v));
+
+      const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
+      const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
+
       return (
         <div>
           <Label>Salary range</Label>
@@ -964,37 +968,43 @@ export default function Page() {
             <div style={sel} />
             <input
               className="dual-range low"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={minSalary}
-              onChange={onLow}
-              onInput={onLow}
+              type="range" min={min} max={max} step={step} value={minSalary}
+              onChange={onLow} onInput={onLow}
+              onMouseDown={() => setActive('low')}  onTouchStart={() => setActive('low')}
+              style={{ pointerEvents: active && active !== 'low' ? 'none' : 'auto' }}
             />
             <input
               className="dual-range high"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={maxSalary}
-              onChange={onHigh}
-              onInput={onHigh}
+              type="range" min={min} max={max} step={step} value={maxSalary}
+              onChange={onHigh} onInput={onHigh}
+              onMouseDown={() => setActive('high')} onTouchStart={() => setActive('high')}
+              style={{ pointerEvents: active && active !== 'high' ? 'none' : 'auto' }}
             />
             <style>{sliderCss}</style>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
-            <span>{`$${minSalary.toLocaleString()}`}</span>
-            <span>{`$${maxSalary.toLocaleString()}`}</span>
+            <span>${minSalary.toLocaleString()}</span>
+            <span>${maxSalary.toLocaleString()}</span>
           </div>
         </div>
       );
     }
+
     function YearsSlider() {
-      const min = 0,
-        max = 50,
-        step = 1;
+      const min = 0, max = 50, step = 1;
+      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
+
+      React.useEffect(() => {
+        if (!active) return;
+        const up = () => setActive(null);
+        window.addEventListener('mouseup', up);
+        window.addEventListener('touchend', up);
+        return () => {
+          window.removeEventListener('mouseup', up);
+          window.removeEventListener('touchend', up);
+        };
+      }, [active]);
+
       const pct = (v) => ((v - min) / (max - min)) * 100;
       const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
       const sel = {
@@ -1007,17 +1017,11 @@ export default function Page() {
         borderRadius: 999,
         pointerEvents: 'none',
       };
-      function clamp(v) {
-        return Math.min(max, Math.max(min, v));
-      }
-      function onLow(e) {
-        const val = clamp(Number(e.target.value));
-        setMinYears(Math.min(val, maxYears));
-      }
-      function onHigh(e) {
-        const val = clamp(Number(e.target.value));
-        setMaxYears(Math.max(val, minYears));
-      }
+      const clamp = (v) => Math.min(max, Math.max(min, v));
+
+      const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
+      const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
+
       return (
         <div>
           <Label>Years of experience</Label>
@@ -1026,23 +1030,17 @@ export default function Page() {
             <div style={sel} />
             <input
               className="dual-range low"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={minYears}
-              onChange={onLow}
-              onInput={onLow}
+              type="range" min={min} max={max} step={step} value={minYears}
+              onChange={onLow} onInput={onLow}
+              onMouseDown={() => setActive('low')}  onTouchStart={() => setActive('low')}
+              style={{ pointerEvents: active && active !== 'low' ? 'none' : 'auto' }}
             />
             <input
               className="dual-range high"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={maxYears}
-              onChange={onHigh}
-              onInput={onHigh}
+              type="range" min={min} max={max} step={step} value={maxYears}
+              onChange={onHigh} onInput={onHigh}
+              onMouseDown={() => setActive('high')} onTouchStart={() => setActive('high')}
+              style={{ pointerEvents: active && active !== 'high' ? 'none' : 'auto' }}
             />
             <style>{sliderCss}</style>
           </div>
