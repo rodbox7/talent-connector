@@ -912,21 +912,20 @@ export default function Page() {
       .dual-range { 
         -webkit-appearance:none; appearance:none; background:transparent; 
         position:absolute; left:0; right:0; top:-7px; height:18px; width:100%; margin:0; 
-        pointer-events:none;             /* only thumbs receive events */
-        touch-action:none;               /* prevent page scroll while dragging */
+        pointer-events:none;             
+        touch-action:none;               
       }
       .dual-range.low  { z-index:3; }
       .dual-range.high { z-index:4; }
       .dual-range::-webkit-slider-runnable-track { background:transparent; }
       .dual-range::-moz-range-track { background:transparent; }
-      /* thumbs */
       .dual-range::-webkit-slider-thumb {
         -webkit-appearance:none; width:18px; height:18px; border-radius:999px; 
-        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all; /* <— enable drag */
+        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all; 
       }
       .dual-range::-moz-range-thumb {
         width:18px; height:18px; border-radius:999px; 
-        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all;   /* <— enable drag */
+        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all;   
       }
     `;
 
@@ -986,8 +985,8 @@ export default function Page() {
             <style>{sliderCss}</style>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
-            <span>${minSalary.toLocaleString()}</span>
-            <span>${maxSalary.toLocaleString()}</span>
+            <span>{`$${minSalary.toLocaleString()}`}</span>
+            <span>{`$${maxSalary.toLocaleString()}`}</span>
           </div>
         </div>
       );
