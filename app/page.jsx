@@ -3,10 +3,18 @@ import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Adds Edit/Delete for recruiters:
- *  - Inline edit in "My recent candidates"
- *  - Delete with confirm()
- * Keeps existing client filters/sort & login UX.
+ * Includes:
+ * - Login screen (unchanged look)
+ * - Recruiter page (kept exactly like your good version w/ Edit & Delete)
+ * - Client page (filters, dual sliders, sorting, expandable notes, email sales contact)
+ * - Admin page (invite user via /api/admin/invite and list profiles)
+ *
+ * Assumes you already have:
+ *   - /app/api/admin/invite/route.js that uses your service key to create auth user + profile
+ *   - Supabase tables: profiles, candidates
+ *   - RLS allowing:
+ *       * admin: read all profiles
+ *       * authenticated: read candidates; recruiters can insert/update/delete own
  */
 
 const NYC =
@@ -160,7 +168,7 @@ export default function Page() {
     setErr('');
   }
 
-  // ---------- Recruiter form state ----------
+  // ---------- Recruiter form state (UNCHANGED) ----------
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
@@ -230,7 +238,7 @@ export default function Page() {
             ? null
             : Number(editForm.years),
         recent_role_years:
-        editForm.recent_role_years === '' || editForm.recent_role_years === null
+          editForm.recent_role_years === '' || editForm.recent_role_years === null
             ? null
             : Number(editForm.recent_role_years),
         salary:
@@ -256,7 +264,6 @@ export default function Page() {
         .eq('id', editingId);
       if (error) throw error;
 
-      // refresh list
       await refreshMyRecent();
       cancelEdit();
     } catch (e) {
@@ -344,7 +351,7 @@ export default function Page() {
     }
   }
 
-  // ---------- Client state ----------
+  // ---------- Client state (RESTORED) ----------
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
   const [minSalary, setMinSalary] = React.useState(0);
@@ -386,18 +393,17 @@ export default function Page() {
     })();
   }, [user, todayStartIso]);
 
-  // Load filter options
+  // Load options for filters
   React.useEffect(() => {
     if (!user || user.role !== 'client') return;
-
     async function loadOptions() {
       try {
         const { data, error } = await supabase
           .from('candidates')
           .select('city,state,titles_csv,law_csv')
           .limit(1000);
-
         if (error) throw error;
+
         const cset = new Set();
         const sset = new Set();
         const tset = new Set();
@@ -406,7 +412,6 @@ export default function Page() {
         for (const row of data || []) {
           if (row.city) cset.add(row.city.trim());
           if (row.state) sset.add(row.state.trim());
-
           if (row.titles_csv) {
             row.titles_csv
               .split(',')
@@ -431,7 +436,6 @@ export default function Page() {
         console.error('loadOptions', e);
       }
     }
-
     loadOptions();
   }, [user]);
 
@@ -453,6 +457,7 @@ export default function Page() {
           `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like}`
         );
       }
+
       if (fCity) q = q.eq('city', fCity);
       if (fState) q = q.eq('state', fState);
       if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
@@ -612,7 +617,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Recruiter UI ----------
+  // ---------- Recruiter UI (UNCHANGED) ----------
   if (user.role === 'recruiter') {
     return (
       <div style={pageWrap}>
@@ -986,7 +991,8 @@ export default function Page() {
                           padding: 12,
                           background: '#0B1220',
                           display: 'grid',
-                          gridTemplateColumns: '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
+                          gridTemplateColumns:
+                            '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
                           gap: 10,
                           alignItems: 'center',
                           fontSize: 13,
@@ -1040,31 +1046,459 @@ export default function Page() {
     );
   }
 
-  // ---------- Client UI ----------
+  // ---------- Client UI (RESTORED) ----------
   if (user.role === 'client') {
-    // (unchanged from your working version; left as-is)
-    // You already have filters, sliders, sorting, and “Additional information”
-    // + “Email for more information” buttons in the previous build.
-    // If you need me to re-include the full client block, say the word.
+    function buildMailto(c) {
+      const to = user.amEmail || 'info@youragency.com';
+      const subj = `Talent Connector Candidate – ${c?.name || ''}`;
+      const body = [
+        `Hello,`,
+        ``,
+        `I'm interested in this candidate:`,
+        `• Name: ${c?.name || ''}`,
+        `• Titles: ${c?.titles_csv || ''}`,
+        `• Type of law: ${c?.law_csv || ''}`,
+        `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
+        `• Years: ${c?.years ?? ''}`,
+        c?.contract && c?.hourly ? `• Contract: $${c.hourly}/hr` : '',
+        c?.salary ? `• Salary: $${c.salary}` : '',
+        ``,
+        `My email: ${user.email || ''}`,
+        ``,
+        `Sent from Talent Connector`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+        subj
+      )}&body=${encodeURIComponent(body)}`;
+    }
+
+    function SalarySlider() {
+      // two thumbs on one line (overlapped inputs)
+      const min = 0,
+        max = 400000,
+        step = 5000;
+
+      function clamp(v) {
+        return Math.min(max, Math.max(min, v));
+      }
+      function onLow(e) {
+        const v = clamp(Number(e.target.value));
+        setMinSalary(Math.min(v, maxSalary));
+      }
+      function onHigh(e) {
+        const v = clamp(Number(e.target.value));
+        setMaxSalary(Math.max(v, minSalary));
+      }
+
+      const track = {
+        position: 'relative',
+        height: 4,
+        background: '#1F2937',
+        borderRadius: 999,
+      };
+      const pct = (v) => ((v - min) / (max - min)) * 100;
+      const sel = {
+        position: 'absolute',
+        top: 0,
+        left: `${pct(minSalary)}%`,
+        right: `${100 - pct(maxSalary)}%`,
+        height: 4,
+        background: '#4F46E5',
+        borderRadius: 999,
+      };
+      const range = {
+        WebkitAppearance: 'none',
+        appearance: 'none',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: -7,
+        height: 18,
+        width: '100%',
+        background: 'transparent',
+        pointerEvents: 'none',
+      };
+      const thumb = {
+        WebkitAppearance: 'none',
+        appearance: 'none',
+        width: 18,
+        height: 18,
+        borderRadius: 999,
+        background: '#22d3ee',
+        border: '2px solid #0b0b0b',
+        pointerEvents: 'all',
+      };
+
+      return (
+        <div>
+          <Label>Salary range</Label>
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={track} />
+            <div style={sel} />
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minSalary}
+              onChange={onLow}
+              style={range}
+            />
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxSalary}
+              onChange={onHigh}
+              style={{ ...range }}
+            />
+            <style>{`
+              input[type=range]::-webkit-slider-thumb { ${cssFromObj(thumb)} }
+              input[type=range]::-moz-range-thumb { ${cssFromObj(thumb)} }
+            `}</style>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
+            <span>${minSalary.toLocaleString()}</span>
+            <span>${maxSalary.toLocaleString()}</span>
+          </div>
+        </div>
+      );
+    }
+
+    function YearsSlider() {
+      const min = 0,
+        max = 50,
+        step = 1;
+
+      function clamp(v) {
+        return Math.min(max, Math.max(min, v));
+      }
+      function onLow(e) {
+        const v = clamp(Number(e.target.value));
+        setMinYears(Math.min(v, maxYears));
+      }
+      function onHigh(e) {
+        const v = clamp(Number(e.target.value));
+        setMaxYears(Math.max(v, minYears));
+      }
+
+      const track = {
+        position: 'relative',
+        height: 4,
+        background: '#1F2937',
+        borderRadius: 999,
+      };
+      const pct = (v) => ((v - min) / (max - min)) * 100;
+      const sel = {
+        position: 'absolute',
+        top: 0,
+        left: `${pct(minYears)}%`,
+        right: `${100 - pct(maxYears)}%`,
+        height: 4,
+        background: '#4F46E5',
+        borderRadius: 999,
+      };
+      const range = {
+        WebkitAppearance: 'none',
+        appearance: 'none',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: -7,
+        height: 18,
+        width: '100%',
+        background: 'transparent',
+        pointerEvents: 'none',
+      };
+      const thumb = {
+        WebkitAppearance: 'none',
+        appearance: 'none',
+        width: 18,
+        height: 18,
+        borderRadius: 999,
+        background: '#22d3ee',
+        border: '2px solid '#0b0b0b',
+        pointerEvents: 'all',
+      };
+
+      return (
+        <div>
+          <Label>Years of experience</Label>
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={track} />
+            <div style={sel} />
+            <input type="range" min={min} max={max} step={step} value={minYears} onChange={onLow} style={range} />
+            <input type="range" min={min} max={max} step={step} value={maxYears} onChange={onHigh} style={{ ...range }} />
+            <style>{`
+              input[type=range]::-webkit-slider-thumb { ${cssFromObj(thumb)} }
+              input[type=range]::-moz-range-thumb { ${cssFromObj(thumb)} }
+            `}</style>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
+            <span>{minYears} yrs</span>
+            <span>{maxYears} yrs</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={pageWrap}>
         <div style={overlay}>
-          <Card>Client workspace (unchanged). If you want me to paste the full client block again, I can drop it in.</Card>
-          <div style={{ marginTop: 12 }}>
-            <Button onClick={logout} style={{ background:'#0B1220', border:'1px solid #1F2937' }}>
-              Log out
-            </Button>
+          <div style={{ width: 'min(1150px, 100%)' }}>
+            {/* Top bar */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Tag>New today: {cCountToday}</Tag>
+                <Button
+                  onClick={logout}
+                  style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+                >
+                  Log out
+                </Button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: 14,
+                }}
+              >
+                <div>
+                  <Label>Keyword</Label>
+                  <Input
+                    placeholder="name, law, title, city/state"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>City</Label>
+                  <select
+                    value={fCity}
+                    onChange={(e) => setFCity(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Any</option>
+                    {cities.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <select
+                    value={fState}
+                    onChange={(e) => setFState(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Any</option>
+                    {states.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Title</Label>
+                  <select
+                    value={fTitle}
+                    onChange={(e) => setFTitle(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Any</option>
+                    {titleOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Type of Law</Label>
+                  <select
+                    value={fLaw}
+                    onChange={(e) => setFLaw(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Any</option>
+                    {lawOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Sort by</Label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="date_desc">Date (newest)</option>
+                    <option value="date_asc">Date (oldest)</option>
+                    <option value="salary_desc">Salary (high → low)</option>
+                    <option value="salary_asc">Salary (low → high)</option>
+                    <option value="hourly_desc">Hourly (high → low)</option>
+                    <option value="hourly_asc">Hourly (low → high)</option>
+                    <option value="years_desc">Years (high → low)</option>
+                    <option value="years_asc">Years (low → high)</option>
+                  </select>
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <SalarySlider />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <YearsSlider />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                <Button onClick={fetchClientRows}>Apply filters</Button>
+                {clientErr ? (
+                  <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>
+                    {clientErr}
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+
+            {/* Results */}
+            <Card style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>
+                Results {clientLoading ? '(loading...)' : `(${clientRows.length})`}
+              </div>
+
+              {clientRows.length === 0 ? (
+                <div style={{ color: '#9CA3AF', fontSize: 14 }}>
+                  No candidates match the filters.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {clientRows.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        border: '1px solid #1F2937',
+                        borderRadius: 12,
+                        padding: 12,
+                        background: '#0B1220',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
+                          gap: 10,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                          {c.name}
+                          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+                            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+                          </div>
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {c.city || '—'}, {c.state || '—'}
+                        </div>
+                        <div style={{ color: '#E5E7EB' }}>
+                          {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
+                          {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {c.date_entered
+                            ? new Date(c.date_entered).toLocaleDateString()
+                            : new Date(c.created_at).toLocaleDateString()}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <Button
+                            onClick={() =>
+                              setExpandedId((id) => (id === c.id ? null : c.id))
+                            }
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                          >
+                            Additional information
+                          </Button>
+                          <a
+                            href={buildMailto(c)}
+                            style={{
+                              display: 'inline-block',
+                              padding: '10px 14px',
+                              borderRadius: 10,
+                              border: '1px solid #243041',
+                              background: '#2563EB',
+                              color: 'white',
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            Email for more information
+                          </a>
+                        </div>
+                      </div>
+
+                      {expandedId === c.id && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            padding: 10,
+                            borderRadius: 10,
+                            border: '1px solid #1F2937',
+                            background: '#0F172A',
+                            color: '#CBD5E1',
+                            fontSize: 14,
+                          }}
+                        >
+                          {c.notes ? c.notes : <i>No additional notes.</i>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
         </div>
       </div>
     );
   }
 
-  // ---------- Admin placeholder ----------
+  // ---------- Admin UI (RESTORED) ----------
   return (
     <div style={pageWrap}>
       <div style={overlay}>
         <div style={{ width: 'min(1100px, 100%)' }}>
+          {/* Top bar */}
           <div
             style={{
               display: 'flex',
@@ -1074,7 +1508,8 @@ export default function Page() {
             }}
           >
             <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-              Admin workspace
+              Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              <span style={{ color: '#9CA3AF' }}>ADMIN workspace</span>
             </div>
             <Button
               onClick={logout}
@@ -1083,9 +1518,225 @@ export default function Page() {
               Log out
             </Button>
           </div>
-          <Card>Minimal placeholder for admin.</Card>
+
+          <AdminPanel />
         </div>
       </div>
     </div>
   );
+}
+
+// ---------- Admin Panel ----------
+function AdminPanel() {
+  const [list, setList] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [flash, setFlash] = React.useState('');
+
+  const [email, setEmail] = React.useState('');
+  const [role, setRole] = React.useState('client');
+  const [org, setOrg] = React.useState('');
+  const [amEmail, setAmEmail] = React.useState('');
+  const [tempPw, setTempPw] = React.useState('');
+
+  async function loadProfiles() {
+    setLoading(true);
+    setErr('');
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,email,role,org,account_manager_email,created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setList(data || []);
+    } catch (e) {
+      console.error(e);
+      setErr('Error loading profiles.');
+    }
+    setLoading(false);
+  }
+
+  React.useEffect(() => {
+    loadProfiles();
+  }, []);
+
+  async function invite() {
+    setFlash('');
+    setErr('');
+    try {
+      if (!email || !tempPw) {
+        setErr('Email and temp password are required.');
+        return;
+      }
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          role,
+          org: org.trim() || null,
+          amEmail: amEmail.trim() || null,
+          password: tempPw,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setErr(json?.error || 'Invite failed');
+        return;
+      }
+      setFlash(`Invited ${email} as ${role}`);
+      setEmail('');
+      setRole('client');
+      setOrg('');
+      setAmEmail('');
+      setTempPw('');
+      await loadProfiles();
+    } catch (e) {
+      console.error(e);
+      setErr('Server error inviting user.');
+    }
+  }
+
+  return (
+    <>
+      <Card style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: 12,
+          }}
+        >
+          <div>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Role</Label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="client">Client</option>
+              <option value="recruiter">Recruiter</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <Label>Organization (optional)</Label>
+            <Input value={org} onChange={(e) => setOrg(e.target.value)} />
+          </div>
+          <div>
+            <Label>Sales contact (optional)</Label>
+            <Input
+              type="email"
+              placeholder="sales@youragency.com"
+              value={amEmail}
+              onChange={(e) => setAmEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Temp password</Label>
+            <Input
+              type="password"
+              placeholder="set a password"
+              value={tempPw}
+              onChange={(e) => setTempPw(e.target.value)}
+            />
+          </div>
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+          <Button onClick={invite}>Add user</Button>
+          {err ? (
+            <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>
+              {err}
+            </div>
+          ) : (
+            <div style={{ color: '#93E2B7', fontSize: 12, paddingTop: 8 }}>
+              {flash}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Directory</div>
+        {loading ? (
+          <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: 13,
+              }}
+            >
+              <thead>
+                <tr style={{ textAlign: 'left', color: '#9CA3AF' }}>
+                  <th style={thStyle}>Email</th>
+                  <th style={thStyle}>Role</th>
+                  <th style={thStyle}>Org</th>
+                  <th style={thStyle}>Sales contact</th>
+                  <th style={thStyle}>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id}>
+                    <td style={tdStyle}>{r.email}</td>
+                    <td style={tdStyle}>{r.role}</td>
+                    <td style={tdStyle}>{r.org || '—'}</td>
+                    <td style={tdStyle}>{r.account_manager_email || '—'}</td>
+                    <td style={tdStyle}>
+                      {new Date(r.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+                {list.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ ...tdStyle, color: '#9CA3AF' }}>
+                      No users yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+// ---------- shared styles ----------
+const selectStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #1F2937',
+  background: '#0F172A',
+  color: '#E5E7EB',
+  outline: 'none',
+};
+
+const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
+const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
+
+// helper for slider thumbs
+function cssFromObj(obj) {
+  return Object.entries(obj)
+    .map(([k, v]) => {
+      const prop = k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+      return `${prop}:${v}`;
+    })
+    .join(';');
 }
