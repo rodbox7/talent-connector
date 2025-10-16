@@ -3,18 +3,8 @@ import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Includes:
- * - Login screen (unchanged look)
- * - Recruiter page (kept exactly like your good version w/ Edit & Delete)
- * - Client page (filters, dual sliders, sorting, expandable notes, email sales contact)
- * - Admin page (invite user via /api/admin/invite and list profiles)
- *
- * Assumes you already have:
- *   - /app/api/admin/invite/route.js that uses your service key to create auth user + profile
- *   - Supabase tables: profiles, candidates
- *   - RLS allowing:
- *       * admin: read all profiles
- *       * authenticated: read candidates; recruiters can insert/update/delete own
+ * Client: working dual sliders, Clear Filters, bigger "New today" count
+ * Recruiter/Admin: unchanged from your current good version
  */
 
 const NYC =
@@ -92,16 +82,17 @@ const Button = ({ children, ...rest }) => (
   </button>
 );
 
-const Tag = ({ children }) => (
+const Tag = ({ children, style }) => (
   <span
     style={{
       display: 'inline-block',
-      padding: '2px 8px',
+      padding: '4px 10px',
       borderRadius: 999,
       background: '#111827',
       border: '1px solid #1F2937',
       fontSize: 12,
-      color: '#9CA3AF',
+      color: '#E5E7EB',
+      ...style,
     }}
   >
     {children}
@@ -242,7 +233,7 @@ export default function Page() {
             ? null
             : Number(editForm.recent_role_years),
         salary:
-        editForm.salary === '' || editForm.salary === null
+          editForm.salary === '' || editForm.salary === null
             ? null
             : Number(editForm.salary),
         contract: !!editForm.contract,
@@ -504,6 +495,22 @@ export default function Page() {
       setClientErr('Error loading client view.');
     }
     setClientLoading(false);
+  }
+
+  // NEW: Clear Filters
+  function clearClientFilters() {
+    setSearch('');
+    setFCity('');
+    setFState('');
+    setFTitle('');
+    setFLaw('');
+    setMinSalary(0);
+    setMaxSalary(400000);
+    setMinYears(0);
+    setMaxYears(50);
+    setSortBy('date_desc');
+    setExpandedId(null);
+    fetchClientRows();
   }
 
   React.useEffect(() => {
@@ -1088,17 +1095,20 @@ export default function Page() {
         position: 'absolute', top: 0,
         left: `${pct(minSalary)}%`, right: `${100 - pct(maxSalary)}%`,
         height: 4, background: '#4F46E5', borderRadius: 999,
+        pointerEvents: 'none',
       };
-      const range = {
+      const baseRange = {
         WebkitAppearance: 'none', appearance: 'none',
         position: 'absolute', left: 0, right: 0, top: -7,
-        height: 18, width: '100%', background: 'transparent', pointerEvents: 'none',
+        height: 18, width: '100%', background: 'transparent',
+        pointerEvents: 'auto',
       };
+      const lowRange = { ...baseRange, zIndex: 3 };
+      const highRange = { ...baseRange, zIndex: 4 };
       const thumb = {
         WebkitAppearance: 'none', appearance: 'none',
         width: 18, height: 18, borderRadius: 999,
-        background: '#22d3ee', border: '2px solid #0b0b0b', // <-- fixed
-        pointerEvents: 'all',
+        background: '#22d3ee', border: '2px solid #0b0b0b',
       };
 
       return (
@@ -1107,8 +1117,8 @@ export default function Page() {
           <div style={{ position: 'relative', height: 18 }}>
             <div style={track} />
             <div style={sel} />
-            <input type="range" min={min} max={max} step={step} value={minSalary} onChange={onLow} style={range} />
-            <input type="range" min={min} max={max} step={step} value={maxSalary} onChange={onHigh} style={{ ...range }} />
+            <input type="range" min={min} max={max} step={step} value={minSalary} onChange={onLow} style={lowRange} />
+            <input type="range" min={min} max={max} step={step} value={maxSalary} onChange={onHigh} style={highRange} />
             <style>{`
               input[type=range]::-webkit-slider-thumb { ${cssFromObj(thumb)} }
               input[type=range]::-moz-range-thumb { ${cssFromObj(thumb)} }
@@ -1135,17 +1145,20 @@ export default function Page() {
         position: 'absolute', top: 0,
         left: `${pct(minYears)}%`, right: `${100 - pct(maxYears)}%`,
         height: 4, background: '#4F46E5', borderRadius: 999,
+        pointerEvents: 'none',
       };
-      const range = {
+      const baseRange = {
         WebkitAppearance: 'none', appearance: 'none',
         position: 'absolute', left: 0, right: 0, top: -7,
-        height: 18, width: '100%', background: 'transparent', pointerEvents: 'none',
+        height: 18, width: '100%', background: 'transparent',
+        pointerEvents: 'auto',
       };
+      const lowRange = { ...baseRange, zIndex: 3 };
+      const highRange = { ...baseRange, zIndex: 4 };
       const thumb = {
         WebkitAppearance: 'none', appearance: 'none',
         width: 18, height: 18, borderRadius: 999,
-        background: '#22d3ee', border: '2px solid #0b0b0b', // <-- fixed
-        pointerEvents: 'all',
+        background: '#22d3ee', border: '2px solid #0b0b0b',
       };
 
       return (
@@ -1154,8 +1167,8 @@ export default function Page() {
           <div style={{ position: 'relative', height: 18 }}>
             <div style={track} />
             <div style={sel} />
-            <input type="range" min={min} max={max} step={step} value={minYears} onChange={onLow} style={range} />
-            <input type="range" min={min} max={max} step={step} value={maxYears} onChange={onHigh} style={{ ...range }} />
+            <input type="range" min={min} max={max} step={step} value={minYears} onChange={onLow} style={lowRange} />
+            <input type="range" min={min} max={max} step={step} value={maxYears} onChange={onHigh} style={highRange} />
             <style>{`
               input[type=range]::-webkit-slider-thumb { ${cssFromObj(thumb)} }
               input[type=range]::-moz-range-thumb { ${cssFromObj(thumb)} }
@@ -1187,7 +1200,10 @@ export default function Page() {
                 <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Tag>New today: {cCountToday}</Tag>
+                {/* Bigger font for "New today" */}
+                <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
+                  New today: <strong>{cCountToday}</strong>
+                </Tag>
                 <Button
                   onClick={logout}
                   style={{ background: '#0B1220', border: '1px solid #1F2937' }}
@@ -1307,6 +1323,12 @@ export default function Page() {
 
               <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                 <Button onClick={fetchClientRows}>Apply filters</Button>
+                <Button
+                  onClick={clearClientFilters}
+                  style={{ background: '#111827', border: '1px solid #1F2937' }}
+                >
+                  Clear filters
+                </Button>
                 {clientErr ? (
                   <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>
                     {clientErr}
