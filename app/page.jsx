@@ -907,11 +907,12 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== Dual-slider CSS (thumbs) ====== */
+    /* ====== Dual-slider CSS (thumbs look/feel) ====== */
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
-        position:absolute; top:-7px; height:18px; margin:0; outline:none;
+        position:absolute; left:0; right:0; top:-7px; height:18px; margin:0; outline:none;
+        touch-action:none;
       }
       .dual-range::-webkit-slider-runnable-track { background:transparent; }
       .dual-range::-moz-range-track { background:transparent; }
@@ -925,13 +926,37 @@ export default function Page() {
       }
     `;
 
-    /* ====== Helpers to split input coverage ====== */
-    const trackBase = { position: 'relative', height: 18 };
+    /* ====== Click-closest logic (nearest thumb wins) ====== */
+    function useNearestThumbZ(min, max) {
+      const boxRef = React.useRef(null);
+      const [topIsLow, setTopIsLow] = React.useState(true); // which input is on top
+
+      const getX = (clientX) => {
+        const rect = boxRef.current?.getBoundingClientRect();
+        return rect ? Math.min(rect.right, Math.max(rect.left, clientX)) - rect.left : 0;
+      };
+      const pct = (v) => (boxRef.current ? ((v - min) / (max - min)) * boxRef.current.clientWidth : 0);
+
+      const onDown = (clientX, lowVal, highVal) => {
+        const x = getX(clientX);
+        const lowX = pct(lowVal);
+        const highX = pct(highVal);
+        // whichever thumb is closer to click gets z-index priority
+        setTopIsLow(Math.abs(x - lowX) <= Math.abs(x - highX));
+      };
+
+      return { boxRef, topIsLow, setTopIsLow, onDown };
+    }
+
+    /* Shared slider pieces */
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
+    const trackBase = { position: 'relative', height: 18 };
 
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
+      const { boxRef, topIsLow, onDown } = useNearestThumbZ(min, max);
       const pct = (v) => ((v - min) / (max - min)) * 100;
+
       const sel = {
         position: 'absolute',
         top: 7,
@@ -946,13 +971,21 @@ export default function Page() {
       const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
       const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
 
+      const handleMouseDown = (e) => onDown(e.clientX, minSalary, maxSalary);
+      const handleTouchStart = (e) => onDown(e.touches[0].clientX, minSalary, maxSalary);
+
       return (
         <div>
           <Label>Salary range</Label>
-          <div style={trackBase}>
+          <div
+            ref={boxRef}
+            style={trackBase}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+          >
             <div style={rail} />
             <div style={sel} />
-            {/* LOW input spans left portion only */}
+            {/* Low & High both full width; z-index flips based on nearest thumb */}
             <input
               className="dual-range"
               type="range"
@@ -962,13 +995,8 @@ export default function Page() {
               value={minSalary}
               onChange={onLow}
               onInput={onLow}
-              style={{
-                left: 0,
-                right: `${100 - pct(maxSalary)}%`, // only left side is interactive
-                zIndex: 3,
-              }}
+              style={{ zIndex: topIsLow ? 5 : 4 }}
             />
-            {/* HIGH input spans right portion only */}
             <input
               className="dual-range"
               type="range"
@@ -978,11 +1006,7 @@ export default function Page() {
               value={maxSalary}
               onChange={onHigh}
               onInput={onHigh}
-              style={{
-                left: `${pct(minSalary)}%`, // only right side is interactive
-                right: 0,
-                zIndex: 4,
-              }}
+              style={{ zIndex: topIsLow ? 4 : 5 }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -996,7 +1020,9 @@ export default function Page() {
 
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
+      const { boxRef, topIsLow, onDown } = useNearestThumbZ(min, max);
       const pct = (v) => ((v - min) / (max - min)) * 100;
+
       const sel = {
         position: 'absolute',
         top: 7,
@@ -1011,13 +1037,20 @@ export default function Page() {
       const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
       const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
 
+      const handleMouseDown = (e) => onDown(e.clientX, minYears, maxYears);
+      const handleTouchStart = (e) => onDown(e.touches[0].clientX, minYears, maxYears);
+
       return (
         <div>
           <Label>Years of experience</Label>
-          <div style={trackBase}>
+          <div
+            ref={boxRef}
+            style={trackBase}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+          >
             <div style={rail} />
             <div style={sel} />
-            {/* LOW input spans left portion only */}
             <input
               className="dual-range"
               type="range"
@@ -1027,13 +1060,8 @@ export default function Page() {
               value={minYears}
               onChange={onLow}
               onInput={onLow}
-              style={{
-                left: 0,
-                right: `${100 - pct(maxYears)}%`,
-                zIndex: 3,
-              }}
+              style={{ zIndex: topIsLow ? 5 : 4 }}
             />
-            {/* HIGH input spans right portion only */}
             <input
               className="dual-range"
               type="range"
@@ -1043,11 +1071,7 @@ export default function Page() {
               value={maxYears}
               onChange={onHigh}
               onInput={onHigh}
-              style={{
-                left: `${pct(minYears)}%`,
-                right: 0,
-                zIndex: 4,
-              }}
+              style={{ zIndex: topIsLow ? 4 : 5 }}
             />
             <style>{sliderCss}</style>
           </div>
