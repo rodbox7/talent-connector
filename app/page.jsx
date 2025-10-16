@@ -907,7 +907,7 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== Dual-slider CSS (thumbs look/feel) ====== */
+    /* ====== Dual-slider CSS ====== */
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
@@ -926,10 +926,10 @@ export default function Page() {
       }
     `;
 
-    /* ====== Click-closest logic (nearest thumb wins) ====== */
+    /* ====== Nearest-thumb z-index control ====== */
     function useNearestThumbZ(min, max) {
       const boxRef = React.useRef(null);
-      const [topIsLow, setTopIsLow] = React.useState(true); // which input is on top
+      const [topIsLow, setTopIsLow] = React.useState(true);
 
       const getX = (clientX) => {
         const rect = boxRef.current?.getBoundingClientRect();
@@ -941,20 +941,18 @@ export default function Page() {
         const x = getX(clientX);
         const lowX = pct(lowVal);
         const highX = pct(highVal);
-        // whichever thumb is closer to click gets z-index priority
         setTopIsLow(Math.abs(x - lowX) <= Math.abs(x - highX));
       };
 
       return { boxRef, topIsLow, setTopIsLow, onDown };
     }
 
-    /* Shared slider pieces */
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
     const trackBase = { position: 'relative', height: 18 };
 
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
-      const { boxRef, topIsLow, onDown } = useNearestThumbZ(min, max);
+      const { boxRef, topIsLow, setTopIsLow, onDown } = useNearestThumbZ(min, max);
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
       const sel = {
@@ -985,7 +983,6 @@ export default function Page() {
           >
             <div style={rail} />
             <div style={sel} />
-            {/* Low & High both full width; z-index flips based on nearest thumb */}
             <input
               className="dual-range"
               type="range"
@@ -995,6 +992,8 @@ export default function Page() {
               value={minSalary}
               onChange={onLow}
               onInput={onLow}
+              onMouseDown={() => setTopIsLow(true)}
+              onTouchStart={() => setTopIsLow(true)}
               style={{ zIndex: topIsLow ? 5 : 4 }}
             />
             <input
@@ -1006,6 +1005,8 @@ export default function Page() {
               value={maxSalary}
               onChange={onHigh}
               onInput={onHigh}
+              onMouseDown={() => setTopIsLow(false)}
+              onTouchStart={() => setTopIsLow(false)}
               style={{ zIndex: topIsLow ? 4 : 5 }}
             />
             <style>{sliderCss}</style>
@@ -1020,7 +1021,7 @@ export default function Page() {
 
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
-      const { boxRef, topIsLow, onDown } = useNearestThumbZ(min, max);
+      const { boxRef, topIsLow, setTopIsLow, onDown } = useNearestThumbZ(min, max);
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
       const sel = {
@@ -1060,6 +1061,8 @@ export default function Page() {
               value={minYears}
               onChange={onLow}
               onInput={onLow}
+              onMouseDown={() => setTopIsLow(true)}
+              onTouchStart={() => setTopIsLow(true)}
               style={{ zIndex: topIsLow ? 5 : 4 }}
             />
             <input
@@ -1071,6 +1074,8 @@ export default function Page() {
               value={maxYears}
               onChange={onHigh}
               onInput={onHigh}
+              onMouseDown={() => setTopIsLow(false)}
+              onTouchStart={() => setTopIsLow(false)}
               style={{ zIndex: topIsLow ? 4 : 5 }}
             />
             <style>{sliderCss}</style>
