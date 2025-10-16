@@ -168,7 +168,7 @@ export default function Page() {
     setErr('');
   }
 
-  // ---------- Recruiter form state (UNCHANGED) ----------
+  // ---------- Recruiter form state ----------
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
@@ -242,7 +242,7 @@ export default function Page() {
             ? null
             : Number(editForm.recent_role_years),
         salary:
-          editForm.salary === '' || editForm.salary === null
+        editForm.salary === '' || editForm.salary === null
             ? null
             : Number(editForm.salary),
         contract: !!editForm.contract,
@@ -351,7 +351,7 @@ export default function Page() {
     }
   }
 
-  // ---------- Client state (RESTORED) ----------
+  // ---------- Client state ----------
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
   const [minSalary, setMinSalary] = React.useState(0);
@@ -617,7 +617,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Recruiter UI (UNCHANGED) ----------
+  // ---------- Recruiter UI ----------
   if (user.role === 'recruiter') {
     return (
       <div style={pageWrap}>
@@ -1046,7 +1046,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Client UI (RESTORED) ----------
+  // ---------- Client UI ----------
   if (user.role === 'client') {
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
@@ -1076,59 +1076,28 @@ export default function Page() {
     }
 
     function SalarySlider() {
-      // two thumbs on one line (overlapped inputs)
-      const min = 0,
-        max = 400000,
-        step = 5000;
+      const min = 0, max = 400000, step = 5000;
 
-      function clamp(v) {
-        return Math.min(max, Math.max(min, v));
-      }
-      function onLow(e) {
-        const v = clamp(Number(e.target.value));
-        setMinSalary(Math.min(v, maxSalary));
-      }
-      function onHigh(e) {
-        const v = clamp(Number(e.target.value));
-        setMaxSalary(Math.max(v, minSalary));
-      }
+      function clamp(v) { return Math.min(max, Math.max(min, v)); }
+      function onLow(e) { setMinSalary(Math.min(clamp(Number(e.target.value)), maxSalary)); }
+      function onHigh(e) { setMaxSalary(Math.max(clamp(Number(e.target.value)), minSalary)); }
 
-      const track = {
-        position: 'relative',
-        height: 4,
-        background: '#1F2937',
-        borderRadius: 999,
-      };
+      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
       const pct = (v) => ((v - min) / (max - min)) * 100;
       const sel = {
-        position: 'absolute',
-        top: 0,
-        left: `${pct(minSalary)}%`,
-        right: `${100 - pct(maxSalary)}%`,
-        height: 4,
-        background: '#4F46E5',
-        borderRadius: 999,
+        position: 'absolute', top: 0,
+        left: `${pct(minSalary)}%`, right: `${100 - pct(maxSalary)}%`,
+        height: 4, background: '#4F46E5', borderRadius: 999,
       };
       const range = {
-        WebkitAppearance: 'none',
-        appearance: 'none',
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: -7,
-        height: 18,
-        width: '100%',
-        background: 'transparent',
-        pointerEvents: 'none',
+        WebkitAppearance: 'none', appearance: 'none',
+        position: 'absolute', left: 0, right: 0, top: -7,
+        height: 18, width: '100%', background: 'transparent', pointerEvents: 'none',
       };
       const thumb = {
-        WebkitAppearance: 'none',
-        appearance: 'none',
-        width: 18,
-        height: 18,
-        borderRadius: 999,
-        background: '#22d3ee',
-        border: '2px solid #0b0b0b',
+        WebkitAppearance: 'none', appearance: 'none',
+        width: 18, height: 18, borderRadius: 999,
+        background: '#22d3ee', border: '2px solid #0b0b0b', // <-- fixed
         pointerEvents: 'all',
       };
 
@@ -1138,24 +1107,8 @@ export default function Page() {
           <div style={{ position: 'relative', height: 18 }}>
             <div style={track} />
             <div style={sel} />
-            <input
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={minSalary}
-              onChange={onLow}
-              style={range}
-            />
-            <input
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={maxSalary}
-              onChange={onHigh}
-              style={{ ...range }}
-            />
+            <input type="range" min={min} max={max} step={step} value={minSalary} onChange={onLow} style={range} />
+            <input type="range" min={min} max={max} step={step} value={maxSalary} onChange={onHigh} style={{ ...range }} />
             <style>{`
               input[type=range]::-webkit-slider-thumb { ${cssFromObj(thumb)} }
               input[type=range]::-moz-range-thumb { ${cssFromObj(thumb)} }
@@ -1170,58 +1123,28 @@ export default function Page() {
     }
 
     function YearsSlider() {
-      const min = 0,
-        max = 50,
-        step = 1;
+      const min = 0, max = 50, step = 1;
 
-      function clamp(v) {
-        return Math.min(max, Math.max(min, v));
-      }
-      function onLow(e) {
-        const v = clamp(Number(e.target.value));
-        setMinYears(Math.min(v, maxYears));
-      }
-      function onHigh(e) {
-        const v = clamp(Number(e.target.value));
-        setMaxYears(Math.max(v, minYears));
-      }
+      function clamp(v) { return Math.min(max, Math.max(min, v)); }
+      function onLow(e) { setMinYears(Math.min(clamp(Number(e.target.value)), maxYears)); }
+      function onHigh(e) { setMaxYears(Math.max(clamp(Number(e.target.value)), minYears)); }
 
-      const track = {
-        position: 'relative',
-        height: 4,
-        background: '#1F2937',
-        borderRadius: 999,
-      };
+      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
       const pct = (v) => ((v - min) / (max - min)) * 100;
       const sel = {
-        position: 'absolute',
-        top: 0,
-        left: `${pct(minYears)}%`,
-        right: `${100 - pct(maxYears)}%`,
-        height: 4,
-        background: '#4F46E5',
-        borderRadius: 999,
+        position: 'absolute', top: 0,
+        left: `${pct(minYears)}%`, right: `${100 - pct(maxYears)}%`,
+        height: 4, background: '#4F46E5', borderRadius: 999,
       };
       const range = {
-        WebkitAppearance: 'none',
-        appearance: 'none',
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: -7,
-        height: 18,
-        width: '100%',
-        background: 'transparent',
-        pointerEvents: 'none',
+        WebkitAppearance: 'none', appearance: 'none',
+        position: 'absolute', left: 0, right: 0, top: -7,
+        height: 18, width: '100%', background: 'transparent', pointerEvents: 'none',
       };
       const thumb = {
-        WebkitAppearance: 'none',
-        appearance: 'none',
-        width: 18,
-        height: 18,
-        borderRadius: 999,
-        background: '#22d3ee',
-        border: '2px solid '#0b0b0b',
+        WebkitAppearance: 'none', appearance: 'none',
+        width: 18, height: 18, borderRadius: 999,
+        background: '#22d3ee', border: '2px solid #0b0b0b', // <-- fixed
         pointerEvents: 'all',
       };
 
@@ -1493,7 +1416,7 @@ export default function Page() {
     );
   }
 
-  // ---------- Admin UI (RESTORED) ----------
+  // ---------- Admin UI ----------
   return (
     <div style={pageWrap}>
       <div style={overlay}>
@@ -1586,11 +1509,7 @@ function AdminPanel() {
         return;
       }
       setFlash(`Invited ${email} as ${role}`);
-      setEmail('');
-      setRole('client');
-      setOrg('');
-      setAmEmail('');
-      setTempPw('');
+      setEmail(''); setRole('client'); setOrg(''); setAmEmail(''); setTempPw('');
       await loadProfiles();
     } catch (e) {
       console.error(e);
