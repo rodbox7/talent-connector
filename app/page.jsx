@@ -907,15 +907,12 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== DRAG-FRIENDLY dual-slider CSS (updated) ====== */
+    /* ====== Dual-slider CSS (thumbs) ====== */
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
-        position:absolute; left:0; right:0; top:-7px; height:18px; width:100%; margin:0;
-        touch-action:none;                  /* allow thumb dragging on touch */
+        position:absolute; top:-7px; height:18px; margin:0; outline:none;
       }
-      .dual-range.low  { z-index:3; }
-      .dual-range.high { z-index:4; }
       .dual-range::-webkit-slider-runnable-track { background:transparent; }
       .dual-range::-moz-range-track { background:transparent; }
       .dual-range::-webkit-slider-thumb{
@@ -928,26 +925,16 @@ export default function Page() {
       }
     `;
 
+    /* ====== Helpers to split input coverage ====== */
+    const trackBase = { position: 'relative', height: 18 };
+    const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
+
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
-      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
-
-      React.useEffect(() => {
-        if (!active) return;
-        const up = () => setActive(null);
-        window.addEventListener('mouseup', up);
-        window.addEventListener('touchend', up);
-        return () => {
-          window.removeEventListener('mouseup', up);
-          window.removeEventListener('touchend', up);
-        };
-      }, [active]);
-
       const pct = (v) => ((v - min) / (max - min)) * 100;
-      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
       const sel = {
         position: 'absolute',
-        top: 0,
+        top: 7,
         left: `${pct(minSalary)}%`,
         right: `${100 - pct(maxSalary)}%`,
         height: 4,
@@ -956,29 +943,46 @@ export default function Page() {
         pointerEvents: 'none',
       };
       const clamp = (v) => Math.min(max, Math.max(min, v));
-
       const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
       const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
 
       return (
         <div>
           <Label>Salary range</Label>
-          <div style={{ position: 'relative', height: 18 }}>
-            <div style={track} />
+          <div style={trackBase}>
+            <div style={rail} />
             <div style={sel} />
+            {/* LOW input spans left portion only */}
             <input
-              className="dual-range low"
-              type="range" min={min} max={max} step={step} value={minSalary}
-              onChange={onLow} onInput={onLow}
-              onMouseDown={() => setActive('low')}  onTouchStart={() => setActive('low')}
-              style={{ pointerEvents: active && active !== 'low' ? 'none' : 'auto' }}
+              className="dual-range"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minSalary}
+              onChange={onLow}
+              onInput={onLow}
+              style={{
+                left: 0,
+                right: `${100 - pct(maxSalary)}%`, // only left side is interactive
+                zIndex: 3,
+              }}
             />
+            {/* HIGH input spans right portion only */}
             <input
-              className="dual-range high"
-              type="range" min={min} max={max} step={step} value={maxSalary}
-              onChange={onHigh} onInput={onHigh}
-              onMouseDown={() => setActive('high')} onTouchStart={() => setActive('high')}
-              style={{ pointerEvents: active && active !== 'high' ? 'none' : 'auto' }}
+              className="dual-range"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxSalary}
+              onChange={onHigh}
+              onInput={onHigh}
+              style={{
+                left: `${pct(minSalary)}%`, // only right side is interactive
+                right: 0,
+                zIndex: 4,
+              }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -992,24 +996,10 @@ export default function Page() {
 
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
-      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
-
-      React.useEffect(() => {
-        if (!active) return;
-        const up = () => setActive(null);
-        window.addEventListener('mouseup', up);
-        window.addEventListener('touchend', up);
-        return () => {
-          window.removeEventListener('mouseup', up);
-          window.removeEventListener('touchend', up);
-        };
-      }, [active]);
-
       const pct = (v) => ((v - min) / (max - min)) * 100;
-      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
       const sel = {
         position: 'absolute',
-        top: 0,
+        top: 7,
         left: `${pct(minYears)}%`,
         right: `${100 - pct(maxYears)}%`,
         height: 4,
@@ -1018,29 +1008,46 @@ export default function Page() {
         pointerEvents: 'none',
       };
       const clamp = (v) => Math.min(max, Math.max(min, v));
-
       const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
       const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
 
       return (
         <div>
           <Label>Years of experience</Label>
-          <div style={{ position: 'relative', height: 18 }}>
-            <div style={track} />
+          <div style={trackBase}>
+            <div style={rail} />
             <div style={sel} />
+            {/* LOW input spans left portion only */}
             <input
-              className="dual-range low"
-              type="range" min={min} max={max} step={step} value={minYears}
-              onChange={onLow} onInput={onLow}
-              onMouseDown={() => setActive('low')}  onTouchStart={() => setActive('low')}
-              style={{ pointerEvents: active && active !== 'low' ? 'none' : 'auto' }}
+              className="dual-range"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minYears}
+              onChange={onLow}
+              onInput={onLow}
+              style={{
+                left: 0,
+                right: `${100 - pct(maxYears)}%`,
+                zIndex: 3,
+              }}
             />
+            {/* HIGH input spans right portion only */}
             <input
-              className="dual-range high"
-              type="range" min={min} max={max} step={step} value={maxYears}
-              onChange={onHigh} onInput={onHigh}
-              onMouseDown={() => setActive('high')} onTouchStart={() => setActive('high')}
-              style={{ pointerEvents: active && active !== 'high' ? 'none' : 'auto' }}
+              className="dual-range"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxYears}
+              onChange={onHigh}
+              onInput={onHigh}
+              style={{
+                left: `${pct(minYears)}%`,
+                right: 0,
+                zIndex: 4,
+              }}
             />
             <style>{sliderCss}</style>
           </div>
