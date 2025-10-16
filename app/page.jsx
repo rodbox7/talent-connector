@@ -337,6 +337,10 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
+  // Insights view
+  const [showInsights, setShowInsights] = React.useState(false);
+  const [insights, setInsights] = React.useState(null); // { avgSalaryByTitle, avgHourlyByTitle, avgSalaryByCity, avgHourlyByCity, avgSalaryByYears }
+
   const todayStartIso = React.useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -907,22 +911,22 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== Dual-slider CSS: inputs ignore pointer events; thumbs capture them ====== */
+    /* ====== Dual-slider CSS ====== */
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
-        position:absolute; left:0; right:0; top:-7px; height:18px; margin:0; outline:none;
+        position:absolute; left:0; right:0; top:7px; height:4px; margin:0; outline:none;
         pointer-events:none; touch-action:none;
       }
-      .dual-range::-webkit-slider-runnable-track { background:transparent; }
-      .dual-range::-moz-range-track { background:transparent; }
       .dual-range::-webkit-slider-thumb{
-        -webkit-appearance:none; width:18px; height:18px; border-radius:999px;
-        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:auto;
+        -webkit-appearance:none; width:18px; height:18px; margin-top:-7px;
+        border-radius:999px; background:#22d3ee; border:2px solid #0b0b0b;
+        pointer-events:auto;
       }
       .dual-range::-moz-range-thumb{
         width:18px; height:18px; border-radius:999px;
-        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:auto;
+        background:#22d3ee; border:2px solid #0b0b0b;
+        pointer-events:auto;
       }
     `;
 
@@ -930,11 +934,144 @@ export default function Page() {
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
     const trackBase = { position: 'relative', height: 18 };
 
+    // Insights helpers
+    function groupAvg(items, key, valueKey) {
+      const acc = new Map();
+      for (const it of items) {
+        const k = (it[key] || '').trim();
+        const v = Number(it[valueKey]);
+        if (!k || !Number.isFinite(v) || v <= 0) continue;
+        const cur = acc.get(k) || { sum: 0, n: 0 };
+        cur.sum += v;
+        cur.n += 1;
+        acc.set(k, cur);
+      }
+      const rows = [];
+      for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
+      rows.sort((a, b) => b.avg - a.avg);
+      return rows.slice(0, 12); // top 12 for readability
+    }
+    function explodeCSVToRows(items, csvKey, valueKey) {
+      // split comma-separated field into multiple pseudo-rows
+      const rows = [];
+      for (const it of items) {
+        const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
+        for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
+      }
+      return rows;
+    }
+    const _csvKey = (k) => k + '_one';
+
+    async function loadInsights() {
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('titles_csv,city,state,years,salary,hourly')
+          .limit(2000);
+        if (error) throw error;
+
+        // Titles explode
+        const byTitleSalary = groupAvg(
+          explodeCSVToRows(data, 'titles_csv', 'salary').map((r) => ({
+            ...r,
+            title_one: r[_csvKey('titles_csv')],
+          })),
+          'title_one',
+          'salary'
+        );
+        const byTitleHourly = groupAvg(
+          explodeCSVToRows(data, 'titles_csv', 'hourly').map((r) => ({
+            ...r,
+            title_one: r[_csvKey('titles_csv')],
+          })),
+          'title_one',
+          'hourly'
+        );
+
+        // City (combine city+state for clarity)
+        const withCityState = data.map((r) => ({
+          ...r,
+          city_full: [r.city, r.state].filter(Boolean).join(', '),
+        }));
+        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
+        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
+
+        // Years buckets
+        const buckets = [
+          { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
+          { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
+          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
+          { label: '11-20 yrs', check: (y) => y >= 11 && y <= 20 },
+          { label: '21+ yrs', check: (y) => y >= 21 },
+        ];
+        const yearsAgg = [];
+        for (const b of buckets) {
+          const vals = data
+            .map((r) => Number(r.salary))
+            .filter((v, i) => {
+              const y = Number(data[i].years);
+              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+            });
+          if (vals.length) {
+            yearsAgg.push({
+              label: b.label,
+              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
+              n: vals.length,
+            });
+          }
+        }
+
+        setInsights({
+          byTitleSalary,
+          byTitleHourly,
+          byCitySalary,
+          byCityHourly,
+          byYearsSalary: yearsAgg,
+        });
+        setShowInsights(true);
+      } catch (e) {
+        console.error(e);
+        alert('Failed to load insights.');
+      }
+    }
+
+    // Bar chart component (CSS only)
+    function BarChart({ title, rows, money = true }) {
+      // Determine max for scale
+      const max = Math.max(...rows.map((r) => r.avg), 1);
+      return (
+        <Card style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {rows.map((r) => (
+              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
+                <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {r.label}
+                </div>
+                <div style={{ height: 12, background: '#111827', borderRadius: 999, overflow: 'hidden', border: '1px solid #1F2937' }}>
+                  <div
+                    style={{
+                      width: `${Math.round((r.avg / max) * 100)}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #3B82F6, #06B6D4)',
+                    }}
+                  />
+                </div>
+                <div style={{ color: '#9CA3AF', textAlign: 'right', fontSize: 12 }}>
+                  {money ? `$${r.avg.toLocaleString()}` : r.avg.toLocaleString()}
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
+          </div>
+        </Card>
+      );
+    }
+
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
-      // When thumbs get close, put LOW on top so it can be grabbed
       const lowOnTop = maxSalary - minSalary <= step * 3;
       const zLow  = lowOnTop ? 7 : 6;
       const zHigh = lowOnTop ? 6 : 7;
@@ -956,8 +1093,8 @@ export default function Page() {
       return (
         <div>
           <Label>Salary range</Label>
-          <div style={trackBase}>
-            <div style={rail} />
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 }} />
             <div style={sel} />
             <input
               className="dual-range"
@@ -1016,8 +1153,8 @@ export default function Page() {
       return (
         <div>
           <Label>Years of experience</Label>
-          <div style={trackBase}>
-            <div style={rail} />
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 }} />
             <div style={sel} />
             <input
               className="dual-range"
@@ -1051,203 +1188,240 @@ export default function Page() {
       );
     }
 
+    // Insights View UI
+    function InsightsView() {
+      if (!insights) return null;
+      return (
+        <div style={{ width: 'min(1150px, 100%)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+              Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
+            </div>
+            <Button
+              onClick={() => setShowInsights(false)}
+              style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+            >
+              Back to Results
+            </Button>
+          </div>
+
+          <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
+          <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
+          <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
+          <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
+          <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+        </div>
+      );
+    }
+
     return (
       <div style={pageWrap}>
         <div style={overlay}>
-          <div style={{ width: 'min(1150px, 100%)' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 10,
-              }}
-            >
-              <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
-                <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+          {!showInsights ? (
+            <div style={{ width: 'min(1150px, 100%)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                  Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
+                    New today: <strong>{cCountToday}</strong>
+                  </Tag>
+                  <Button
+                    onClick={loadInsights}
+                    style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+                  >
+                    Compensation Insights
+                  </Button>
+                  <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+                    Log out
+                  </Button>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
-                  New today: <strong>{cCountToday}</strong>
-                </Tag>
-                <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
-                  Log out
-                </Button>
-              </div>
-            </div>
 
-            <Card style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                <div>
-                  <Label>Keyword</Label>
-                  <Input
-                    placeholder="name, law, title, city/state"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+              <Card style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                  <div>
+                    <Label>Keyword</Label>
+                    <Input
+                      placeholder="name, law, title, city/state"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {cities.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {states.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Title</Label>
+                    <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {titleOptions.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Type of Law</Label>
+                    <select value={fLaw} onChange={(e) => setFLaw(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {lawOptions.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Sort by</Label>
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+                      <option value="date_desc">Date (newest)</option>
+                      <option value="date_asc">Date (oldest)</option>
+                      <option value="salary_desc">Salary (high → low)</option>
+                      <option value="salary_asc">Salary (low → high)</option>
+                      <option value="hourly_desc">Hourly (high → low)</option>
+                      <option value="hourly_asc">Hourly (low → high)</option>
+                      <option value="years_desc">Years (high → low)</option>
+                      <option value="years_asc">Years (low → high)</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <SalarySlider />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <YearsSlider />
+                  </div>
                 </div>
-                <div>
-                  <Label>City</Label>
-                  <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-                    <option value="">Any</option>
-                    {cities.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <Button onClick={fetchClientRows}>Apply filters</Button>
+                  <Button
+                    onClick={clearClientFilters}
+                    style={{ background: '#111827', border: '1px solid #1F2937' }}
+                  >
+                    Clear filters
+                  </Button>
+                  {clientErr ? (
+                    <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
+                  ) : null}
                 </div>
-                <div>
-                  <Label>State</Label>
-                  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-                    <option value="">Any</option>
-                    {states.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label>Title</Label>
-                  <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
-                    <option value="">Any</option>
-                    {titleOptions.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label>Type of Law</Label>
-                  <select value={fLaw} onChange={(e) => setFLaw(e.target.value)} style={selectStyle}>
-                    <option value="">Any</option>
-                    {lawOptions.map((l) => (
-                      <option key={l} value={l}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label>Sort by</Label>
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
-                    <option value="date_desc">Date (newest)</option>
-                    <option value="date_asc">Date (oldest)</option>
-                    <option value="salary_desc">Salary (high → low)</option>
-                    <option value="salary_asc">Salary (low → high)</option>
-                    <option value="hourly_desc">Hourly (high → low)</option>
-                    <option value="hourly_asc">Hourly (low → high)</option>
-                    <option value="years_desc">Years (high → low)</option>
-                    <option value="years_asc">Years (low → high)</option>
-                  </select>
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <SalarySlider />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <YearsSlider />
-                </div>
-              </div>
-              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                <Button onClick={fetchClientRows}>Apply filters</Button>
-                <Button
-                  onClick={clearClientFilters}
-                  style={{ background: '#111827', border: '1px solid #1F2937' }}
-                >
-                  Clear filters
-                </Button>
-                {clientErr ? (
-                  <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
-                ) : null}
-              </div>
-            </Card>
+              </Card>
 
-            <Card style={{ marginTop: 14 }}>
-              <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
-              {clientRows.length === 0 ? (
-                <div style={{ color: '#9CA3AF', fontSize: 14 }}>
-                  {clientLoading ? 'Loading…' : 'No candidates match the filters.'}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {clientRows.map((c) => (
-                    <div
-                      key={c.id}
-                      style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
-                    >
+              <Card style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
+                {clientRows.length === 0 ? (
+                  <div style={{ color: '#9CA3AF', fontSize: 14 }}>
+                    {clientLoading ? 'Loading…' : 'No candidates match the filters.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {clientRows.map((c) => (
                       <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
-                          gap: 10,
-                          alignItems: 'center',
-                        }}
+                        key={c.id}
+                        style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
                       >
-                        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
-                          {c.name}
-                          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
-                            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
-                          </div>
-                        </div>
-                        <div style={{ color: '#9CA3AF' }}>
-                          {c.city || '—'}, {c.state || '—'}
-                        </div>
-                        <div style={{ color: '#E5E7EB' }}>
-                          {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                          {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
-                        </div>
-                        <div style={{ color: '#9CA3AF' }}>
-                          {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <Button
-                            onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                            style={{ background: '#111827', border: '1px solid #1F2937' }}
-                          >
-                            Additional information
-                          </Button>
-                          <a
-                            href={buildMailto(c)}
-                            style={{
-                              display: 'inline-block',
-                              padding: '10px 14px',
-                              borderRadius: 10,
-                              border: '1px solid #243041',
-                              background: '#2563EB',
-                              color: 'white',
-                              fontWeight: 600,
-                              textDecoration: 'none',
-                            }}
-                          >
-                            Email for more information
-                          </a>
-                        </div>
-                      </div>
-                      {expandedId === c.id && (
                         <div
                           style={{
-                            marginTop: 10,
-                            padding: 10,
-                            borderRadius: 10,
-                            border: '1px solid #1F2937',
-                            background: '#0F172A',
-                            color: '#CBD5E1',
-                            fontSize: 14,
+                            display: 'grid',
+                            gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
+                            gap: 10,
+                            alignItems: 'center',
                           }}
                         >
-                          {c.notes ? c.notes : <i>No additional notes.</i>}
+                          <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                            {c.name}
+                            <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+                              {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+                            </div>
+                          </div>
+                          <div style={{ color: '#9CA3AF' }}>
+                            {c.city || '—'}, {c.state || '—'}
+                          </div>
+                          <div style={{ color: '#E5E7EB' }}>
+                            {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
+                            {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                          </div>
+                          <div style={{ color: '#9CA3AF' }}>
+                            {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <Button
+                              onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+                              style={{ background: '#111827', border: '1px solid #1F2937' }}
+                            >
+                              Additional information
+                            </Button>
+                            <a
+                              href={buildMailto(c)}
+                              style={{
+                                display: 'inline-block',
+                                padding: '10px 14px',
+                                borderRadius: 10,
+                                border: '1px solid #243041',
+                                background: '#2563EB',
+                                color: 'white',
+                                fontWeight: 600,
+                                textDecoration: 'none',
+                              }}
+                            >
+                              Email for more information
+                            </a>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
+                        {expandedId === c.id && (
+                          <div
+                            style={{
+                              marginTop: 10,
+                              padding: 10,
+                              borderRadius: 10,
+                              border: '1px solid #1F2937',
+                              background: '#0F172A',
+                              color: '#CBD5E1',
+                              fontSize: 14,
+                            }}
+                          >
+                            {c.notes ? c.notes : <i>No additional notes.</i>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </div>
+          ) : (
+            <InsightsView />
+          )}
         </div>
       </div>
     );
