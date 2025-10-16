@@ -3,7 +3,7 @@ import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Client tab now includes extra sort options for hourly rate (high→low, low→high).
+ * Client tab includes sort options for hourly rate (high→low, low→high).
  * Recruiter UI and styling preserved.
  */
 
@@ -258,11 +258,8 @@ export default function Page() {
   const [maxSalary, setMaxSalary] = React.useState(400000);
   const [minYears, setMinYears] = React.useState(0);
   const [maxYears, setMaxYears] = React.useState(50);
-
-  // NEW: add hourly sort options
   const [sortBy, setSortBy] = React.useState('date_desc');
 
-  // filter selects
   const [cities, setCities] = React.useState([]);
   const [states, setStates] = React.useState([]);
   const [titleOptions, setTitleOptions] = React.useState([]);
@@ -396,7 +393,6 @@ export default function Page() {
         case 'years_asc':
           q = q.order('years', { ascending: true, nullsFirst: true });
           break;
-        // NEW: hourly sorts
         case 'hourly_desc':
           q = q.order('hourly', { ascending: false, nullsFirst: false });
           break;
@@ -553,7 +549,7 @@ export default function Page() {
                 onClick={logout}
                 style={{
                   background: '#0B1220',
-                  border: '1px solid '#1F2937',
+                  border: '1px solid #1F2937',
                 }}
               >
                 Log out
