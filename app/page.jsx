@@ -337,9 +337,9 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
-  // Insights view
+  // Insights (existing)
   const [showInsights, setShowInsights] = React.useState(false);
-  const [insights, setInsights] = React.useState(null); // preexisting charts
+  const [insights, setInsights] = React.useState(null);
 
   const todayStartIso = React.useMemo(() => {
     const d = new Date();
@@ -911,36 +911,38 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== Dual-slider CSS (FINAL) ====== */
+    /* ====== Dual-slider CSS — ORIGINAL WORKING ====== */
     const sliderCss = `
-      .dual-wrap { position: relative; height: 18px; }
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
-        position:absolute; left:0; right:0; top:0; height:18px; margin:0; outline:none;
-        pointer-events:auto;            /* inputs receive events */
-        touch-action:none;              /* prevent page scroll while dragging */
+        position:absolute; left:0; right:0; top:7px; height:4px; margin:0; outline:none;
+        pointer-events:none;             /* track ignores events */
+        touch-action:none;               /* prevent page scroll while dragging */
       }
-      .dual-range::-webkit-slider-runnable-track { background:transparent; }
-      .dual-range::-moz-range-track { background:transparent; }
       .dual-range::-webkit-slider-thumb{
-        -webkit-appearance:none; width:18px; height:18px;
+        -webkit-appearance:none; width:18px; height:18px; margin-top:-7px;
         border-radius:999px; background:#22d3ee; border:2px solid #0b0b0b;
+        pointer-events:auto;             /* thumb itself receives events */
       }
       .dual-range::-moz-range-thumb{
         width:18px; height:18px; border-radius:999px;
         background:#22d3ee; border:2px solid #0b0b0b;
+        pointer-events:auto;             /* thumb itself receives events */
       }
     `;
 
+    // Common visuals
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
     const trackBase = { position: 'relative', height: 18 };
 
-    // ----- Salary Slider with active handle z-index -----
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
-      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
-
       const pct = (v) => ((v - min) / (max - min)) * 100;
+
+      const lowOnTop = maxSalary - minSalary <= step * 3;
+      const zLow  = lowOnTop ? 7 : 6;
+      const zHigh = lowOnTop ? 6 : 7;
+
       const sel = {
         position: 'absolute',
         top: 7,
@@ -952,16 +954,13 @@ export default function Page() {
         pointerEvents: 'none',
       };
       const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary - step));
-      const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary + step));
-
-      const zLow  = active === 'low'  ? 5 : 4;
-      const zHigh = active === 'high' ? 5 : 4;
+      const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
+      const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
 
       return (
         <div>
           <Label>Salary range</Label>
-          <div className="dual-wrap" style={trackBase}>
+          <div style={trackBase}>
             <div style={rail} />
             <div style={sel} />
             <input
@@ -972,10 +971,6 @@ export default function Page() {
               step={step}
               value={minSalary}
               onChange={onLow}
-              onMouseDown={() => setActive('low')}
-              onTouchStart={() => setActive('low')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
               style={{ zIndex: zLow }}
             />
             <input
@@ -986,10 +981,6 @@ export default function Page() {
               step={step}
               value={maxSalary}
               onChange={onHigh}
-              onMouseDown={() => setActive('high')}
-              onTouchStart={() => setActive('high')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
               style={{ zIndex: zHigh }}
             />
             <style>{sliderCss}</style>
@@ -1002,12 +993,14 @@ export default function Page() {
       );
     }
 
-    // ----- Years Slider with active handle z-index -----
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
-      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
-
       const pct = (v) => ((v - min) / (max - min)) * 100;
+
+      const lowOnTop = maxYears - minYears <= step * 2;
+      const zLow  = lowOnTop ? 7 : 6;
+      const zHigh = lowOnTop ? 6 : 7;
+
       const sel = {
         position: 'absolute',
         top: 7,
@@ -1019,16 +1012,13 @@ export default function Page() {
         pointerEvents: 'none',
       };
       const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears - step));
-      const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears + step));
-
-      const zLow  = active === 'low'  ? 5 : 4;
-      const zHigh = active === 'high' ? 5 : 4;
+      const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
+      const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
 
       return (
         <div>
           <Label>Years of experience</Label>
-          <div className="dual-wrap" style={trackBase}>
+          <div style={trackBase}>
             <div style={rail} />
             <div style={sel} />
             <input
@@ -1039,10 +1029,6 @@ export default function Page() {
               step={step}
               value={minYears}
               onChange={onLow}
-              onMouseDown={() => setActive('low')}
-              onTouchStart={() => setActive('low')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
               style={{ zIndex: zLow }}
             />
             <input
@@ -1053,10 +1039,6 @@ export default function Page() {
               step={step}
               value={maxYears}
               onChange={onHigh}
-              onMouseDown={() => setActive('high')}
-              onTouchStart={() => setActive('high')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
               style={{ zIndex: zHigh }}
             />
             <style>{sliderCss}</style>
@@ -1069,7 +1051,7 @@ export default function Page() {
       );
     }
 
-    // ----- Insights (unchanged) -----
+    // ===== Insights helpers/components (unchanged) =====
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -1198,7 +1180,7 @@ export default function Page() {
             </div>
             <Button
               onClick={() => setShowInsights(false)}
-              style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+              style={{ background: '#0B1220', border: '1px solid '#1F2937' }}
             >
               Back to Results
             </Button>
