@@ -37,7 +37,7 @@ const Input = (props) => (
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      ...props.style,
+      ...(props.style || {}),
     }}
   />
 );
@@ -54,7 +54,7 @@ const TextArea = (props) => (
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      ...props.style,
+      ...(props.style || {}),
     }}
   />
 );
@@ -317,9 +317,29 @@ export default function Page() {
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
-  // NEW: dropdown ranges
-  const [salaryRange, setSalaryRange] = React.useState(''); // encoded as "min-max" or "min-"
-  const [yearsRange, setYearsRange] = React.useState('');   // encoded as "min-max" or "min-"
+  // dropdown ranges
+  const SALARY_RANGES = [
+    { key: '', label: 'Any', min: null, max: null },
+    { key: '40-60', label: '$40,000 – $60,000', min: 40000, max: 60000 },
+    { key: '60-80', label: '$60,000 – $80,000', min: 60000, max: 80000 },
+    { key: '80-100', label: '$80,000 – $100,000', min: 80000, max: 100000 },
+    { key: '100-150', label: '$100,000 – $150,000', min: 100000, max: 150000 },
+    { key: '150-200', label: '$150,000 – $200,000', min: 150000, max: 200000 },
+    { key: '200-300', label: '$200,000 – $300,000', min: 200000, max: 300000 },
+    { key: '300-400', label: '$300,000 – $400,000', min: 300000, max: 400000 },
+    { key: '400-500', label: '$400,000 – $500,000', min: 400000, max: 500000 },
+    { key: '500+', label: '$500,000+', min: 500000, max: null },
+  ];
+  const YEARS_RANGES = [
+    { key: '', label: 'Any', min: null, max: null },
+    { key: '0-2', label: '0 – 2 years', min: 0, max: 2 },
+    { key: '3-5', label: '3 – 5 years', min: 3, max: 5 },
+    { key: '6-10', label: '6 – 10 years', min: 6, max: 10 },
+    { key: '11-20', label: '11 – 20 years', min: 11, max: 20 },
+    { key: '21+', label: '21+ years', min: 21, max: null },
+  ];
+  const [salaryRange, setSalaryRange] = React.useState('');
+  const [yearsRange, setYearsRange] = React.useState('');
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
@@ -338,65 +358,86 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
-  // Insights view
-  const [showInsights, setShowInsights] = React.useState(false);
-  const [insights, setInsights] = React.useState(null);
+  // New-today counter (robust, local-midnight)
+  React.useEffect(() => {
+    if (user?.role !== 'client') return;
 
-  const todayStartIso = React.useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
-  }, []);
+    (async () => {
+      try {
+        const now = new Date();
+        const startLocalMidnight = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        const startIso = startLocalMidnight.toISOString();
+        const dateYmdLocal = `${now.getFullYear()}-${String(
+          now.getMonth() + 1
+        ).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // A) date_entered >= local today (DATE or TIMESTAMPTZ)
+        const { count: cA, error: eA } = await supabase
+          .from('candidates')
+          .select('id', { count: 'exact', head: true })
+          .gte('date_entered', dateYmdLocal);
+        if (eA) throw eA;
+
+        // B) date_entered IS NULL AND created_at >= local midnight
+        const { count: cB, error: eB } = await supabase
+          .from('candidates')
+          .select('id', { count: 'exact', head: true })
+          .is('date_entered', null)
+          .gte('created_at', startIso);
+        if (eB) throw eB;
+
+        setCCountToday((cA || 0) + (cB || 0));
+      } catch (err) {
+        console.error('New-today counter error:', err);
+        setCCountToday(0);
+      }
+    })();
+  }, [user]);
 
   React.useEffect(() => {
     if (user?.role !== 'client') return;
     (async () => {
-      const { count } = await supabase
-        .from('candidates')
-        .select('id', { count: 'exact', head: true })
-        .gte('date_entered', todayStartIso);
-      setCCountToday(count || 0);
-    })();
-  }, [user, todayStartIso]);
-
-  React.useEffect(() => {
-  if (user?.role !== 'client') return;
-
-  (async () => {
-    try {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0); // start of today in local time
-      const iso = d.toISOString();
-
-      // Count candidates where:
-      //  - date_entered >= today
-      //  - OR (date_entered IS NULL AND created_at >= today)
-      const { count, error } = await supabase
-        .from('candidates')
-        .select('id', { count: 'exact', head: true })
-        .or(`date_entered.gte.${iso},and(date_entered.is.null,created_at.gte.${iso})`);
-
-      if (error) {
-        console.error('Count error:', error);
-        setCCountToday(0);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('city,state,titles_csv,law_csv')
+          .limit(1000);
+        if (error) throw error;
+        const cset = new Set(),
+          sset = new Set(),
+          tset = new Set(),
+          lset = new Set();
+        for (const r of data || []) {
+          if (r.city) cset.add(r.city.trim());
+          if (r.state) sset.add(r.state.trim());
+          (r.titles_csv || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean)
+            .forEach((x) => tset.add(x));
+          (r.law_csv || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean)
+            .forEach((x) => lset.add(x));
+        }
+        setCities([...cset].sort());
+        setStates([...sset].sort());
+        setTitleOptions([...tset].sort());
+        setLawOptions([...lset].sort());
+      } catch (e) {
+        console.error(e);
       }
+    })();
+  }, [user]);
 
-      setCCountToday(count || 0);
-    } catch (e) {
-      console.error('Count exception:', e);
-      setCCountToday(0);
-    }
-  })();
-}, [user]);
-
-  // Helper to parse "min-max" or "min-" strings into numbers (or null)
-  function parseRange(val) {
-    if (!val) return { min: null, max: null };
-    const [minStr, maxStr] = val.split('-');
-    const min = minStr ? Number(minStr) : null;
-    const max = maxStr ? Number(maxStr) : null;
-    return { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null };
+  // Helpers for mapping dropdown keys to min/max
+  function getRangeDef(list, key) {
+    return list.find((r) => r.key === key) || list[0];
   }
 
   async function fetchClientRows() {
@@ -422,15 +463,15 @@ export default function Page() {
       if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
       if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
 
-      // Apply years range
-      const y = parseRange(yearsRange);
-      if (y.min != null) q = q.gte('years', y.min);
-      if (y.max != null) q = q.lte('years', y.max);
+      // Salary range
+      const sDef = getRangeDef(SALARY_RANGES, salaryRange);
+      if (sDef.min != null) q = q.gte('salary', sDef.min);
+      if (sDef.max != null) q = q.lte('salary', sDef.max);
 
-      // Apply salary range
-      const s = parseRange(salaryRange);
-      if (s.min != null) q = q.gte('salary', s.min);
-      if (s.max != null) q = q.lte('salary', s.max);
+      // Years range
+      const yDef = getRangeDef(YEARS_RANGES, yearsRange);
+      if (yDef.min != null) q = q.gte('years', yDef.min);
+      if (yDef.max != null) q = q.lte('years', yDef.max);
 
       switch (sortBy) {
         case 'date_asc':
@@ -897,9 +938,9 @@ export default function Page() {
       const to = user.amEmail || 'info@youragency.com';
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
       const body = [
-        `Hello,`,
-        ``,
-        `I'm interested in this candidate:`,
+        'Hello,',
+        '',
+        "I'm interested in this candidate:",
         `• Name: ${c?.name || ''}`,
         `• Titles: ${c?.titles_csv || ''}`,
         `• Type of law: ${c?.law_csv || ''}`,
@@ -907,10 +948,10 @@ export default function Page() {
         `• Years: ${c?.years ?? ''}`,
         c?.contract && c?.hourly ? `• Contract: $${c.hourly}/hr` : '',
         c?.salary ? `• Salary: $${c.salary}` : '',
-        ``,
+        '',
         `My email: ${user.email || ''}`,
-        ``,
-        `Sent from Talent Connector`,
+        '',
+        'Sent from Talent Connector',
       ]
         .filter(Boolean)
         .join('\n');
@@ -919,406 +960,226 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    // Insights helpers
-    function groupAvg(items, key, valueKey) {
-      const acc = new Map();
-      for (const it of items) {
-        const k = (it[key] || '').trim();
-        const v = Number(it[valueKey]);
-        if (!k || !Number.isFinite(v) || v <= 0) continue;
-        const cur = acc.get(k) || { sum: 0, n: 0 };
-        cur.sum += v;
-        cur.n += 1;
-        acc.set(k, cur);
-      }
-      const rows = [];
-      for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
-      rows.sort((a, b) => b.avg - a.avg);
-      return rows.slice(0, 12);
-    }
-    const _csvKey = (k) => k + '_one';
-    function explodeCSVToRows(items, csvKey) {
-      const rows = [];
-      for (const it of items) {
-        const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
-        for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
-      }
-      return rows;
-    }
-
-    async function loadInsights() {
-      try {
-        const { data, error } = await supabase
-          .from('candidates')
-          .select('titles_csv,city,state,years,salary,hourly')
-          .limit(2000);
-        if (error) throw error;
-
-        const byTitleSalary = groupAvg(
-          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
-          'title_one',
-          'salary'
-        );
-        const byTitleHourly = groupAvg(
-          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
-          'title_one',
-          'hourly'
-        );
-        const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
-        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
-        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
-
-        const buckets = [
-          { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
-          { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
-          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
-          { label: '11-20 yrs', check: (y) => y >= 11 && y <= 20 },
-          { label: '21+ yrs', check: (y) => y >= 21 },
-        ];
-        const yearsAgg = [];
-        for (const b of buckets) {
-          const vals = data
-            .map((r) => Number(r.salary))
-            .filter((v, i) => {
-              const y = Number(data[i].years);
-              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
-            });
-          if (vals.length) {
-            yearsAgg.push({
-              label: b.label,
-              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
-              n: vals.length,
-            });
-          }
-        }
-
-        setInsights({
-          byTitleSalary,
-          byTitleHourly,
-          byCitySalary,
-          byCityHourly,
-          byYearsSalary: yearsAgg,
-        });
-        setShowInsights(true);
-      } catch (e) {
-        console.error(e);
-        alert('Failed to load insights.');
-      }
-    }
-
-    function BarChart({ title, rows, money = true }) {
-      const max = Math.max(...rows.map((r) => r.avg), 1);
-      return (
-        <Card style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {rows.map((r) => (
-              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
-                <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.label}
-                </div>
-                <div style={{ height: 12, background: '#111827', borderRadius: 999, overflow: 'hidden', border: '1px solid #1F2937' }}>
-                  <div
-                    style={{
-                      width: `${Math.round((r.avg / max) * 100)}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, #3B82F6, #06B6D4)',
-                    }}
-                  />
-                </div>
-                <div style={{ color: '#9CA3AF', textAlign: 'right', fontSize: 12 }}>
-                  {money ? `$${r.avg.toLocaleString()}` : r.avg.toLocaleString()}
-                </div>
-              </div>
-            ))}
-            {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
-          </div>
-        </Card>
-      );
-    }
-
-    // Build dropdown options
-    const yearsOptions = [
-      { label: 'Any', value: '' },
-      { label: '0–2 years', value: '0-2' },
-      { label: '3–5 years', value: '3-5' },
-      { label: '6–10 years', value: '6-10' },
-      { label: '11–20 years', value: '11-20' },
-      { label: '21+ years', value: '21-' },
-    ];
-
-    const salaryOptions = (() => {
-      const opts = [{ label: 'Any', value: '' }, { label: 'Under $40,000', value: '0-40000' }];
-      for (let start = 40000; start < 500000; start += 20000) {
-        const end = start + 20000;
-        if (end <= 500000) {
-          opts.push({ label: `$${(start/1000).toFixed(0)}k–$${(end/1000).toFixed(0)}k`, value: `${start}-${end}` });
-        }
-      }
-      opts.push({ label: '$500k+', value: '500000-' });
-      return opts;
-    })();
-
-    function InsightsView() {
-      if (!insights) return null;
-      return (
-        <div style={{ width: 'min(1150px, 100%)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-              Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
-              <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
-            </div>
-            <Button
-              onClick={() => setShowInsights(false)}
-              style={{ background: '#0B1220', border: '1px solid #1F2937' }}
-            >
-              Back to Results
-            </Button>
-          </div>
-
-          <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
-          <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
-          <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
-          <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
-          <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
-        </div>
-      );
-    }
-
     return (
       <div style={pageWrap}>
         <div style={overlay}>
-          {!showInsights ? (
-            <div style={{ width: 'min(1150px, 100%)' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 10,
-                }}
-              >
-                <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                  Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
-                  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+          <div style={{ width: 'min(1150px, 100%)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
+                  New today: <strong>{cCountToday}</strong>
+                </Tag>
+                <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+                  Log out
+                </Button>
+              </div>
+            </div>
+
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                <div>
+                  <Label>Keyword</Label>
+                  <Input
+                    placeholder="name, law, title, city/state"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
-                    New today: <strong>{cCountToday}</strong>
-                  </Tag>
-                  <Button
-                    onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+                <div>
+                  <Label>City</Label>
+                  <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {cities.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {states.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Title</Label>
+                  <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {titleOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Type of Law</Label>
+                  <select value={fLaw} onChange={(e) => setFLaw(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {lawOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Sort by</Label>
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+                    <option value="date_desc">Date (newest)</option>
+                    <option value="date_asc">Date (oldest)</option>
+                    <option value="salary_desc">Salary (high → low)</option>
+                    <option value="salary_asc">Salary (low → high)</option>
+                    <option value="hourly_desc">Hourly (high → low)</option>
+                    <option value="hourly_asc">Hourly (low → high)</option>
+                    <option value="years_desc">Years (high → low)</option>
+                    <option value="years_asc">Years (low → high)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Salary range</Label>
+                  <select
+                    value={salaryRange}
+                    onChange={(e) => setSalaryRange(e.target.value)}
+                    style={selectStyle}
                   >
-                    Compensation Insights
-                  </Button>
-                  <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
-                    Log out
-                  </Button>
+                    {SALARY_RANGES.map((r) => (
+                      <option key={r.key || 'any'} value={r.key}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Years of experience</Label>
+                  <select
+                    value={yearsRange}
+                    onChange={(e) => setYearsRange(e.target.value)}
+                    style={selectStyle}
+                  >
+                    {YEARS_RANGES.map((r) => (
+                      <option key={r.key || 'any'} value={r.key}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
+              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                <Button onClick={fetchClientRows}>Apply filters</Button>
+                <Button
+                  onClick={clearClientFilters}
+                  style={{ background: '#111827', border: '1px solid #1F2937' }}
+                >
+                  Clear filters
+                </Button>
+                {clientErr ? (
+                  <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
+                ) : null}
+              </div>
+            </Card>
 
-              <Card style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                  <div>
-                    <Label>Keyword</Label>
-                    <Input
-                      placeholder="name, law, title, city/state"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>City</Label>
-                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {cities.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>State</Label>
-                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {states.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Title</Label>
-                    <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {titleOptions.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Type of Law</Label>
-                    <select value={fLaw} onChange={(e) => setFLaw(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {lawOptions.map((l) => (
-                        <option key={l} value={l}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* NEW: Salary Range Dropdown */}
-                  <div>
-                    <Label>Salary range</Label>
-                    <select
-                      value={salaryRange}
-                      onChange={(e) => setSalaryRange(e.target.value)}
-                      style={selectStyle}
-                    >
-                      {salaryOptions.map((o) => (
-                        <option key={o.value || 'any-salary'} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* NEW: Years Range Dropdown */}
-                  <div>
-                    <Label>Years of experience</Label>
-                    <select
-                      value={yearsRange}
-                      onChange={(e) => setYearsRange(e.target.value)}
-                      style={selectStyle}
-                    >
-                      {yearsOptions.map((o) => (
-                        <option key={o.value || 'any-years'} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <Label>Sort by</Label>
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
-                      <option value="date_desc">Date (newest)</option>
-                      <option value="date_asc">Date (oldest)</option>
-                      <option value="salary_desc">Salary (high → low)</option>
-                      <option value="salary_asc">Salary (low → high)</option>
-                      <option value="hourly_desc">Hourly (high → low)</option>
-                      <option value="hourly_asc">Hourly (low → high)</option>
-                      <option value="years_desc">Years (high → low)</option>
-                      <option value="years_asc">Years (low → high)</option>
-                    </select>
-                  </div>
+            <Card style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
+              {clientRows.length === 0 ? (
+                <div style={{ color: '#9CA3AF', fontSize: 14 }}>
+                  {clientLoading ? 'Loading…' : 'No candidates match the filters.'}
                 </div>
-                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                  <Button onClick={fetchClientRows}>Apply filters</Button>
-                  <Button
-                    onClick={clearClientFilters}
-                    style={{ background: '#111827', border: '1px solid #1F2937' }}
-                  >
-                    Clear filters
-                  </Button>
-                  {clientErr ? (
-                    <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
-                  ) : null}
-                </div>
-              </Card>
-
-              <Card style={{ marginTop: 14 }}>
-                <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
-                {clientRows.length === 0 ? (
-                  <div style={{ color: '#9CA3AF', fontSize: 14 }}>
-                    {clientLoading ? 'Loading…' : 'No candidates match the filters.'}
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gap: 10 }}>
-                    {clientRows.map((c) => (
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {clientRows.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
+                    >
                       <div
-                        key={c.id}
-                        style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
+                          gap: 10,
+                          alignItems: 'center',
+                        }}
                       >
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
-                            gap: 10,
-                            alignItems: 'center',
-                          }}
-                        >
-                          <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
-                            {c.name}
-                            <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
-                              {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
-                            </div>
-                          </div>
-                          <div style={{ color: '#9CA3AF' }}>
-                            {c.city || '—'}, {c.state || '—'}
-                          </div>
-                          <div style={{ color: '#E5E7EB' }}>
-                            {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                            {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
-                          </div>
-                          <div style={{ color: '#9CA3AF' }}>
-                            {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
-                          </div>
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            <Button
-                              onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                              style={{ background: '#111827', border: '1px solid #1F2937' }}
-                            >
-                              Additional information
-                            </Button>
-                            <a
-                              href={buildMailto(c)}
-                              style={{
-                                display: 'inline-block',
-                                padding: '10px 14px',
-                                borderRadius: 10,
-                                border: '1px solid #243041',
-                                background: '#2563EB',
-                                color: 'white',
-                                fontWeight: 600,
-                                textDecoration: 'none',
-                              }}
-                            >
-                              Email for more information
-                            </a>
+                        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                          {c.name}
+                          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+                            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
                           </div>
                         </div>
-                        {expandedId === c.id && (
-                          <div
+                        <div style={{ color: '#9CA3AF' }}>
+                          {c.city || '—'}, {c.state || '—'}
+                        </div>
+                        <div style={{ color: '#E5E7EB' }}>
+                          {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
+                          {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <Button
+                            onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                          >
+                            Additional information
+                          </Button>
+                          <a
+                            href={buildMailto(c)}
                             style={{
-                              marginTop: 10,
-                              padding: 10,
+                              display: 'inline-block',
+                              padding: '10px 14px',
                               borderRadius: 10,
-                              border: '1px solid #1F2937',
-                              background: '#0F172A',
-                              color: '#CBD5E1',
-                              fontSize: 14,
+                              border: '1px solid #243041',
+                              background: '#2563EB',
+                              color: 'white',
+                              fontWeight: 600,
+                              textDecoration: 'none',
                             }}
                           >
-                            {c.notes ? c.notes : <i>No additional notes.</i>}
-                          </div>
-                        )}
+                            Email for more information
+                          </a>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </div>
-          ) : (
-            <InsightsView />
-          )}
+                      {expandedId === c.id && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            padding: 10,
+                            borderRadius: 10,
+                            border: '1px solid #1F2937',
+                            background: '#0F172A',
+                            color: '#CBD5E1',
+                            fontSize: 14,
+                          }}
+                        >
+                          {c.notes ? c.notes : <i>No additional notes.</i>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
     );
