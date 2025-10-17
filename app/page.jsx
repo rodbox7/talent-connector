@@ -339,7 +339,7 @@ export default function Page() {
 
   // Insights view
   const [showInsights, setShowInsights] = React.useState(false);
-  const [insights, setInsights] = React.useState(null); // { byTitleSalary, byTitleHourly, byCitySalary, byCityHourly, byYearsSalary }
+  const [insights, setInsights] = React.useState(null); // { avgSalaryByTitle, avgHourlyByTitle, avgSalaryByCity, avgHourlyByCity, avgSalaryByYears }
 
   const todayStartIso = React.useMemo(() => {
     const d = new Date();
@@ -911,24 +911,25 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    /* ====== Dual-slider CSS ====== */
+    /* ====== Dual-slider CSS (UPDATED) ====== */
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
         position:absolute; left:0; right:0; top:0; height:18px; margin:0; outline:none;
-        pointer-events:auto; touch-action:none;
+        pointer-events:none;            /* input ignores events */
+        touch-action:none;              /* prevent page scroll while dragging */
       }
       .dual-range::-webkit-slider-runnable-track { background:transparent; }
       .dual-range::-moz-range-track { background:transparent; }
       .dual-range::-webkit-slider-thumb{
-        -webkit-appearance:none; width:18px; height:18px; margin-top:0;
+        -webkit-appearance:none; width:18px; height:18px;
         border-radius:999px; background:#22d3ee; border:2px solid #0b0b0b;
-        pointer-events:auto;
+        pointer-events:auto;            /* thumb gets events */
       }
       .dual-range::-moz-range-thumb{
         width:18px; height:18px; border-radius:999px;
         background:#22d3ee; border:2px solid #0b0b0b;
-        pointer-events:auto;
+        pointer-events:auto;            /* thumb gets events */
       }
     `;
 
@@ -951,16 +952,17 @@ export default function Page() {
       const rows = [];
       for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
       rows.sort((a, b) => b.avg - a.avg);
-      return rows.slice(0, 12); // top 12
+      return rows.slice(0, 12); // top 12 for readability
     }
-    function explodeCSVToRows(items, csvKey) {
+    function explodeCSVToRows(items, csvKey, valueKey) {
       const rows = [];
       for (const it of items) {
         const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
-        for (const r of raw) rows.push({ ...it, [csvKey + '_one']: r });
+        for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
       }
       return rows;
     }
+    const _csvKey = (k) => k + '_one';
 
     async function loadInsights() {
       try {
@@ -971,12 +973,18 @@ export default function Page() {
         if (error) throw error;
 
         const byTitleSalary = groupAvg(
-          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r.titles_csv_one })),
+          explodeCSVToRows(data, 'titles_csv', 'salary').map((r) => ({
+            ...r,
+            title_one: r[_csvKey('titles_csv')],
+          })),
           'title_one',
           'salary'
         );
         const byTitleHourly = groupAvg(
-          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r.titles_csv_one })),
+          explodeCSVToRows(data, 'titles_csv', 'hourly').map((r) => ({
+            ...r,
+            title_one: r[_csvKey('titles_csv')],
+          })),
           'title_one',
           'hourly'
         );
@@ -1026,7 +1034,7 @@ export default function Page() {
       }
     }
 
-    // Bar chart (CSS-only)
+    // Bar chart component (CSS only)
     function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
       return (
@@ -1058,10 +1066,8 @@ export default function Page() {
       );
     }
 
-    /* ===== SMOOTH DRAG SLIDERS (updated) ===== */
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
-      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
       const sel = {
@@ -1074,18 +1080,14 @@ export default function Page() {
         borderRadius: 999,
         pointerEvents: 'none',
       };
-
       const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow = (v) => setMinSalary(Math.min(clamp(v), maxSalary - step));
-      const onHigh = (v) => setMaxSalary(Math.max(clamp(v), minSalary + step));
-
-      const zLow  = active === 'low'  ? 7 : 6;
-      const zHigh = active === 'high' ? 7 : 6;
+      const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary - step));
+      const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary + step));
 
       return (
         <div>
           <Label>Salary range</Label>
-          <div style={{ position: 'relative', height: 18 }}>
+          <div style={trackBase}>
             <div style={rail} />
             <div style={sel} />
             <input
@@ -1095,13 +1097,9 @@ export default function Page() {
               max={max}
               step={step}
               value={minSalary}
-              onChange={(e) => onLow(+e.target.value)}
-              onInput={(e) => onLow(+e.target.value)}
-              onMouseDown={() => setActive('low')}
-              onTouchStart={() => setActive('low')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zLow, pointerEvents: 'auto', touchAction: 'none' }}
+              onChange={onLow}
+              onInput={onLow}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: 3, pointerEvents: 'none' }}
             />
             <input
               className="dual-range"
@@ -1110,13 +1108,9 @@ export default function Page() {
               max={max}
               step={step}
               value={maxSalary}
-              onChange={(e) => onHigh(+e.target.value)}
-              onInput={(e) => onHigh(+e.target.value)}
-              onMouseDown={() => setActive('high')}
-              onTouchStart={() => setActive('high')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zHigh, pointerEvents: 'auto', touchAction: 'none' }}
+              onChange={onHigh}
+              onInput={onHigh}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: 4, pointerEvents: 'none' }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -1130,7 +1124,6 @@ export default function Page() {
 
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
-      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
       const pct = (v) => ((v - min) / (max - min)) * 100;
 
       const sel = {
@@ -1143,18 +1136,14 @@ export default function Page() {
         borderRadius: 999,
         pointerEvents: 'none',
       };
-
       const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow = (v) => setMinYears(Math.min(clamp(v), maxYears - step));
-      const onHigh = (v) => setMaxYears(Math.max(clamp(v), minYears + step));
-
-      const zLow  = active === 'low'  ? 7 : 6;
-      const zHigh = active === 'high' ? 7 : 6;
+      const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears - step));
+      const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears + step));
 
       return (
         <div>
           <Label>Years of experience</Label>
-          <div style={{ position: 'relative', height: 18 }}>
+          <div style={trackBase}>
             <div style={rail} />
             <div style={sel} />
             <input
@@ -1164,13 +1153,9 @@ export default function Page() {
               max={max}
               step={step}
               value={minYears}
-              onChange={(e) => onLow(+e.target.value)}
-              onInput={(e) => onLow(+e.target.value)}
-              onMouseDown={() => setActive('low')}
-              onTouchStart={() => setActive('low')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zLow, pointerEvents: 'auto', touchAction: 'none' }}
+              onChange={onLow}
+              onInput={onLow}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: 3, pointerEvents: 'none' }}
             />
             <input
               className="dual-range"
@@ -1179,13 +1164,9 @@ export default function Page() {
               max={max}
               step={step}
               value={maxYears}
-              onChange={(e) => onHigh(+e.target.value)}
-              onInput={(e) => onHigh(+e.target.value)}
-              onMouseDown={() => setActive('high')}
-              onTouchStart={() => setActive('high')}
-              onMouseUp={() => setActive(null)}
-              onTouchEnd={() => setActive(null)}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zHigh, pointerEvents: 'auto', touchAction: 'none' }}
+              onChange={onHigh}
+              onInput={onHigh}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: 4, pointerEvents: 'none' }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -1197,7 +1178,7 @@ export default function Page() {
       );
     }
 
-    // Insights View UI
+    // Bar charts & insights view omitted for brevity (unchanged above)
     function InsightsView() {
       if (!insights) return null;
       return (
