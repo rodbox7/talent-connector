@@ -1180,7 +1180,7 @@ export default function Page() {
             </div>
             <Button
               onClick={() => setShowInsights(false)}
-              style={{ background: '#0B1220', border: '1px solid '#1F2937' }}
+              style={{ background: '#0B1220', border: '1px solid #1F2937' }}
             >
               Back to Results
             </Button>
