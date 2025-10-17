@@ -710,7 +710,7 @@ export default function Page() {
                       <div
                         key={c.id}
                         style={{
-                          border: '1px solid '#1F2937',
+                          border: '1px solid #1F2937',
                           borderRadius: 12,
                           padding: 12,
                           background: '#0B1220',
@@ -930,118 +930,130 @@ export default function Page() {
       }
     `;
 
-    
-function SalarySlider() {
-  const min = 0, max = 400000, step = 5000;
-  const pct = (v) => ((v - min) / (max - min)) * 100;
-
-  const sel = {
-    position: 'absolute',
-    top: 7,
-    left: `${pct(minSalary)}%`,
-    right: `${100 - pct(maxSalary)}%`,
-    height: 4,
-    background: '#4F46E5',
-    borderRadius: 999,
-    pointerEvents: 'none',
-  };
-
-  const clamp = (v) => Math.min(max, Math.max(min, v));
-  const onLow = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary - step));
-  const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary + step));
-
-  return (
-    <div>
-      <Label>Salary range</Label>
-      <div style={trackBase}>
-        <div style={rail} />
-        <div style={sel} />
-        <input
-          className="dual-range"
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={minSalary}
-          onChange={onLow}
-          style={{ zIndex: 3 }}
-        />
-        <input
-          className="dual-range"
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={maxSalary}
-          onChange={onHigh}
-          style={{ zIndex: 4 }}
-        />
-        <style>{sliderCss}</style>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
-        <span>${minSalary.toLocaleString()}</span>
-        <span>${maxSalary.toLocaleString()}</span>
-      </div>
-    </div>
-  );
-}
-``
-
-    
-function YearsSlider() {
-  const min = 0, max = 50, step = 1;
-  const pct = (v) => ((v - min) / (max - min)) * 100;
-
-  const sel = {
-    position: 'absolute',
-    top: 7,
-    left: `${pct(minYears)}%`,
-    right: `${100 - pct(maxYears)}%`,
-    height: 4,
-    background: '#4F46E5',
-    borderRadius: 999,
-    pointerEvents: 'none',
-  };
-
-  const clamp = (v) => Math.min(max, Math.max(min, v));
-  const onLow = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears - step));
-  const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears + step));
-
-  return (
-    <div>
-      <Label>Years of experience</Label>
-      <div style={trackBase}>
-        <div style={rail} />
-        <div style={sel} />
-        <input
-          className="dual-range"
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={minYears}
-          onChange={onLow}
-          style={{ zIndex: 3 }}
-        />
-        <input
-          className="dual-range"
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={maxYears}
-          onChange={onHigh}
-          style={{ zIndex: 4 }}
-        />
-        <style>{sliderCss}</style>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
-        <span>{minYears} yrs</span>
-        <span>{maxYears} yrs</span>
-      </div>
-    </div>
-  );
-}
+    function SalarySlider() {
+      const min = 0,
+        max = 400000,
+        step = 5000;
+      const pct = (v) => ((v - min) / (max - min)) * 100;
+      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
+      const sel = {
+        position: 'absolute',
+        top: 0,
+        left: `${pct(minSalary)}%`,
+        right: `${100 - pct(maxSalary)}%`,
+        height: 4,
+        background: '#4F46E5',
+        borderRadius: 999,
+        pointerEvents: 'none',
+      };
+      function clamp(v) {
+        return Math.min(max, Math.max(min, v));
+      }
+      function onLow(e) {
+        const val = clamp(Number(e.target.value));
+        setMinSalary(Math.min(val, maxSalary));
+      }
+      function onHigh(e) {
+        const val = clamp(Number(e.target.value));
+        setMaxSalary(Math.max(val, minSalary));
+      }
+      return (
+        <div>
+          <Label>Salary range</Label>
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={track} />
+            <div style={sel} />
+            <input
+              className="dual-range low"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minSalary}
+              onChange={onLow}
+              onInput={onLow}
+            />
+            <input
+              className="dual-range high"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxSalary}
+              onChange={onHigh}
+              onInput={onHigh}
+            />
+            <style>{sliderCss}</style>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
+            <span>${minSalary.toLocaleString()}</span>
+            <span>${maxSalary.toLocaleString()}</span>
+          </div>
+        </div>
+      );
+    }
+    function YearsSlider() {
+      const min = 0,
+        max = 50,
+        step = 1;
+      const pct = (v) => ((v - min) / (max - min)) * 100;
+      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
+      const sel = {
+        position: 'absolute',
+        top: 0,
+        left: `${pct(minYears)}%`,
+        right: `${100 - pct(maxYears)}%`,
+        height: 4,
+        background: '#4F46E5',
+        borderRadius: 999,
+        pointerEvents: 'none',
+      };
+      function clamp(v) {
+        return Math.min(max, Math.max(min, v));
+      }
+      function onLow(e) {
+        const val = clamp(Number(e.target.value));
+        setMinYears(Math.min(val, maxYears));
+      }
+      function onHigh(e) {
+        const val = clamp(Number(e.target.value));
+        setMaxYears(Math.max(val, minYears));
+      }
+      return (
+        <div>
+          <Label>Years of experience</Label>
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={track} />
+            <div style={sel} />
+            <input
+              className="dual-range low"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minYears}
+              onChange={onLow}
+              onInput={onLow}
+            />
+            <input
+              className="dual-range high"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxYears}
+              onChange={onHigh}
+              onInput={onHigh}
+            />
+            <style>{sliderCss}</style>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
+            <span>{minYears} yrs</span>
+            <span>{maxYears} yrs</span>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={pageWrap}>
@@ -1064,7 +1076,6 @@ function YearsSlider() {
                   New today: <strong>{cCountToday}</strong>
                 </Tag>
 
-                {/* NEW: link to the Insights page */}
                 <Link href="/client/insights">
                   <Button style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
                     Compensation Insights
