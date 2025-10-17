@@ -339,15 +339,7 @@ export default function Page() {
 
   // Insights view
   const [showInsights, setShowInsights] = React.useState(false);
-  const [insights, setInsights] = React.useState(null);
-  // {
-  //   byTitleSalary, byTitleHourly,
-  //   byCitySalary, byCityHourly,
-  //   byYearsSalary,
-  //   byTitleStateSalary, byTitleStateHourly,
-  //   byLawSalary, byLawHourly,
-  //   distByState
-  // }
+  const [insights, setInsights] = React.useState(null); // { byTitleSalary, byTitleHourly, byCitySalary, byCityHourly, byYearsSalary }
 
   const todayStartIso = React.useMemo(() => {
     const d = new Date();
@@ -923,11 +915,13 @@ export default function Page() {
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
-        position:absolute; left:0; right:0; top:7px; height:4px; margin:0; outline:none;
-        pointer-events:none; touch-action:none;
+        position:absolute; left:0; right:0; top:0; height:18px; margin:0; outline:none;
+        pointer-events:auto; touch-action:none;
       }
+      .dual-range::-webkit-slider-runnable-track { background:transparent; }
+      .dual-range::-moz-range-track { background:transparent; }
       .dual-range::-webkit-slider-thumb{
-        -webkit-appearance:none; width:18px; height:18px; margin-top:-7px;
+        -webkit-appearance:none; width:18px; height:18px; margin-top:0;
         border-radius:999px; background:#22d3ee; border:2px solid #0b0b0b;
         pointer-events:auto;
       }
@@ -957,54 +951,35 @@ export default function Page() {
       const rows = [];
       for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
       rows.sort((a, b) => b.avg - a.avg);
-      return rows.slice(0, 12); // top 12 for readability
-    }
-    function groupCount(items, key) {
-      const acc = new Map();
-      for (const it of items) {
-        const k = (it[key] || '').trim();
-        if (!k) continue;
-        acc.set(k, (acc.get(k) || 0) + 1);
-      }
-      const rows = Array.from(acc.entries()).map(([label, count]) => ({ label, count }));
-      rows.sort((a, b) => b.count - a.count);
-      return rows;
+      return rows.slice(0, 12); // top 12
     }
     function explodeCSVToRows(items, csvKey) {
-      const out = [];
+      const rows = [];
       for (const it of items) {
-        const vals = String(it[csvKey] || '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (vals.length === 0) continue;
-        for (const v of vals) out.push({ ...it, [_csvKey(csvKey)]: v });
+        const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
+        for (const r of raw) rows.push({ ...it, [csvKey + '_one']: r });
       }
-      return out;
+      return rows;
     }
-    const _csvKey = (k) => k + '_one';
 
     async function loadInsights() {
       try {
         const { data, error } = await supabase
           .from('candidates')
-          .select('titles_csv,law_csv,city,state,years,salary,hourly')
+          .select('titles_csv,city,state,years,salary,hourly')
           .limit(2000);
         if (error) throw error;
 
-        // explode titles & law (CSV -> one per row)
-        const titlesExploded = explodeCSVToRows(data, 'titles_csv').map((r) => ({
-          ...r,
-          title_one: r[_csvKey('titles_csv')],
-        }));
-        const lawExploded = explodeCSVToRows(data, 'law_csv').map((r) => ({
-          ...r,
-          law_one: r[_csvKey('law_csv')],
-        }));
-
-        // Existing summaries
-        const byTitleSalary = groupAvg(titlesExploded, 'title_one', 'salary');
-        const byTitleHourly = groupAvg(titlesExploded, 'title_one', 'hourly');
+        const byTitleSalary = groupAvg(
+          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r.titles_csv_one })),
+          'title_one',
+          'salary'
+        );
+        const byTitleHourly = groupAvg(
+          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r.titles_csv_one })),
+          'title_one',
+          'hourly'
+        );
 
         const withCityState = data.map((r) => ({
           ...r,
@@ -1013,7 +988,6 @@ export default function Page() {
         const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
         const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
 
-        // Years buckets -> average salary
         const buckets = [
           { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
           { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
@@ -1038,38 +1012,12 @@ export default function Page() {
           }
         }
 
-        // NEW: Title × State averages (salary/hourly)
-        const titlesWithState = titlesExploded
-          .filter((r) => (r.state || '').trim().length > 0)
-          .map((r) => ({ ...r, title_state: `${r.title_one} — ${r.state.trim()}` }));
-        const byTitleStateSalary = groupAvg(titlesWithState, 'title_state', 'salary');
-        const byTitleStateHourly = groupAvg(titlesWithState, 'title_state', 'hourly');
-
-        // NEW: Specialty (Type of Law) averages (salary/hourly)
-        const byLawSalary = groupAvg(lawExploded, 'law_one', 'salary');
-        const byLawHourly = groupAvg(lawExploded, 'law_one', 'hourly');
-
-        // NEW: Distribution by State (for pie)
-        const distRaw = groupCount(data, 'state');
-        const topN = 8;
-        const top = distRaw.slice(0, topN);
-        const others = distRaw.slice(topN);
-        const othersTotal = others.reduce((a, c) => a + c.count, 0);
-        const distByState = othersTotal
-          ? [...top, { label: 'Other', count: othersTotal }]
-          : top;
-
         setInsights({
           byTitleSalary,
           byTitleHourly,
           byCitySalary,
           byCityHourly,
           byYearsSalary: yearsAgg,
-          byTitleStateSalary,
-          byTitleStateHourly,
-          byLawSalary,
-          byLawHourly,
-          distByState,
         });
         setShowInsights(true);
       } catch (e) {
@@ -1078,7 +1026,7 @@ export default function Page() {
       }
     }
 
-    // Bar chart component (CSS only)
+    // Bar chart (CSS-only)
     function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
       return (
@@ -1086,7 +1034,7 @@ export default function Page() {
           <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
           <div style={{ display: 'grid', gap: 8 }}>
             {rows.map((r) => (
-              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '220px 1fr 80px', gap: 10, alignItems: 'center' }}>
+              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
                 <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {r.label}
                 </div>
@@ -1110,64 +1058,11 @@ export default function Page() {
       );
     }
 
-    // Simple pie via CSS conic-gradient
-    function PieChart({ title, rows }) {
-      const total = rows.reduce((a, c) => a + c.count, 0) || 1;
-      const colors = [
-        '#60A5FA','#34D399','#F59E0B','#F472B6','#A78BFA',
-        '#22D3EE','#F87171','#C084FC','#4ADE80','#FCD34D',
-        '#FB7185','#38BDF8',
-      ];
-      let start = 0;
-      const segments = rows.map((r, i) => {
-        const angle = (r.count / total) * 360;
-        const end = start + angle;
-        const seg = { color: colors[i % colors.length], start, end, label: r.label, count: r.count };
-        start = end;
-        return seg;
-      });
-      const gradient = segments
-        .map((s) => `${s.color} ${s.start.toFixed(2)}deg ${s.end.toFixed(2)}deg`)
-        .join(', ');
-
-      return (
-        <Card style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 12 }}>{title}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, alignItems: 'center' }}>
-            <div
-              style={{
-                width: 180,
-                height: 180,
-                borderRadius: '50%',
-                background: `conic-gradient(${gradient})`,
-                justifySelf: 'center',
-                boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset',
-              }}
-            />
-            <div style={{ display: 'grid', gap: 6 }}>
-              {segments.map((s, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, display: 'inline-block' }} />
-                  <span style={{ color: '#E5E7EB' }}>{s.label}</span>
-                  <span style={{ color: '#9CA3AF', marginLeft: 'auto', fontSize: 12 }}>
-                    {Math.round((s.count / total) * 100)}%
-                  </span>
-                </div>
-              ))}
-              {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
-            </div>
-          </div>
-        </Card>
-      );
-    }
-
+    /* ===== SMOOTH DRAG SLIDERS (updated) ===== */
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
+      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
       const pct = (v) => ((v - min) / (max - min)) * 100;
-
-      const lowOnTop = maxSalary - minSalary <= step * 3;
-      const zLow  = lowOnTop ? 7 : 6;
-      const zHigh = lowOnTop ? 6 : 7;
 
       const sel = {
         position: 'absolute',
@@ -1179,15 +1074,19 @@ export default function Page() {
         borderRadius: 999,
         pointerEvents: 'none',
       };
+
       const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
-      const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
+      const onLow = (v) => setMinSalary(Math.min(clamp(v), maxSalary - step));
+      const onHigh = (v) => setMaxSalary(Math.max(clamp(v), minSalary + step));
+
+      const zLow  = active === 'low'  ? 7 : 6;
+      const zHigh = active === 'high' ? 7 : 6;
 
       return (
         <div>
           <Label>Salary range</Label>
           <div style={{ position: 'relative', height: 18 }}>
-            <div style={{ position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 }} />
+            <div style={rail} />
             <div style={sel} />
             <input
               className="dual-range"
@@ -1196,9 +1095,13 @@ export default function Page() {
               max={max}
               step={step}
               value={minSalary}
-              onChange={onLow}
-              onInput={onLow}
-              style={{ zIndex: zLow }}
+              onChange={(e) => onLow(+e.target.value)}
+              onInput={(e) => onLow(+e.target.value)}
+              onMouseDown={() => setActive('low')}
+              onTouchStart={() => setActive('low')}
+              onMouseUp={() => setActive(null)}
+              onTouchEnd={() => setActive(null)}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zLow, pointerEvents: 'auto', touchAction: 'none' }}
             />
             <input
               className="dual-range"
@@ -1207,9 +1110,13 @@ export default function Page() {
               max={max}
               step={step}
               value={maxSalary}
-              onChange={onHigh}
-              onInput={onHigh}
-              style={{ zIndex: zHigh }}
+              onChange={(e) => onHigh(+e.target.value)}
+              onInput={(e) => onHigh(+e.target.value)}
+              onMouseDown={() => setActive('high')}
+              onTouchStart={() => setActive('high')}
+              onMouseUp={() => setActive(null)}
+              onTouchEnd={() => setActive(null)}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zHigh, pointerEvents: 'auto', touchAction: 'none' }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -1223,11 +1130,8 @@ export default function Page() {
 
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
+      const [active, setActive] = React.useState(null); // 'low' | 'high' | null
       const pct = (v) => ((v - min) / (max - min)) * 100;
-
-      const lowOnTop = maxYears - minYears <= step * 2;
-      const zLow  = lowOnTop ? 7 : 6;
-      const zHigh = lowOnTop ? 6 : 7;
 
       const sel = {
         position: 'absolute',
@@ -1239,15 +1143,19 @@ export default function Page() {
         borderRadius: 999,
         pointerEvents: 'none',
       };
+
       const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
-      const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
+      const onLow = (v) => setMinYears(Math.min(clamp(v), maxYears - step));
+      const onHigh = (v) => setMaxYears(Math.max(clamp(v), minYears + step));
+
+      const zLow  = active === 'low'  ? 7 : 6;
+      const zHigh = active === 'high' ? 7 : 6;
 
       return (
         <div>
           <Label>Years of experience</Label>
           <div style={{ position: 'relative', height: 18 }}>
-            <div style={{ position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 }} />
+            <div style={rail} />
             <div style={sel} />
             <input
               className="dual-range"
@@ -1256,9 +1164,13 @@ export default function Page() {
               max={max}
               step={step}
               value={minYears}
-              onChange={onLow}
-              onInput={onLow}
-              style={{ zIndex: zLow }}
+              onChange={(e) => onLow(+e.target.value)}
+              onInput={(e) => onLow(+e.target.value)}
+              onMouseDown={() => setActive('low')}
+              onTouchStart={() => setActive('low')}
+              onMouseUp={() => setActive(null)}
+              onTouchEnd={() => setActive(null)}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zLow, pointerEvents: 'auto', touchAction: 'none' }}
             />
             <input
               className="dual-range"
@@ -1267,9 +1179,13 @@ export default function Page() {
               max={max}
               step={step}
               value={maxYears}
-              onChange={onHigh}
-              onInput={onHigh}
-              style={{ zIndex: zHigh }}
+              onChange={(e) => onHigh(+e.target.value)}
+              onInput={(e) => onHigh(+e.target.value)}
+              onMouseDown={() => setActive('high')}
+              onTouchStart={() => setActive('high')}
+              onMouseUp={() => setActive(null)}
+              onTouchEnd={() => setActive(null)}
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, zIndex: zHigh, pointerEvents: 'auto', touchAction: 'none' }}
             />
             <style>{sliderCss}</style>
           </div>
@@ -1299,19 +1215,11 @@ export default function Page() {
             </Button>
           </div>
 
-          {/* Existing */}
           <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
           <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
           <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
           <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
-
-          {/* NEW */}
-          <BarChart title="Avg Salary by Title × State" rows={insights.byTitleStateSalary} money />
-          <BarChart title="Avg Hourly by Title × State" rows={insights.byTitleStateHourly} money />
-          <BarChart title="Avg Salary by Specialty (Type of Law)" rows={insights.byLawSalary} money />
-          <BarChart title="Avg Hourly by Specialty (Type of Law)" rows={insights.byLawHourly} money />
-          <PieChart title="Candidate Distribution by State" rows={insights.distByState} />
         </div>
       );
     }
@@ -1729,7 +1637,7 @@ const selectStyle = {
   width: '100%',
   padding: '10px 12px',
   borderRadius: 10,
-  border: '1px solid #1F2937', // <-- fixed quotes here
+  border: '1px solid #1F2937',
   background: '#0F172A',
   color: '#E5E7EB',
   outline: 'none',
