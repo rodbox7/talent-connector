@@ -360,41 +360,35 @@ export default function Page() {
   }, [user, todayStartIso]);
 
   React.useEffect(() => {
-    if (user?.role !== 'client') return;
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('candidates')
-          .select('city,state,titles_csv,law_csv')
-          .limit(1000);
-        if (error) throw error;
-        const cset = new Set(),
-          sset = new Set(),
-          tset = new Set(),
-          lset = new Set();
-        for (const r of data || []) {
-          if (r.city) cset.add(r.city.trim());
-          if (r.state) sset.add(r.state.trim());
-          (r.titles_csv || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean)
-            .forEach((x) => tset.add(x));
-          (r.law_csv || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean)
-            .forEach((x) => lset.add(x));
-        }
-        setCities([...cset].sort());
-        setStates([...sset].sort());
-        setTitleOptions([...tset].sort());
-        setLawOptions([...lset].sort());
-      } catch (e) {
-        console.error(e);
+  if (user?.role !== 'client') return;
+
+  (async () => {
+    try {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0); // start of today in local time
+      const iso = d.toISOString();
+
+      // Count candidates where:
+      //  - date_entered >= today
+      //  - OR (date_entered IS NULL AND created_at >= today)
+      const { count, error } = await supabase
+        .from('candidates')
+        .select('id', { count: 'exact', head: true })
+        .or(`date_entered.gte.${iso},and(date_entered.is.null,created_at.gte.${iso})`);
+
+      if (error) {
+        console.error('Count error:', error);
+        setCCountToday(0);
+        return;
       }
-    })();
-  }, [user]);
+
+      setCCountToday(count || 0);
+    } catch (e) {
+      console.error('Count exception:', e);
+      setCCountToday(0);
+    }
+  })();
+}, [user]);
 
   // Helper to parse "min-max" or "min-" strings into numbers (or null)
   function parseRange(val) {
