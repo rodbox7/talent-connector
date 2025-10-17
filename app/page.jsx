@@ -1051,7 +1051,6 @@ export default function Page() {
 
         // NEW: Distribution by State (for pie)
         const distRaw = groupCount(data, 'state');
-        // compress long tails to "Other" for readability
         const topN = 8;
         const top = distRaw.slice(0, topN);
         const others = distRaw.slice(topN);
@@ -1114,7 +1113,6 @@ export default function Page() {
     // Simple pie via CSS conic-gradient
     function PieChart({ title, rows }) {
       const total = rows.reduce((a, c) => a + c.count, 0) || 1;
-      // palette
       const colors = [
         '#60A5FA','#34D399','#F59E0B','#F472B6','#A78BFA',
         '#22D3EE','#F87171','#C084FC','#4ADE80','#FCD34D',
@@ -1731,7 +1729,7 @@ const selectStyle = {
   width: '100%',
   padding: '10px 12px',
   borderRadius: 10,
-  border: '1px solid '#1F2937',
+  border: '1px solid #1F2937', // <-- fixed quotes here
   background: '#0F172A',
   color: '#E5E7EB',
   outline: 'none',
