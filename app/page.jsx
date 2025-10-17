@@ -1,51 +1,12 @@
 'use client';
 import React from 'react';
 import Link from 'next/link';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
-/**
- * Compensation Insights
- * - No extra deps (pure React + SVG)
- * - Pulls from public.candidates (titles_csv, law_csv, city/state, salary, hourly, years)
- * - Filters: Location (City, State), Title, Practice Area
- * - Charts:
- *    1) Avg Salary by Title (scoped to selected Location, else overall)
- *    2) Avg Hourly by Title (scoped to selected Location, else overall)
- *    3) Avg Salary by Practice Area (scoped to selected Location, else overall)
- *    4) Avg Hourly by Practice Area (scoped to selected Location, else overall)
- *    5) Pie: Candidate distribution by State (or City if preferred)
- */
+const NYC =
+  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
-const PageWrap = ({ children }) => (
-  <div
-    style={{
-      minHeight: '100vh',
-      width: '100%',
-      backgroundImage:
-        "url('https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg')",
-      backgroundPosition: 'center',
-      backgroundSize: 'cover',
-      backgroundAttachment: 'fixed',
-    }}
-  >
-    <div
-      style={{
-        minHeight: '100vh',
-        width: '100%',
-        backdropFilter: 'blur(1px)',
-        background:
-          'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 16%, rgba(0,0,0,0.75) 100%)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: '32px 16px',
-      }}
-    >
-      <div style={{ width: 'min(1200px, 100%)' }}>{children}</div>
-    </div>
-  </div>
-);
-
+/* ---------- Small UI helpers ---------- */
 const Card = ({ children, style }) => (
   <div
     style={{
@@ -66,8 +27,8 @@ const Label = ({ children }) => (
   <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 6 }}>{children}</div>
 );
 
-const Select = (props) => (
-  <select
+const Input = (props) => (
+  <input
     {...props}
     style={{
       width: '100%',
@@ -77,7 +38,24 @@ const Select = (props) => (
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      ...(props.style || {}),
+      ...props.style,
+    }}
+  />
+);
+
+const TextArea = (props) => (
+  <textarea
+    {...props}
+    style={{
+      width: '100%',
+      minHeight: 120,
+      padding: '10px 12px',
+      borderRadius: 10,
+      border: '1px solid #1F2937',
+      background: '#0F172A',
+      color: '#E5E7EB',
+      outline: 'none',
+      ...props.style,
     }}
   />
 );
@@ -100,374 +78,1398 @@ const Button = ({ children, ...rest }) => (
   </button>
 );
 
-/* ---------------- helpers ---------------- */
+const Tag = ({ children, style }) => (
+  <span
+    style={{
+      display: 'inline-block',
+      padding: '4px 10px',
+      borderRadius: 999,
+      background: '#111827',
+      border: '1px solid #1F2937',
+      fontSize: 12,
+      color: '#E5E7EB',
+      ...style,
+    }}
+  >
+    {children}
+  </span>
+);
 
-function splitCSV(s = '') {
-  return String(s || '')
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-function fmtMoney(n) {
-  if (n == null || isNaN(n)) return '—';
-  return `$${Math.round(n).toLocaleString()}`;
-}
-function average(arr) {
-  const vals = arr.filter((v) => v != null && !isNaN(v));
-  if (!vals.length) return null;
-  return vals.reduce((a, b) => a + b, 0) / vals.length;
-}
-function groupAvg(rows, keyFn, valueFn) {
-  const map = new Map();
-  for (const r of rows) {
-    const k = keyFn(r);
-    if (!k) continue;
-    const v = valueFn(r);
-    if (v == null || isNaN(v)) continue;
-    if (!map.has(k)) map.set(k, []);
-    map.get(k).push(v);
-  }
-  return Array.from(map.entries())
-    .map(([k, arr]) => ({ key: k, avg: average(arr) }))
-    .filter((x) => x.avg != null)
-    .sort((a, b) => b.avg - a.avg);
-}
-
-function useCandidates() {
-  const [rows, setRows] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
+/* ---------- Page ---------- */
+export default function Page() {
+  const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
+  const [email, setEmail] = React.useState('');
+  const [pwd, setPwd] = React.useState('');
   const [err, setErr] = React.useState('');
+  const [user, setUser] = React.useState(null);
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErr('');
-        const { data, error } = await supabase
-          .from('candidates')
-          .select(
-            'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at'
-          )
-          .limit(5000);
-        if (error) throw error;
-        setRows(data || []);
-      } catch (e) {
-        console.error(e);
-        setErr('Error loading compensation data.');
+  async function login() {
+    try {
+      setErr('');
+      if (!email || !pwd) {
+        setErr('Enter email & password.');
+        return;
       }
-      setLoading(false);
-    })();
+      const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: pwd,
+      });
+      if (authErr) throw authErr;
+
+      const { data: prof, error: profErr } = await supabase
+        .from('profiles')
+        .select('id,email,role,org,account_manager_email')
+        .eq('id', auth.user.id)
+        .single();
+
+      if (profErr || !prof) {
+        setErr('Login ok, but profile not found.');
+        return;
+      }
+      if (prof.role !== mode) {
+        setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
+        return;
+      }
+
+      setUser({
+        id: prof.id,
+        email: prof.email,
+        role: prof.role,
+        org: prof.org || null,
+        amEmail: prof.account_manager_email || null,
+      });
+    } catch (e) {
+      console.error(e);
+      setErr('Login failed.');
+    }
+  }
+
+  async function logout() {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    setUser(null);
+    setEmail('');
+    setPwd('');
+    setMode('recruiter');
+    setErr('');
+  }
+
+  /* ---------- Recruiter state & functions ---------- */
+  const [name, setName] = React.useState('');
+  const [titles, setTitles] = React.useState('');
+  const [law, setLaw] = React.useState('');
+  const [city, setCity] = React.useState('');
+  const [state, setState] = React.useState('');
+  const [years, setYears] = React.useState('');
+  const [recentYears, setRecentYears] = React.useState('');
+  const [salary, setSalary] = React.useState('');
+  const [contract, setContract] = React.useState(false);
+  const [hourly, setHourly] = React.useState('');
+  const [dateEntered, setDateEntered] = React.useState(() => {
+    const d = new Date();
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+      .toISOString()
+      .slice(0, 10);
+  });
+  const [notes, setNotes] = React.useState('');
+  const [addMsg, setAddMsg] = React.useState('');
+
+  const [myRecent, setMyRecent] = React.useState([]);
+  const [loadingList, setLoadingList] = React.useState(false);
+
+  const [editingId, setEditingId] = React.useState(null);
+  const [editForm, setEditForm] = React.useState({});
+
+  function startEdit(row) {
+    setEditingId(row.id);
+    setEditForm({
+      name: row.name || '',
+      titles_csv: row.titles_csv || '',
+      law_csv: row.law_csv || '',
+      city: row.city || '',
+      state: row.state || '',
+      years: row.years ?? '',
+      recent_role_years: row.recent_role_years ?? '',
+      salary: row.salary ?? '',
+      contract: !!row.contract,
+      hourly: row.hourly ?? '',
+      date_entered: (row.date_entered ? new Date(row.date_entered) : new Date(row.created_at))
+        .toISOString()
+        .slice(0, 10),
+      notes: row.notes || '',
+    });
+  }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm({});
+  }
+  function changeEditField(k, v) {
+    setEditForm((s) => ({ ...s, [k]: v }));
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    try {
+      const payload = {
+        name: String(editForm.name || '').trim(),
+        titles_csv: String(editForm.titles_csv || '').trim(),
+        law_csv: String(editForm.law_csv || '').trim(),
+        city: String(editForm.city || '').trim(),
+        state: String(editForm.state || '').trim(),
+        years: editForm.years === '' ? null : Number(editForm.years),
+        recent_role_years:
+          editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
+        salary: editForm.salary === '' ? null : Number(editForm.salary),
+        contract: !!editForm.contract,
+        hourly: !editForm.contract
+          ? null
+          : editForm.hourly === ''
+          ? null
+          : Number(editForm.hourly),
+        date_entered: editForm.date_entered
+          ? new Date(editForm.date_entered).toISOString()
+          : null,
+        notes: String(editForm.notes || '').trim() || null,
+      };
+      const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
+      if (error) throw error;
+      await refreshMyRecent();
+      cancelEdit();
+    } catch (e) {
+      console.error(e);
+      alert(`Update failed${e?.message ? `: ${e.message}` : ''}`);
+    }
+  }
+
+  async function removeCandidate(id) {
+    try {
+      if (!confirm('Delete this candidate?')) return;
+      const { error } = await supabase.from('candidates').delete().eq('id', id);
+      if (error) throw error;
+      await refreshMyRecent();
+    } catch (e) {
+      console.error(e);
+      alert(`Delete failed${e?.message ? `: ${e.message}` : ''}`);
+    }
+  }
+
+  async function refreshMyRecent() {
+    if (!user || user.role !== 'recruiter') return;
+    setLoadingList(true);
+    const { data, error } = await supabase
+      .from('candidates')
+      .select(
+        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes'
+      )
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (!error && data) setMyRecent(data);
+    setLoadingList(false);
+  }
+  React.useEffect(() => {
+    if (user?.role === 'recruiter') refreshMyRecent();
+  }, [user]);
+
+  async function addCandidate() {
+    setAddMsg('');
+    try {
+      if (!user || user.role !== 'recruiter') {
+        setAddMsg('You must be logged in as recruiter.');
+        return;
+      }
+      const payload = {
+        name: name.trim(),
+        titles_csv: titles.trim(),
+        law_csv: law.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        years: years ? Number(years) : null,
+        recent_role_years: recentYears ? Number(recentYears) : null,
+        salary: salary ? Number(salary) : null,
+        contract: !!contract,
+        hourly: contract ? (hourly ? Number(hourly) : null) : null,
+        date_entered: dateEntered ? new Date(dateEntered).toISOString() : null,
+        notes: notes.trim() || null,
+        created_by: user.id,
+      };
+      const { error } = await supabase.from('candidates').insert(payload);
+      if (error) throw error;
+
+      setAddMsg('Candidate added');
+      setName('');
+      setCity('');
+      setState('');
+      setYears('');
+      setRecentYears('');
+      setSalary('');
+      setContract(false);
+      setHourly('');
+      setNotes('');
+      await refreshMyRecent();
+    } catch (e) {
+      console.error(e);
+      setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
+    }
+  }
+
+  /* ---------- Client state & functions ---------- */
+  const [cCountToday, setCCountToday] = React.useState(0);
+  const [search, setSearch] = React.useState('');
+  const [minSalary, setMinSalary] = React.useState(0);
+  const [maxSalary, setMaxSalary] = React.useState(400000);
+  const [minYears, setMinYears] = React.useState(0);
+  const [maxYears, setMaxYears] = React.useState(50);
+  const [sortBy, setSortBy] = React.useState('date_desc');
+
+  const [cities, setCities] = React.useState([]);
+  const [states, setStates] = React.useState([]);
+  const [titleOptions, setTitleOptions] = React.useState([]);
+  const [lawOptions, setLawOptions] = React.useState([]);
+
+  const [fCity, setFCity] = React.useState('');
+  const [fState, setFState] = React.useState('');
+  const [fTitle, setFTitle] = React.useState('');
+  const [fLaw, setFLaw] = React.useState('');
+
+  const [clientRows, setClientRows] = React.useState([]);
+  const [clientLoading, setClientLoading] = React.useState(false);
+  const [clientErr, setClientErr] = React.useState('');
+  const [expandedId, setExpandedId] = React.useState(null);
+
+  const todayStartIso = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
   }, []);
 
-  return { rows, loading, err };
-}
+  React.useEffect(() => {
+    if (user?.role !== 'client') return;
+    (async () => {
+      const { count } = await supabase
+        .from('candidates')
+        .select('id', { count: 'exact', head: true })
+        .gte('date_entered', todayStartIso);
+      setCCountToday(count || 0);
+    })();
+  }, [user, todayStartIso]);
 
-/* ------------ tiny SVG chart primitives ------------ */
+  React.useEffect(() => {
+    if (user?.role !== 'client') return;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('city,state,titles_csv,law_csv')
+          .limit(1000);
+        if (error) throw error;
+        const cset = new Set(),
+          sset = new Set(),
+          tset = new Set(),
+          lset = new Set();
+        for (const r of data || []) {
+          if (r.city) cset.add(r.city.trim());
+          if (r.state) sset.add(r.state.trim());
+          (r.titles_csv || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean)
+            .forEach((x) => tset.add(x));
+          (r.law_csv || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean)
+            .forEach((x) => lset.add(x));
+        }
+        setCities([...cset].sort());
+        setStates([...sset].sort());
+        setTitleOptions([...tset].sort());
+        setLawOptions([...lset].sort());
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [user]);
 
-function BarChart({ title, data, height = 240, color = '#60A5FA', fmt = fmtMoney }) {
-  const pad = 24;
-  const width = 820;
-  const max = Math.max(1, ...data.map((d) => d.avg || 0));
-  const barW = Math.max(16, Math.floor((width - pad * 2) / Math.max(1, data.length)));
-  const chartH = height - pad * 2;
+  async function fetchClientRows() {
+    if (!user || user.role !== 'client') return;
+    setClientErr('');
+    setClientLoading(true);
+    try {
+      let q = supabase
+        .from('candidates')
+        .select(
+          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,notes,date_entered,created_at'
+        );
 
-  return (
-    <Card style={{ overflow: 'hidden' }}>
-      <div style={{ color: '#E5E7EB', fontWeight: 700, marginBottom: 8 }}>{title}</div>
-      {data.length === 0 ? (
-        <div style={{ color: '#9CA3AF', fontSize: 12 }}>No data.</div>
-      ) : (
-        <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-          {/* y-grid */}
-          {[0.25, 0.5, 0.75, 1].map((p) => (
-            <line
-              key={p}
-              x1={pad}
-              y1={pad + (1 - p) * chartH}
-              x2={width - pad}
-              y2={pad + (1 - p) * chartH}
-              stroke="rgba(255,255,255,0.08)"
-            />
-          ))}
-          {/* bars */}
-          {data.map((d, i) => {
-            const h = (d.avg / max) * chartH;
-            const x = pad + i * barW + 2;
-            const y = pad + (chartH - h);
-            return (
-              <g key={d.key}>
-                <rect x={x} y={y} width={barW - 4} height={h} fill={color} rx="4" />
-                {/* labels */}
-                <text
-                  x={x + (barW - 4) / 2}
-                  y={height - 6}
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill="#9CA3AF"
+      const qStr = search.trim();
+      if (qStr) {
+        const like = `%${qStr}%`;
+        q = q.or(
+          `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like}`
+        );
+      }
+      if (fCity) q = q.eq('city', fCity);
+      if (fState) q = q.eq('state', fState);
+      if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
+      if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
+      if (minSalary != null) q = q.gte('salary', minSalary);
+      if (maxSalary != null) q = q.lte('salary', maxSalary);
+      if (minYears != null) q = q.gte('years', minYears);
+      if (maxYears != null) q = q.lte('years', maxYears);
+
+      switch (sortBy) {
+        case 'date_asc':
+          q = q.order('date_entered', { ascending: true });
+          break;
+        case 'salary_desc':
+          q = q.order('salary', { ascending: false, nullsFirst: false });
+          break;
+        case 'salary_asc':
+          q = q.order('salary', { ascending: true, nullsFirst: true });
+          break;
+        case 'years_desc':
+          q = q.order('years', { ascending: false, nullsFirst: false });
+          break;
+        case 'years_asc':
+          q = q.order('years', { ascending: true, nullsFirst: true });
+          break;
+        case 'hourly_desc':
+          q = q.order('hourly', { ascending: false, nullsFirst: false });
+          break;
+        case 'hourly_asc':
+          q = q.order('hourly', { ascending: true, nullsFirst: true });
+          break;
+        case 'date_desc':
+        default:
+          q = q.order('date_entered', { ascending: false });
+          break;
+      }
+
+      const { data, error } = await q.limit(200);
+      if (error) throw error;
+      setClientRows(data || []);
+    } catch (e) {
+      console.error(e);
+      setClientErr('Error loading client view.');
+    }
+    setClientLoading(false);
+  }
+
+  function clearClientFilters() {
+    setSearch('');
+    setFCity('');
+    setFState('');
+    setFTitle('');
+    setFLaw('');
+    setMinSalary(0);
+    setMaxSalary(400000);
+    setMinYears(0);
+    setMaxYears(50);
+    setSortBy('date_desc');
+    setExpandedId(null);
+    fetchClientRows();
+  }
+
+  React.useEffect(() => {
+    if (user?.role === 'client') fetchClientRows();
+  }, [user]);
+
+  /* ---------- Layout ---------- */
+  const pageWrap = {
+    minHeight: '100vh',
+    width: '100%',
+    backgroundImage: `url(${NYC})`,
+    backgroundPosition: 'center',
+    backgroundSize: 'cover',
+    backgroundAttachment: 'fixed',
+  };
+  const overlay = {
+    minHeight: '100vh',
+    width: '100%',
+    backdropFilter: 'blur(1px)',
+    background:
+      'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 16%, rgba(0,0,0,0.75) 100%)',
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    padding: '40px 16px',
+  };
+
+  /* ---------- Logged-out ---------- */
+  if (!user) {
+    return (
+      <div style={pageWrap}>
+        <div style={overlay}>
+          <Card style={{ width: 520, padding: 24 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
+              Talent Connector
+            </div>
+            <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
+              Invitation-only access
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              {['recruiter', 'client', 'admin'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: '1px solid #1F2937',
+                    background: mode === m ? '#1F2937' : '#0B1220',
+                    color: '#E5E7EB',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
                 >
-                  {d.key.length > 12 ? d.key.slice(0, 12) + '…' : d.key}
-                </text>
-                <text
-                  x={x + (barW - 4) / 2}
-                  y={y - 4}
-                  textAnchor="middle"
-                  fontSize="11"
-                  fill="#CBD5E1"
-                >
-                  {fmt(d.avg)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      )}
-    </Card>
-  );
-}
+                  {m[0].toUpperCase() + m.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                placeholder="your password"
+                value={pwd}
+                onChange={(e) => setPwd(e.target.value)}
+              />
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <Button onClick={login} style={{ width: '100%' }}>
+                Log in
+              </Button>
+            </div>
+            {err ? (
+              <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
+            ) : null}
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-function PieChart({ title, slices, radius = 140 }) {
-  const size = radius * 2 + 20;
-  const cx = size / 2;
-  const cy = size / 2 + 8;
-  const total = slices.reduce((a, s) => a + s.value, 0) || 1;
-  let angle = -Math.PI / 2;
-
-  const colors = [
-    '#60A5FA',
-    '#34D399',
-    '#F59E0B',
-    '#F87171',
-    '#A78BFA',
-    '#F472B6',
-    '#22D3EE',
-    '#FB7185',
-    '#93C5FD',
-    '#4ADE80',
-  ];
-
-  const arcs = slices.slice(0, 10).map((s, i) => {
-    const frac = s.value / total;
-    const start = angle;
-    const end = angle + frac * Math.PI * 2;
-    angle = end;
-
-    const x1 = cx + radius * Math.cos(start);
-    const y1 = cy + radius * Math.sin(start);
-    const x2 = cx + radius * Math.cos(end);
-    const y2 = cy + radius * Math.sin(end);
-    const large = end - start > Math.PI ? 1 : 0;
-
-    const d = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${large} 1 ${x2} ${y2} Z`;
-    return { d, color: colors[i % colors.length], label: s.label, value: s.value };
-  });
-
-  return (
-    <Card>
-      <div style={{ color: '#E5E7EB', fontWeight: 700, marginBottom: 8 }}>{title}</div>
-      {slices.length === 0 ? (
-        <div style={{ color: '#9CA3AF', fontSize: 12 }}>No data.</div>
-      ) : (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <svg width={size} height={size} style={{ flexShrink: 0 }}>
-            {arcs.map((a, i) => (
-              <path key={i} d={a.d} fill={a.color} stroke="rgba(0,0,0,0.4)" />
-            ))}
-          </svg>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {arcs.map((a, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#CBD5E1' }}>
-                <span style={{ width: 12, height: 12, background: a.color, borderRadius: 2 }} />
-                <span style={{ minWidth: 120 }}>{a.label}</span>
-                <span style={{ color: '#9CA3AF', fontSize: 12 }}>
-                  {a.value} {a.value === 1 ? 'candidate' : 'candidates'}
-                </span>
+  /* ---------- Recruiter UI ---------- */
+  if (user.role === 'recruiter') {
+    return (
+      <div style={pageWrap}>
+        <div style={overlay}>
+          <div style={{ width: 'min(1100px, 100%)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                <span style={{ color: '#9CA3AF' }}>RECRUITER workspace</span>
               </div>
-            ))}
+              <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+                Log out
+              </Button>
+            </div>
+
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Label>Full name</Label>
+                  <Input placeholder="Attorney" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Title(s) (CSV)</Label>
+                  <Input
+                    placeholder="Attorney, Paralegal, etc."
+                    value={titles}
+                    onChange={(e) => setTitles(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Type of Law (CSV)</Label>
+                  <Input
+                    placeholder="Litigation, Immigration"
+                    value={law}
+                    onChange={(e) => setLaw(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>City</Label>
+                  <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <Input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Years of experience</Label>
+                  <Input
+                    placeholder="Years"
+                    inputMode="numeric"
+                    value={years}
+                    onChange={(e) => setYears(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Years in most recent job</Label>
+                  <Input
+                    placeholder="e.g., 3"
+                    inputMode="numeric"
+                    value={recentYears}
+                    onChange={(e) => setRecentYears(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Salary desired</Label>
+                  <Input
+                    placeholder="e.g., 120000"
+                    inputMode="numeric"
+                    value={salary}
+                    onChange={(e) => setSalary(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Date entered</Label>
+                  <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <input
+                      type="checkbox"
+                      checked={contract}
+                      onChange={(e) => setContract(e.target.checked)}
+                    />
+                    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
+                  </label>
+                  {contract ? (
+                    <div style={{ flex: 1 }}>
+                      <Input
+                        placeholder="Hourly rate (e.g., 80)"
+                        inputMode="numeric"
+                        value={hourly}
+                        onChange={(e) => setHourly(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Label>Candidate Notes</Label>
+                  <TextArea
+                    placeholder="Short summary: strengths, availability, fit notes."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+                <Button onClick={addCandidate}>Add candidate</Button>
+                {addMsg ? (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: addMsg.startsWith('Database') ? '#F87171' : '#93E2B7',
+                      paddingTop: 8,
+                    }}
+                  >
+                    {addMsg}
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+
+            <Card style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>My recent candidates</div>
+              {loadingList ? (
+                <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
+              ) : myRecent.length === 0 ? (
+                <div style={{ fontSize: 14, color: '#9CA3AF' }}>No candidates yet.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {myRecent.map((c) =>
+                    editingId === c.id ? (
+                      <div
+                        key={c.id}
+                        style={{
+                          border: '1px solid '#1F2937',
+                          borderRadius: 12,
+                          padding: 12,
+                          background: '#0B1220',
+                        }}
+                      >
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <Label>Full name</Label>
+                            <Input
+                              value={editForm.name}
+                              onChange={(e) => changeEditField('name', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Title(s) (CSV)</Label>
+                            <Input
+                              value={editForm.titles_csv}
+                              onChange={(e) => changeEditField('titles_csv', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Type of Law (CSV)</Label>
+                            <Input
+                              value={editForm.law_csv}
+                              onChange={(e) => changeEditField('law_csv', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>City</Label>
+                            <Input
+                              value={editForm.city}
+                              onChange={(e) => changeEditField('city', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>State</Label>
+                            <Input
+                              value={editForm.state}
+                              onChange={(e) => changeEditField('state', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Years</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={editForm.years}
+                              onChange={(e) => changeEditField('years', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Recent role years</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={editForm.recent_role_years}
+                              onChange={(e) => changeEditField('recent_role_years', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Salary</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={editForm.salary}
+                              onChange={(e) => changeEditField('salary', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Date entered</Label>
+                            <Input
+                              type="date"
+                              value={editForm.date_entered}
+                              onChange={(e) => changeEditField('date_entered', e.target.value)}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.contract}
+                                onChange={(e) => changeEditField('contract', e.target.checked)}
+                              />
+                              <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract</span>
+                            </label>
+                            {editForm.contract ? (
+                              <Input
+                                placeholder="Hourly"
+                                inputMode="numeric"
+                                value={editForm.hourly}
+                                onChange={(e) => changeEditField('hourly', e.target.value)}
+                              />
+                            ) : null}
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <Label>Notes</Label>
+                            <TextArea
+                              value={editForm.notes}
+                              onChange={(e) => changeEditField('notes', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                          <Button onClick={saveEdit}>Save</Button>
+                          <Button
+                            onClick={cancelEdit}
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        key={c.id}
+                        style={{
+                          border: '1px solid #1F2937',
+                          borderRadius: 12,
+                          padding: 12,
+                          background: '#0B1220',
+                          display: 'grid',
+                          gridTemplateColumns:
+                            '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
+                          gap: 10,
+                          alignItems: 'center',
+                          fontSize: 13,
+                        }}
+                      >
+                        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                          {c.name}
+                          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+                            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+                          </div>
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {c.city || '—'}, {c.state || '—'}
+                        </div>
+                        <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
+                        <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
+                        <div style={{ color: '#E5E7EB' }}>
+                          {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
+                          {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <Button
+                            onClick={() => startEdit(c)}
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={() => removeCandidate(c.id)}
+                            style={{ background: '#B91C1C', border: '1px solid #7F1D1D' }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </Card>
           </div>
         </div>
-      )}
-    </Card>
+      </div>
+    );
+  }
+
+  /* ---------- Client UI ---------- */
+  if (user.role === 'client') {
+    function buildMailto(c) {
+      const to = user.amEmail || 'info@youragency.com';
+      const subj = `Talent Connector Candidate – ${c?.name || ''}`;
+      const body = [
+        `Hello,`,
+        ``,
+        `I'm interested in this candidate:`,
+        `• Name: ${c?.name || ''}`,
+        `• Titles: ${c?.titles_csv || ''}`,
+        `• Type of law: ${c?.law_csv || ''}`,
+        `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
+        `• Years: ${c?.years ?? ''}`,
+        c?.contract && c?.hourly ? `• Contract: $${c.hourly}/hr` : '',
+        c?.salary ? `• Salary: $${c.salary}` : '',
+        ``,
+        `My email: ${user.email || ''}`,
+        ``,
+        `Sent from Talent Connector`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+        subj
+      )}&body=${encodeURIComponent(body)}`;
+    }
+
+    /* ====== DRAG-FRIENDLY dual-slider CSS ====== */
+    const sliderCss = `
+      .dual-range { 
+        -webkit-appearance:none; appearance:none; background:transparent; 
+        position:absolute; left:0; right:0; top:-7px; height:18px; width:100%; margin:0; 
+        pointer-events:none;
+        touch-action:none;
+      }
+      .dual-range.low  { z-index:3; }
+      .dual-range.high { z-index:4; }
+      .dual-range::-webkit-slider-runnable-track { background:transparent; }
+      .dual-range::-moz-range-track { background:transparent; }
+      .dual-range::-webkit-slider-thumb {
+        -webkit-appearance:none; width:18px; height:18px; border-radius:999px; 
+        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all;
+      }
+      .dual-range::-moz-range-thumb {
+        width:18px; height:18px; border-radius:999px; 
+        background:#22d3ee; border:2px solid #0b0b0b; pointer-events:all;
+      }
+    `;
+
+    function SalarySlider() {
+      const min = 0,
+        max = 400000,
+        step = 5000;
+      const pct = (v) => ((v - min) / (max - min)) * 100;
+      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
+      const sel = {
+        position: 'absolute',
+        top: 0,
+        left: `${pct(minSalary)}%`,
+        right: `${100 - pct(maxSalary)}%`,
+        height: 4,
+        background: '#4F46E5',
+        borderRadius: 999,
+        pointerEvents: 'none',
+      };
+      function clamp(v) {
+        return Math.min(max, Math.max(min, v));
+      }
+      function onLow(e) {
+        const val = clamp(Number(e.target.value));
+        setMinSalary(Math.min(val, maxSalary));
+      }
+      function onHigh(e) {
+        const val = clamp(Number(e.target.value));
+        setMaxSalary(Math.max(val, minSalary));
+      }
+      return (
+        <div>
+          <Label>Salary range</Label>
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={track} />
+            <div style={sel} />
+            <input
+              className="dual-range low"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minSalary}
+              onChange={onLow}
+              onInput={onLow}
+            />
+            <input
+              className="dual-range high"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxSalary}
+              onChange={onHigh}
+              onInput={onHigh}
+            />
+            <style>{sliderCss}</style>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
+            <span>${minSalary.toLocaleString()}</span>
+            <span>${maxSalary.toLocaleString()}</span>
+          </div>
+        </div>
+      );
+    }
+    function YearsSlider() {
+      const min = 0,
+        max = 50,
+        step = 1;
+      const pct = (v) => ((v - min) / (max - min)) * 100;
+      const track = { position: 'relative', height: 4, background: '#1F2937', borderRadius: 999 };
+      const sel = {
+        position: 'absolute',
+        top: 0,
+        left: `${pct(minYears)}%`,
+        right: `${100 - pct(maxYears)}%`,
+        height: 4,
+        background: '#4F46E5',
+        borderRadius: 999,
+        pointerEvents: 'none',
+      };
+      function clamp(v) {
+        return Math.min(max, Math.max(min, v));
+      }
+      function onLow(e) {
+        const val = clamp(Number(e.target.value));
+        setMinYears(Math.min(val, maxYears));
+      }
+      function onHigh(e) {
+        const val = clamp(Number(e.target.value));
+        setMaxYears(Math.max(val, minYears));
+      }
+      return (
+        <div>
+          <Label>Years of experience</Label>
+          <div style={{ position: 'relative', height: 18 }}>
+            <div style={track} />
+            <div style={sel} />
+            <input
+              className="dual-range low"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={minYears}
+              onChange={onLow}
+              onInput={onLow}
+            />
+            <input
+              className="dual-range high"
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={maxYears}
+              onChange={onHigh}
+              onInput={onHigh}
+            />
+            <style>{sliderCss}</style>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
+            <span>{minYears} yrs</span>
+            <span>{maxYears} yrs</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={pageWrap}>
+        <div style={overlay}>
+          <div style={{ width: 'min(1150px, 100%)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
+                  New today: <strong>{cCountToday}</strong>
+                </Tag>
+
+                {/* NEW: link to the Insights page */}
+                <Link href="/client/insights">
+                  <Button style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+                    Compensation Insights
+                  </Button>
+                </Link>
+
+                <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+                  Log out
+                </Button>
+              </div>
+            </div>
+
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                <div>
+                  <Label>Keyword</Label>
+                  <Input
+                    placeholder="name, law, title, city/state"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>City</Label>
+                  <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {cities.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {states.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Title</Label>
+                  <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {titleOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Type of Law</Label>
+                  <select value={fLaw} onChange={(e) => setFLaw(e.target.value)} style={selectStyle}>
+                    <option value="">Any</option>
+                    {lawOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Sort by</Label>
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
+                    <option value="date_desc">Date (newest)</option>
+                    <option value="date_asc">Date (oldest)</option>
+                    <option value="salary_desc">Salary (high → low)</option>
+                    <option value="salary_asc">Salary (low → high)</option>
+                    <option value="hourly_desc">Hourly (high → low)</option>
+                    <option value="hourly_asc">Hourly (low → high)</option>
+                    <option value="years_desc">Years (high → low)</option>
+                    <option value="years_asc">Years (low → high)</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <SalarySlider />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <YearsSlider />
+                </div>
+              </div>
+              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                <Button onClick={fetchClientRows}>Apply filters</Button>
+                <Button
+                  onClick={clearClientFilters}
+                  style={{ background: '#111827', border: '1px solid #1F2937' }}
+                >
+                  Clear filters
+                </Button>
+                {clientErr ? (
+                  <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
+                ) : null}
+              </div>
+            </Card>
+
+            <Card style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
+              {clientRows.length === 0 ? (
+                <div style={{ color: '#9CA3AF', fontSize: 14 }}>
+                  {clientLoading ? 'Loading…' : 'No candidates match the filters.'}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {clientRows.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
+                    >
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
+                          gap: 10,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                          {c.name}
+                          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+                            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+                          </div>
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {c.city || '—'}, {c.state || '—'}
+                        </div>
+                        <div style={{ color: '#E5E7EB' }}>
+                          {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
+                          {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <Button
+                            onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                          >
+                            Additional information
+                          </Button>
+                          <a
+                            href={buildMailto(c)}
+                            style={{
+                              display: 'inline-block',
+                              padding: '10px 14px',
+                              borderRadius: 10,
+                              border: '1px solid #243041',
+                              background: '#2563EB',
+                              color: 'white',
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            Email for more information
+                          </a>
+                        </div>
+                      </div>
+                      {expandedId === c.id && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            padding: 10,
+                            borderRadius: 10,
+                            border: '1px solid #1F2937',
+                            background: '#0F172A',
+                            color: '#CBD5E1',
+                            fontSize: 14,
+                          }}
+                        >
+                          {c.notes ? c.notes : <i>No additional notes.</i>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- Admin UI ---------- */
+  return (
+    <div style={pageWrap}>
+      <div style={overlay}>
+        <div style={{ width: 'min(1100px, 100%)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+              Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              <span style={{ color: '#9CA3AF' }}>ADMIN workspace</span>
+            </div>
+            <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+              Log out
+            </Button>
+          </div>
+          <AdminPanel />
+        </div>
+      </div>
+    </div>
   );
 }
 
-/* ---------------- main page ---------------- */
+/* ---------- Admin Panel ---------- */
+function AdminPanel() {
+  const [list, setList] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [flash, setFlash] = React.useState('');
 
-export default function InsightsPage() {
-  const { rows, loading, err } = useCandidates();
+  const [email, setEmail] = React.useState('');
+  const [role, setRole] = React.useState('client');
+  const [org, setOrg] = React.useState('');
+  const [amEmail, setAmEmail] = React.useState('');
+  const [tempPw, setTempPw] = React.useState('');
 
-  // Build filter options
-  const allLocations = React.useMemo(() => {
-    const set = new Set();
-    rows.forEach((r) => {
-      const loc = [r.city, r.state].filter(Boolean).join(', ');
-      if (loc) set.add(loc);
-    });
-    return Array.from(set).sort();
-  }, [rows]);
+  React.useEffect(() => {
+    loadProfiles();
+  }, []);
+  async function loadProfiles() {
+    setLoading(true);
+    setErr('');
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,email,role,org,account_manager_email,created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setList(data || []);
+    } catch (e) {
+      console.error(e);
+      setErr('Error loading profiles.');
+    }
+    setLoading(false);
+  }
 
-  const allTitles = React.useMemo(() => {
-    const set = new Set();
-    rows.forEach((r) => splitCSV(r.titles_csv).forEach((t) => set.add(t)));
-    return Array.from(set).sort();
-  }, [rows]);
-
-  const allLaws = React.useMemo(() => {
-    const set = new Set();
-    rows.forEach((r) => splitCSV(r.law_csv).forEach((t) => set.add(t)));
-    return Array.from(set).sort();
-  }, [rows]);
-
-  // Filters
-  const [loc, setLoc] = React.useState('');
-  const [title, setTitle] = React.useState('');
-  const [law, setLaw] = React.useState('');
-
-  const scoped = React.useMemo(() => {
-    return rows.filter((r) => {
-      if (loc) {
-        const l = [r.city, r.state].filter(Boolean).join(', ');
-        if (l !== loc) return false;
+  async function invite() {
+    setFlash('');
+    setErr('');
+    try {
+      if (!email || !tempPw) {
+        setErr('Email and temp password are required.');
+        return;
       }
-      if (title) {
-        if (!splitCSV(r.titles_csv).some((t) => t.toLowerCase() === title.toLowerCase())) return false;
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          role,
+          org: org.trim() || null,
+          amEmail: amEmail.trim() || null,
+          password: tempPw,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setErr(json?.error || 'Invite failed');
+        return;
       }
-      if (law) {
-        if (!splitCSV(r.law_csv).some((t) => t.toLowerCase() === law.toLowerCase())) return false;
-      }
-      return true;
-    });
-  }, [rows, loc, title, law]);
-
-  // Charts data
-  const salaryByTitle = React.useMemo(() => {
-    return groupAvg(scoped, (r) => splitCSV(r.titles_csv)[0], (r) => r.salary);
-  }, [scoped]);
-
-  const hourlyByTitle = React.useMemo(() => {
-    return groupAvg(
-      scoped.filter((r) => r.contract),
-      (r) => splitCSV(r.titles_csv)[0],
-      (r) => r.hourly
-    );
-  }, [scoped]);
-
-  const salaryByLaw = React.useMemo(() => {
-    // explode by law area
-    const exploded = [];
-    scoped.forEach((r) => {
-      splitCSV(r.law_csv).forEach((p) => exploded.push({ ...r, _law: p }));
-    });
-    return groupAvg(exploded, (r) => r._law, (r) => r.salary);
-  }, [scoped]);
-
-  const hourlyByLaw = React.useMemo(() => {
-    const exploded = [];
-    scoped.forEach((r) => {
-      splitCSV(r.law_csv).forEach((p) => exploded.push({ ...r, _law: p }));
-    });
-    return groupAvg(
-      exploded.filter((r) => r.contract),
-      (r) => r._law,
-      (r) => r.hourly
-    );
-  }, [scoped]);
-
-  const pieByState = React.useMemo(() => {
-    const map = new Map();
-    scoped.forEach((r) => {
-      const k = r.state || '—';
-      map.set(k, (map.get(k) || 0) + 1);
-    });
-    return Array.from(map.entries())
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [scoped]);
+      setFlash(`Invited ${email} as ${role}`);
+      setEmail('');
+      setRole('client');
+      setOrg('');
+      setAmEmail('');
+      setTempPw('');
+      await loadProfiles();
+    } catch (e) {
+      console.error(e);
+      setErr('Server error inviting user.');
+    }
+  }
 
   return (
-    <PageWrap>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#E5E7EB' }}>
-        <div style={{ fontWeight: 800, letterSpacing: 0.3, fontSize: 18 }}>
-          Compensation Insights
-          <span style={{ color: '#93C5FD' }}> — </span>
-          <span style={{ color: '#9CA3AF' }}>{rows.length} candidates</span>
-        </div>
-        <Link href="/"><Button style={{ background: '#0B1220', border: '1px solid #1F2937' }}>Back to Client</Button></Link>
-      </div>
-
-      {/* Filters */}
+    <>
       <Card style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 10, color: '#E5E7EB' }}>Filters (scope the charts)</div>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
           <div>
-            <Label>Location</Label>
-            <Select value={loc} onChange={(e) => setLoc(e.target.value)}>
-              <option value="">All locations</option>
-              {allLocations.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </Select>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div>
-            <Label>Title</Label>
-            <Select value={title} onChange={(e) => setTitle(e.target.value)}>
-              <option value="">All titles</option>
-              {allTitles.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </Select>
+            <Label>Role</Label>
+            <select value={role} onChange={(e) => setRole(e.target.value)} style={selectStyle}>
+              <option value="client">Client</option>
+              <option value="recruiter">Recruiter</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
           <div>
-            <Label>Practice Area</Label>
-            <Select value={law} onChange={(e) => setLaw(e.target.value)}>
-              <option value="">All practice areas</option>
-              {allLaws.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </Select>
+            <Label>Organization (optional)</Label>
+            <Input value={org} onChange={(e) => setOrg(e.target.value)} />
+          </div>
+          <div>
+            <Label>Sales contact (optional)</Label>
+            <Input
+              type="email"
+              placeholder="sales@youragency.com"
+              value={amEmail}
+              onChange={(e) => setAmEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Temp password</Label>
+            <Input
+              type="password"
+              placeholder="set a password"
+              value={tempPw}
+              onChange={(e) => setTempPw(e.target.value)}
+            />
           </div>
         </div>
-        {loading ? (
-          <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 10 }}>Loading…</div>
-        ) : err ? (
-          <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
-        ) : null}
+        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+          <Button onClick={invite}>Add user</Button>
+          {err ? (
+            <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{err}</div>
+          ) : (
+            <div style={{ color: '#93E2B7', fontSize: 12, paddingTop: 8 }}>{flash}</div>
+          )}
+        </div>
       </Card>
 
-      {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 12 }}>
-        <BarChart
-          title={`Average Salary by Title${loc ? ` — ${loc}` : ''}`}
-          data={salaryByTitle}
-          color="#60A5FA"
-        />
-        <BarChart
-          title={`Average Hourly by Title${loc ? ` — ${loc}` : ''}`}
-          data={hourlyByTitle}
-          color="#34D399"
-          fmt={(n) => (n == null ? '—' : `$${Math.round(n)}/hr`)}
-        />
-        <BarChart
-          title={`Average Salary by Practice Area${loc ? ` — ${loc}` : ''}`}
-          data={salaryByLaw}
-          color="#A78BFA"
-        />
-        <BarChart
-          title={`Average Hourly by Practice Area${loc ? ` — ${loc}` : ''}`}
-          data={hourlyByLaw}
-          color="#F59E0B"
-          fmt={(n) => (n == null ? '—' : `$${Math.round(n)}/hr`)}
-        />
-        <PieChart title="Candidate Distribution by State" slices={pieByState} />
-      </div>
-
-      <div style={{ height: 16 }} />
-    </PageWrap>
+      <Card style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Directory</div>
+        {loading ? (
+          <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: '#9CA3AF' }}>
+                  <th style={thStyle}>Email</th>
+                  <th style={thStyle}>Role</th>
+                  <th style={thStyle}>Org</th>
+                  <th style={thStyle}>Sales contact</th>
+                  <th style={thStyle}>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id}>
+                    <td style={tdStyle}>{r.email}</td>
+                    <td style={tdStyle}>{r.role}</td>
+                    <td style={tdStyle}>{r.org || '—'}</td>
+                    <td style={tdStyle}>{r.account_manager_email || '—'}</td>
+                    <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {list.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ ...tdStyle, color: '#9CA3AF' }}>
+                      No users yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
   );
 }
+
+/* ---------- shared styles ---------- */
+const selectStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #1F2937',
+  background: '#0F172A',
+  color: '#E5E7EB',
+  outline: 'none',
+};
+const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
+const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
