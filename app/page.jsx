@@ -337,164 +337,32 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
-  // === Insights state & helpers (added) ===
-  const [showInsights, setShowInsights] = React.useState(false);
-  const [insights, setInsights] = React.useState(null); // { byTitleSalary, byTitleHourly, byCitySalary, byCityHourly, byYearsSalary }
-
-  function groupAvg(items, key, valueKey) {
-    const acc = new Map();
-    for (const it of items) {
-      const k = (it[key] || '').trim();
-      const v = Number(it[valueKey]);
-      if (!k || !Number.isFinite(v) || v <= 0) continue;
-      const cur = acc.get(k) || { sum: 0, n: 0 };
-      cur.sum += v;
-      cur.n += 1;
-      acc.set(k, cur);
-    }
-    const rows = [];
-    for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
-    rows.sort((a, b) => b.avg - a.avg);
-    return rows.slice(0, 12);
-  }
-  const _csvKey = (k) => k + '_one';
-  function explodeCSVToRows(items, csvKey) {
-    const rows = [];
-    for (const it of items) {
-      const raw = (it[csvKey] || '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
-    }
-    return rows;
-  }
-  async function loadInsights() {
-    try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('titles_csv,city,state,years,salary,hourly')
-        .limit(2000);
-      if (error) throw error;
-
-      const byTitleSalary = groupAvg(
-        explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
-        'title_one',
-        'salary'
-      );
-      const byTitleHourly = groupAvg(
-        explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
-        'title_one',
-        'hourly'
-      );
-      const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
-      const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
-      const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
-
-      const buckets = [
-        { label: '0–2 yrs', check: (y) => y >= 0 && y <= 2 },
-        { label: '3–5 yrs', check: (y) => y >= 3 && y <= 5 },
-        { label: '6–10 yrs', check: (y) => y >= 6 && y <= 10 },
-        { label: '11–20 yrs', check: (y) => y >= 11 && y <= 20 },
-        { label: '21+ yrs', check: (y) => y >= 21 },
-      ];
-      const yearsAgg = [];
-      for (const b of buckets) {
-        const vals = data
-          .map((r) => Number(r.salary))
-          .filter((v, i) => {
-            const y = Number(data[i].years);
-            return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
-          });
-        if (vals.length) {
-          yearsAgg.push({
-            label: b.label,
-            avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
-            n: vals.length,
-          });
-        }
-      }
-
-      setInsights({
-        byTitleSalary,
-        byTitleHourly,
-        byCitySalary,
-        byCityHourly,
-        byYearsSalary: yearsAgg,
-      });
-      setShowInsights(true);
-    } catch (e) {
-      console.error(e);
-      alert('Failed to load insights.');
-    }
-  }
-  function BarChart({ title, rows, money = true }) {
-    const max = Math.max(...rows.map((r) => r.avg), 1);
-    return (
-      <Card style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {rows.map((r) => (
-            <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
-              <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label}</div>
-              <div style={{ height: 12, background: '#111827', borderRadius: 999, overflow: 'hidden', border: '1px solid #1F2937' }}>
-                <div
-                  style={{
-                    width: `${Math.round((r.avg / max) * 100)}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #3B82F6, #06B6D4)',
-                  }}
-                />
-              </div>
-              <div style={{ color: '#9CA3AF', textAlign: 'right', fontSize: 12 }}>
-                {money ? `$${r.avg.toLocaleString()}` : r.avg.toLocaleString()}
-              </div>
-            </div>
-          ))}
-          {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
-        </div>
-      </Card>
-    );
-  }
-  function InsightsView({ onBack }) {
-    if (!insights) return null;
-    return (
-      <div style={{ width: 'min(1150px, 100%)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-            Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
-            <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
-          </div>
-          <Button onClick={onBack} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
-            Back to Results
-          </Button>
-        </div>
-
-        <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
-        <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
-        <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
-        <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
-        <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
-      </div>
-    );
-  }
-
-  const todayStartIso = React.useMemo(() => {
+  // ====== FIX #1: robust "today" window (local time) and OR on date_entered/created_at ======
+  const startOfTodayIso = React.useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, []);
+  const endOfTodayIso = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
     return d.toISOString();
   }, []);
 
   React.useEffect(() => {
     if (user?.role !== 'client') return;
     (async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('candidates')
         .select('id', { count: 'exact', head: true })
-        .gte('date_entered', todayStartIso);
-      setCCountToday(count || 0);
+        .or(
+          `and(date_entered.gte.${startOfTodayIso},date_entered.lte.${endOfTodayIso}),` +
+          `and(created_at.gte.${startOfTodayIso},created_at.lte.${endOfTodayIso})`
+        );
+      if (!error) setCCountToday(count || 0);
     })();
-  }, [user, todayStartIso]);
+  }, [user, startOfTodayIso, endOfTodayIso]);
+  // ====== /FIX #1 ======
 
   React.useEffect(() => {
     if (user?.role !== 'client') return;
@@ -588,7 +456,9 @@ export default function Page() {
           break;
       }
 
-      const { data, error } = await q.limit(200);
+      // ====== FIX #2: increase limit so we don't miss candidates ======
+      const { data, error } = await q.limit(1000);
+      // ====== /FIX #2 ======
       if (error) throw error;
       setClientRows(data || []);
     } catch (e) {
@@ -1049,7 +919,7 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    // ====== Dual-slider CSS (unchanged) ======
+    // Dual-slider CSS used by client filters (unchanged from your working build)
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
@@ -1068,7 +938,6 @@ export default function Page() {
       }
     `;
 
-    // Common visuals
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
     const trackBase = { position: 'relative', height: 18 };
 
@@ -1157,7 +1026,7 @@ export default function Page() {
       return (
         <div>
           <Label>Years of experience</Label>
-          <div style={trackBase}>
+          <div style={{ position: 'relative', height: 18 }}>
             <div style={rail} />
             <div style={sel} />
             <input
@@ -1192,9 +1061,151 @@ export default function Page() {
       );
     }
 
-    function InsightsToggleView() {
-      if (!showInsights) return null;
-      return <InsightsView onBack={() => setShowInsights(false)} />;
+    // Insights helpers & UI
+    function groupAvg(items, key, valueKey) {
+      const acc = new Map();
+      for (const it of items) {
+        const k = (it[key] || '').trim();
+        const v = Number(it[valueKey]);
+        if (!k || !Number.isFinite(v) || v <= 0) continue;
+        const cur = acc.get(k) || { sum: 0, n: 0 };
+        cur.sum += v;
+        cur.n += 1;
+        acc.set(k, cur);
+      }
+      const rows = [];
+      for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
+      rows.sort((a, b) => b.avg - a.avg);
+      return rows.slice(0, 12);
+    }
+    function explodeCSVToRows(items, csvKey) {
+      const rows = [];
+      for (const it of items) {
+        const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
+        for (const r of raw) rows.push({ ...it, [csvKey + '_one']: r });
+      }
+      return rows;
+    }
+
+    const [showInsights, setShowInsights] = React.useState(false);
+    const [insights, setInsights] = React.useState(null);
+
+    async function loadInsights() {
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('titles_csv,city,state,years,salary,hourly')
+          .limit(2000);
+        if (error) throw error;
+
+        const exTitles = explodeCSVToRows(data, 'titles_csv');
+        const byTitleSalary = groupAvg(
+          exTitles.map((r) => ({ ...r, title_one: r['titles_csv_one'] })), 'title_one', 'salary'
+        );
+        const byTitleHourly = groupAvg(
+          exTitles.map((r) => ({ ...r, title_one: r['titles_csv_one'] })), 'title_one', 'hourly'
+        );
+
+        const withCityState = data.map((r) => ({
+          ...r,
+          city_full: [r.city, r.state].filter(Boolean).join(', '),
+        }));
+        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
+        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
+
+        const buckets = [
+          { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
+          { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
+          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
+          { label: '11-20 yrs', check: (y) => y >= 11 && y <= 20 },
+          { label: '21+ yrs', check: (y) => y >= 21 },
+        ];
+        const yearsAgg = [];
+        for (const b of buckets) {
+          const vals = data
+            .map((r) => Number(r.salary))
+            .filter((v, i) => {
+              const y = Number(data[i].years);
+              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+            });
+          if (vals.length) {
+            yearsAgg.push({
+              label: b.label,
+              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
+              n: vals.length,
+            });
+          }
+        }
+
+        setInsights({
+          byTitleSalary,
+          byTitleHourly,
+          byCitySalary,
+          byCityHourly,
+          byYearsSalary: yearsAgg,
+        });
+        setShowInsights(true);
+      } catch (e) {
+        console.error(e);
+        alert('Failed to load insights.');
+      }
+    }
+
+    function BarChart({ title, rows, money = true }) {
+      const max = Math.max(...rows.map((r) => r.avg), 1);
+      return (
+        <Card style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {rows.map((r) => (
+              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
+                <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {r.label}
+                </div>
+                <div style={{ height: 12, background: '#111827', borderRadius: 999, overflow: 'hidden', border: '1px solid #1F2937' }}>
+                  <div
+                    style={{
+                      width: `${Math.round((r.avg / max) * 100)}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #3B82F6, #06B6D4)',
+                    }}
+                  />
+                </div>
+                <div style={{ color: '#9CA3AF', textAlign: 'right', fontSize: 12 }}>
+                  {money ? `$${r.avg.toLocaleString()}` : r.avg.toLocaleString()}
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
+          </div>
+        </Card>
+      );
+    }
+
+    function InsightsView() {
+      if (!insights) return null;
+      return (
+        <div style={{ width: 'min(1150px, 100%)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+              Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
+            </div>
+            <Button
+              onClick={() => setShowInsights(false)}
+              style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+            >
+              Back to Results
+            </Button>
+          </div>
+
+          <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
+          <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
+          <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
+          <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
+          <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+        </div>
+      );
     }
 
     return (
@@ -1402,7 +1413,7 @@ export default function Page() {
               </Card>
             </div>
           ) : (
-            <InsightsView onBack={() => setShowInsights(false)} />
+            <InsightsView />
           )}
         </div>
       </div>
