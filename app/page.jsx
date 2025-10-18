@@ -316,10 +316,11 @@ export default function Page() {
   /* ---------- Client state & functions ---------- */
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
-  const [minSalary, setMinSalary] = React.useState(0);
-  const [maxSalary, setMaxSalary] = React.useState(400000);
-  const [minYears, setMinYears] = React.useState(0);
-  const [maxYears, setMaxYears] = React.useState(50);
+
+  // NEW: dropdown ranges
+  const [salaryRange, setSalaryRange] = React.useState(''); // encoded as "min-max" or "min-"
+  const [yearsRange, setYearsRange] = React.useState('');   // encoded as "min-max" or "min-"
+
   const [sortBy, setSortBy] = React.useState('date_desc');
 
   const [cities, setCities] = React.useState([]);
@@ -337,51 +338,26 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
-  // start/end of today (local)
-  // TEMP: disable "New today" query to unblock Client tab
-const startOfTodayIso = React.useMemo(() => {
-  const d = new Date(); d.setHours(0,0,0,0); return d.toISOString();
-}, []);
-const endOfTodayIso = React.useMemo(() => {
-  const d = new Date(); d.setHours(23,59,59,999); return d.toISOString();
-}, []);
+  // Insights view
+  const [showInsights, setShowInsights] = React.useState(false);
+  const [insights, setInsights] = React.useState(null);
 
-// Do not query yet — just show 0 (or keep last known value if you prefer)
-React.useEffect(() => {
-  if (user?.role !== 'client') return;
-  // setCCountToday(0); // or leave whatever value it had
-}, [user, startOfTodayIso, endOfTodayIso]);
+  const todayStartIso = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  }, []);
 
-  // ---------- FIXED: robust "New today" counter without OR filter ----------
   React.useEffect(() => {
     if (user?.role !== 'client') return;
     (async () => {
-      try {
-        const ids = new Set();
-        const { data: d1 } = await supabase
-          .from('candidates')
-          .select('id')
-          .gte('date_entered', startOfTodayIso)
-          .lte('date_entered', endOfTodayIso)
-          .limit(10000);
-        (d1 || []).forEach((r) => ids.add(r.id));
-
-        const { data: d2 } = await supabase
-          .from('candidates')
-          .select('id')
-          .gte('created_at', startOfTodayIso)
-          .lte('created_at', endOfTodayIso)
-          .limit(10000);
-        (d2 || []).forEach((r) => ids.add(r.id));
-
-        setCCountToday(ids.size);
-      } catch (e) {
-        console.error(e);
-        setCCountToday(0);
-      }
+      const { count } = await supabase
+        .from('candidates')
+        .select('id', { count: 'exact', head: true })
+        .gte('date_entered', todayStartIso);
+      setCCountToday(count || 0);
     })();
-  }, [user, startOfTodayIso, endOfTodayIso]);
-  // ------------------------------------------------------------------------
+  }, [user, todayStartIso]);
 
   React.useEffect(() => {
     if (user?.role !== 'client') return;
@@ -420,6 +396,15 @@ React.useEffect(() => {
     })();
   }, [user]);
 
+  // Helper to parse "min-max" or "min-" strings into numbers (or null)
+  function parseRange(val) {
+    if (!val) return { min: null, max: null };
+    const [minStr, maxStr] = val.split('-');
+    const min = minStr ? Number(minStr) : null;
+    const max = maxStr ? Number(maxStr) : null;
+    return { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null };
+  }
+
   async function fetchClientRows() {
     if (!user || user.role !== 'client') return;
     setClientErr('');
@@ -442,10 +427,16 @@ React.useEffect(() => {
       if (fState) q = q.eq('state', fState);
       if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
       if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
-      if (minSalary != null) q = q.gte('salary', minSalary);
-      if (maxSalary != null) q = q.lte('salary', maxSalary);
-      if (minYears != null) q = q.gte('years', minYears);
-      if (maxYears != null) q = q.lte('years', maxYears);
+
+      // Apply years range
+      const y = parseRange(yearsRange);
+      if (y.min != null) q = q.gte('years', y.min);
+      if (y.max != null) q = q.lte('years', y.max);
+
+      // Apply salary range
+      const s = parseRange(salaryRange);
+      if (s.min != null) q = q.gte('salary', s.min);
+      if (s.max != null) q = q.lte('salary', s.max);
 
       switch (sortBy) {
         case 'date_asc':
@@ -475,7 +466,7 @@ React.useEffect(() => {
           break;
       }
 
-      const { data, error } = await q.limit(1000); // keep expanded limit
+      const { data, error } = await q.limit(200);
       if (error) throw error;
       setClientRows(data || []);
     } catch (e) {
@@ -491,10 +482,8 @@ React.useEffect(() => {
     setFState('');
     setFTitle('');
     setFLaw('');
-    setMinSalary(0);
-    setMaxSalary(400000);
-    setMinYears(0);
-    setMaxYears(50);
+    setSalaryRange('');
+    setYearsRange('');
     setSortBy('date_desc');
     setExpandedId(null);
     fetchClientRows();
@@ -936,142 +925,7 @@ React.useEffect(() => {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    // Slider visuals kept as-is
-    const sliderCss = `
-      .dual-range{
-        -webkit-appearance:none; appearance:none; background:transparent;
-        position:absolute; left:0; right:0; top:7px; height:4px; margin:0; outline:none;
-        pointer-events:none; touch-action:none;
-      }
-      .dual-range::-webkit-slider-thumb{
-        -webkit-appearance:none; width:18px; height:18px; margin-top:-7px;
-        border-radius:999px; background:#22d3ee; border:2px solid #0b0b0b;
-        pointer-events:auto;
-      }
-      .dual-range::-moz-range-thumb{
-        width:18px; height:18px; border-radius:999px;
-        background:#22d3ee; border:2px solid #0b0b0b;
-        pointer-events:auto;
-      }
-    `;
-    const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
-    const trackBase = { position: 'relative', height: 18 };
-
-    function SalarySlider() {
-      const min = 0, max = 400000, step = 5000;
-      const pct = (v) => ((v - min) / (max - min)) * 100;
-      const lowOnTop = maxSalary - minSalary <= step * 3;
-      const zLow  = lowOnTop ? 7 : 6;
-      const zHigh = lowOnTop ? 6 : 7;
-      const sel = {
-        position: 'absolute',
-        top: 7,
-        left: `${pct(minSalary)}%`,
-        right: `${100 - pct(maxSalary)}%`,
-        height: 4,
-        background: '#4F46E5',
-        borderRadius: 999,
-        pointerEvents: 'none',
-      };
-      const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
-      const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
-      return (
-        <div>
-          <Label>Salary range</Label>
-          <div style={{ position: 'relative', height: 18 }}>
-            <div style={rail} />
-            <div style={sel} />
-            <input
-              className="dual-range"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={minSalary}
-              onChange={onLow}
-              onInput={onLow}
-              style={{ zIndex: zLow }}
-            />
-            <input
-              className="dual-range"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={maxSalary}
-              onChange={onHigh}
-              onInput={onHigh}
-              style={{ zIndex: zHigh }}
-            />
-            <style>{sliderCss}</style>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
-            <span>${minSalary.toLocaleString()}</span>
-            <span>${maxSalary.toLocaleString()}</span>
-          </div>
-        </div>
-      );
-    }
-
-    function YearsSlider() {
-      const min = 0, max = 50, step = 1;
-      const pct = (v) => ((v - min) / (max - min)) * 100;
-      const lowOnTop = maxYears - minYears <= step * 2;
-      const zLow  = lowOnTop ? 7 : 6;
-      const zHigh = lowOnTop ? 6 : 7;
-      const sel = {
-        position: 'absolute',
-        top: 7,
-        left: `${pct(minYears)}%`,
-        right: `${100 - pct(maxYears)}%`,
-        height: 4,
-        background: '#4F46E5',
-        borderRadius: 999,
-        pointerEvents: 'none',
-      };
-      const clamp = (v) => Math.min(max, Math.max(min, v));
-      const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
-      const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
-      return (
-        <div>
-          <Label>Years of experience</Label>
-          <div style={{ position: 'relative', height: 18 }}>
-            <div style={rail} />
-            <div style={sel} />
-            <input
-              className="dual-range"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={minYears}
-              onChange={onLow}
-              onInput={onLow}
-              style={{ zIndex: zLow }}
-            />
-            <input
-              className="dual-range"
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={maxYears}
-              onChange={onHigh}
-              onInput={onHigh}
-              style={{ zIndex: zHigh }}
-            />
-            <style>{sliderCss}</style>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12 }}>
-            <span>{minYears} yrs</span>
-            <span>{maxYears} yrs</span>
-          </div>
-        </div>
-      );
-    }
-
-    // Insights helpers + UI
+    // Insights helpers
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -1088,17 +942,15 @@ React.useEffect(() => {
       rows.sort((a, b) => b.avg - a.avg);
       return rows.slice(0, 12);
     }
+    const _csvKey = (k) => k + '_one';
     function explodeCSVToRows(items, csvKey) {
       const rows = [];
       for (const it of items) {
         const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
-        for (const r of raw) rows.push({ ...it, [csvKey + '_one']: r });
+        for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
       }
       return rows;
     }
-
-    const [showInsights, setShowInsights] = React.useState(false);
-    const [insights, setInsights] = React.useState(null);
 
     async function loadInsights() {
       try {
@@ -1108,18 +960,17 @@ React.useEffect(() => {
           .limit(2000);
         if (error) throw error;
 
-        const exTitles = explodeCSVToRows(data, 'titles_csv');
         const byTitleSalary = groupAvg(
-          exTitles.map((r) => ({ ...r, title_one: r['titles_csv_one'] })), 'title_one', 'salary'
+          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
+          'title_one',
+          'salary'
         );
         const byTitleHourly = groupAvg(
-          exTitles.map((r) => ({ ...r, title_one: r['titles_csv_one'] })), 'title_one', 'hourly'
+          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
+          'title_one',
+          'hourly'
         );
-
-        const withCityState = data.map((r) => ({
-          ...r,
-          city_full: [r.city, r.state].filter(Boolean).join(', '),
-        }));
+        const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
         const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
         const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
 
@@ -1191,6 +1042,28 @@ React.useEffect(() => {
         </Card>
       );
     }
+
+    // Build dropdown options
+    const yearsOptions = [
+      { label: 'Any', value: '' },
+      { label: '0–2 years', value: '0-2' },
+      { label: '3–5 years', value: '3-5' },
+      { label: '6–10 years', value: '6-10' },
+      { label: '11–20 years', value: '11-20' },
+      { label: '21+ years', value: '21-' },
+    ];
+
+    const salaryOptions = (() => {
+      const opts = [{ label: 'Any', value: '' }, { label: 'Under $40,000', value: '0-40000' }];
+      for (let start = 40000; start < 500000; start += 20000) {
+        const end = start + 20000;
+        if (end <= 500000) {
+          opts.push({ label: `$${(start/1000).toFixed(0)}k–$${(end/1000).toFixed(0)}k`, value: `${start}-${end}` });
+        }
+      }
+      opts.push({ label: '$500k+', value: '500000-' });
+      return opts;
+    })();
 
     function InsightsView() {
       if (!insights) return null;
@@ -1306,6 +1179,39 @@ React.useEffect(() => {
                       ))}
                     </select>
                   </div>
+
+                  {/* NEW: Salary Range Dropdown */}
+                  <div>
+                    <Label>Salary range</Label>
+                    <select
+                      value={salaryRange}
+                      onChange={(e) => setSalaryRange(e.target.value)}
+                      style={selectStyle}
+                    >
+                      {salaryOptions.map((o) => (
+                        <option key={o.value || 'any-salary'} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* NEW: Years Range Dropdown */}
+                  <div>
+                    <Label>Years of experience</Label>
+                    <select
+                      value={yearsRange}
+                      onChange={(e) => setYearsRange(e.target.value)}
+                      style={selectStyle}
+                    >
+                      {yearsOptions.map((o) => (
+                        <option key={o.value || 'any-years'} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <Label>Sort by</Label>
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
@@ -1318,12 +1224,6 @@ React.useEffect(() => {
                       <option value="years_desc">Years (high → low)</option>
                       <option value="years_asc">Years (low → high)</option>
                     </select>
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <SalarySlider />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <YearsSlider />
                   </div>
                 </div>
                 <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
