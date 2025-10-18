@@ -338,16 +338,19 @@ export default function Page() {
   const [expandedId, setExpandedId] = React.useState(null);
 
   // start/end of today (local)
-  const startOfTodayIso = React.useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
-  }, []);
-  const endOfTodayIso = React.useMemo(() => {
-    const d = new Date();
-    d.setHours(23, 59, 59, 999);
-    return d.toISOString();
-  }, []);
+  // TEMP: disable "New today" query to unblock Client tab
+const startOfTodayIso = React.useMemo(() => {
+  const d = new Date(); d.setHours(0,0,0,0); return d.toISOString();
+}, []);
+const endOfTodayIso = React.useMemo(() => {
+  const d = new Date(); d.setHours(23,59,59,999); return d.toISOString();
+}, []);
+
+// Do not query yet — just show 0 (or keep last known value if you prefer)
+React.useEffect(() => {
+  if (user?.role !== 'client') return;
+  // setCCountToday(0); // or leave whatever value it had
+}, [user, startOfTodayIso, endOfTodayIso]);
 
   // ---------- FIXED: robust "New today" counter without OR filter ----------
   React.useEffect(() => {
