@@ -337,7 +337,7 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
-  // ====== FIX #1: robust "today" window (local time) and OR on date_entered/created_at ======
+  // start/end of today (local)
   const startOfTodayIso = React.useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -349,20 +349,36 @@ export default function Page() {
     return d.toISOString();
   }, []);
 
+  // ---------- FIXED: robust "New today" counter without OR filter ----------
   React.useEffect(() => {
     if (user?.role !== 'client') return;
     (async () => {
-      const { count, error } = await supabase
-        .from('candidates')
-        .select('id', { count: 'exact', head: true })
-        .or(
-          `and(date_entered.gte.${startOfTodayIso},date_entered.lte.${endOfTodayIso}),` +
-          `and(created_at.gte.${startOfTodayIso},created_at.lte.${endOfTodayIso})`
-        );
-      if (!error) setCCountToday(count || 0);
+      try {
+        const ids = new Set();
+        const { data: d1 } = await supabase
+          .from('candidates')
+          .select('id')
+          .gte('date_entered', startOfTodayIso)
+          .lte('date_entered', endOfTodayIso)
+          .limit(10000);
+        (d1 || []).forEach((r) => ids.add(r.id));
+
+        const { data: d2 } = await supabase
+          .from('candidates')
+          .select('id')
+          .gte('created_at', startOfTodayIso)
+          .lte('created_at', endOfTodayIso)
+          .limit(10000);
+        (d2 || []).forEach((r) => ids.add(r.id));
+
+        setCCountToday(ids.size);
+      } catch (e) {
+        console.error(e);
+        setCCountToday(0);
+      }
     })();
   }, [user, startOfTodayIso, endOfTodayIso]);
-  // ====== /FIX #1 ======
+  // ------------------------------------------------------------------------
 
   React.useEffect(() => {
     if (user?.role !== 'client') return;
@@ -456,9 +472,7 @@ export default function Page() {
           break;
       }
 
-      // ====== FIX #2: increase limit so we don't miss candidates ======
-      const { data, error } = await q.limit(1000);
-      // ====== /FIX #2 ======
+      const { data, error } = await q.limit(1000); // keep expanded limit
       if (error) throw error;
       setClientRows(data || []);
     } catch (e) {
@@ -919,7 +933,7 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    // Dual-slider CSS used by client filters (unchanged from your working build)
+    // Slider visuals kept as-is
     const sliderCss = `
       .dual-range{
         -webkit-appearance:none; appearance:none; background:transparent;
@@ -937,18 +951,15 @@ export default function Page() {
         pointer-events:auto;
       }
     `;
-
     const rail = { position: 'absolute', left: 0, right: 0, top: 7, height: 4, background: '#1F2937', borderRadius: 999 };
     const trackBase = { position: 'relative', height: 18 };
 
     function SalarySlider() {
       const min = 0, max = 400000, step = 5000;
       const pct = (v) => ((v - min) / (max - min)) * 100;
-
       const lowOnTop = maxSalary - minSalary <= step * 3;
       const zLow  = lowOnTop ? 7 : 6;
       const zHigh = lowOnTop ? 6 : 7;
-
       const sel = {
         position: 'absolute',
         top: 7,
@@ -962,7 +973,6 @@ export default function Page() {
       const clamp = (v) => Math.min(max, Math.max(min, v));
       const onLow  = (e) => setMinSalary(Math.min(clamp(+e.target.value), maxSalary));
       const onHigh = (e) => setMaxSalary(Math.max(clamp(+e.target.value), minSalary));
-
       return (
         <div>
           <Label>Salary range</Label>
@@ -1004,11 +1014,9 @@ export default function Page() {
     function YearsSlider() {
       const min = 0, max = 50, step = 1;
       const pct = (v) => ((v - min) / (max - min)) * 100;
-
       const lowOnTop = maxYears - minYears <= step * 2;
       const zLow  = lowOnTop ? 7 : 6;
       const zHigh = lowOnTop ? 6 : 7;
-
       const sel = {
         position: 'absolute',
         top: 7,
@@ -1022,7 +1030,6 @@ export default function Page() {
       const clamp = (v) => Math.min(max, Math.max(min, v));
       const onLow  = (e) => setMinYears(Math.min(clamp(+e.target.value), maxYears));
       const onHigh = (e) => setMaxYears(Math.max(clamp(+e.target.value), minYears));
-
       return (
         <div>
           <Label>Years of experience</Label>
@@ -1061,7 +1068,7 @@ export default function Page() {
       );
     }
 
-    // Insights helpers & UI
+    // Insights helpers + UI
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
