@@ -419,9 +419,9 @@ export default function Page() {
       const qStr = search.trim();
       if (qStr) {
         const like = `%${qStr}%`;
-        q = q.or(
-          `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like}`
-        );
+      q = q.or(
+  `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like},notes.ilike.${like}`
+);
       }
       if (fCity) q = q.eq('city', fCity);
       if (fState) q = q.eq('state', fState);
