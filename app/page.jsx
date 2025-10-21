@@ -572,7 +572,8 @@ export default function Page() {
                 onChange={(e) => setPwd(e.target.value)}
               />
             </div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8, ...formNarrow }}>
+            {/* CHANGED: matched spacing (10) & centered under password */}
+            <div style={{ marginTop: 10, ...formNarrow }}>
               <Button onClick={login} style={{ width: '100%' }}>
                 Log in
               </Button>
@@ -1551,6 +1552,6 @@ const selectStyle = {
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 
-// Center/narrow form helpers (added)
+// Center/narrow form helpers
 const formNarrow = { maxWidth: 420, margin: '0 auto' };
 const formWide = { maxWidth: 1000, margin: '0 auto' };
