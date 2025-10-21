@@ -573,7 +573,7 @@ export default function Page() {
               />
             </div>
 
-            {/* CHANGED: centered button beneath password and nudged down */}
+            {/* Centered button beneath password */}
             <div style={{ ...formNarrow, marginTop: 16, display: 'flex', justifyContent: 'center' }}>
               <Button onClick={login} style={{ display: 'inline-block', minWidth: 220 }}>
                 Log in
@@ -974,6 +974,7 @@ export default function Page() {
           .limit(2000);
         if (error) throw error;
 
+        // By Title (overall)
         const byTitleSalary = groupAvg(
           explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
           'title_one',
@@ -984,10 +985,13 @@ export default function Page() {
           'title_one',
           'hourly'
         );
+
+        // By City (overall)
         const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
         const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
         const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
 
+        // By Years (salary)
         const buckets = [
           { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
           { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
@@ -1012,12 +1016,35 @@ export default function Page() {
           }
         }
 
+        /* ======== NEW: By City broken up by Title (Paralegal / Attorney) ======== */
+        const lcIncludes = (hay, needle) =>
+          (hay || '').toLowerCase().split(',').map(s => s.trim()).some(t => t.includes(needle));
+        const filterByTitle = (rows, needleLC) =>
+          rows.filter(r => lcIncludes(r.titles_csv, needleLC));
+
+        const byCitySalaryParalegal = groupAvg(
+          filterByTitle(withCityState, 'paralegal'),
+          'city_full',
+          'salary'
+        );
+        const byCitySalaryAttorney = groupAvg(
+          filterByTitle(withCityState, 'attorney'),
+          'city_full',
+          'salary'
+        );
+        /* ======================================================================= */
+
         setInsights({
           byTitleSalary,
           byTitleHourly,
           byCitySalary,
           byCityHourly,
           byYearsSalary: yearsAgg,
+          // NEW additions:
+          byCitySalaryByTitle: {
+            Paralegal: byCitySalaryParalegal,
+            Attorney: byCitySalaryAttorney,
+          },
         });
         setShowInsights(true);
       } catch (e) {
@@ -1081,6 +1108,8 @@ export default function Page() {
 
     function InsightsView() {
       if (!insights) return null;
+      const cityByParalegal = insights.byCitySalaryByTitle?.Paralegal || [];
+      const cityByAttorney  = insights.byCitySalaryByTitle?.Attorney  || [];
       return (
         <div style={{ width: 'min(1150px, 100%)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1101,6 +1130,15 @@ export default function Page() {
           <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
           <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+
+          {/* ===== NEW: By City broken up by Title ===== */}
+          {cityByParalegal.length > 0 && (
+            <BarChart title="Avg Salary by City — Paralegals" rows={cityByParalegal} money />
+          )}
+          {cityByAttorney.length > 0 && (
+            <BarChart title="Avg Salary by City — Attorneys" rows={cityByAttorney} money />
+          )}
+          {/* ========================================== */}
         </div>
       );
     }
