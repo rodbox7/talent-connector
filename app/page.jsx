@@ -317,9 +317,13 @@ export default function Page() {
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
-  // NEW: dropdown ranges
-  const [salaryRange, setSalaryRange] = React.useState(''); // encoded as "min-max" or "min-"
-  const [yearsRange, setYearsRange] = React.useState('');   // encoded as "min-max" or "min-"
+  // Dropdown ranges
+  const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
+  const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
+
+  // NEW: contract-only and hourly range UI
+  const [contractOnly, setContractOnly] = React.useState(false);
+  const [hourlyRange, setHourlyRange] = React.useState(''); // "min-max"
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
@@ -438,6 +442,14 @@ export default function Page() {
       if (s.min != null) q = q.gte('salary', s.min);
       if (s.max != null) q = q.lte('salary', s.max);
 
+      // NEW: Contract-only and hourly range filter
+      if (contractOnly) {
+        q = q.eq('contract', true);
+        const hr = parseRange(hourlyRange);
+        if (hr.min != null) q = q.gte('hourly', hr.min);
+        if (hr.max != null) q = q.lte('hourly', hr.max);
+      }
+
       switch (sortBy) {
         case 'date_asc':
           q = q.order('date_entered', { ascending: true });
@@ -484,6 +496,8 @@ export default function Page() {
     setFLaw('');
     setSalaryRange('');
     setYearsRange('');
+    setContractOnly(false);     // NEW
+    setHourlyRange('');         // NEW
     setSortBy('date_desc');
     setExpandedId(null);
     fetchClientRows();
@@ -1016,7 +1030,8 @@ export default function Page() {
           }
         }
 
-        /* ======== NEW: By City broken up by Title (Paralegal / Attorney) ======== */
+        // By City broken up by Title (Paralegal / Attorney)
+        const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
         const lcIncludes = (hay, needle) =>
           (hay || '').toLowerCase().split(',').map(s => s.trim()).some(t => t.includes(needle));
         const filterByTitle = (rows, needleLC) =>
@@ -1032,7 +1047,6 @@ export default function Page() {
           'city_full',
           'salary'
         );
-        /* ======================================================================= */
 
         setInsights({
           byTitleSalary,
@@ -1040,7 +1054,6 @@ export default function Page() {
           byCitySalary,
           byCityHourly,
           byYearsSalary: yearsAgg,
-          // NEW additions:
           byCitySalaryByTitle: {
             Paralegal: byCitySalaryParalegal,
             Attorney: byCitySalaryAttorney,
@@ -1106,6 +1119,22 @@ export default function Page() {
       return opts;
     })();
 
+    // NEW: hourly options $25–$50 up to $275–$300 in $25 steps
+    const hourlyOptions = React.useMemo(() => {
+      const list = [{ label: 'Any hourly', value: '' }];
+      let start = 25;
+      while (start < 300) {
+        const end = start + 25;
+        list.push({ label: `$${start}–$${end}`, value: `${start}-${end}` });
+        start = end;
+      }
+      // add the final 275–300
+      if (!list.find(o => o.value === '275-300')) {
+        list.push({ label: '$275–$300', value: '275-300' });
+      }
+      return list;
+    }, []);
+
     function InsightsView() {
       if (!insights) return null;
       const cityByParalegal = insights.byCitySalaryByTitle?.Paralegal || [];
@@ -1130,15 +1159,12 @@ export default function Page() {
           <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
           <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
-
-          {/* ===== NEW: By City broken up by Title ===== */}
           {cityByParalegal.length > 0 && (
             <BarChart title="Avg Salary by City — Paralegals" rows={cityByParalegal} money />
           )}
           {cityByAttorney.length > 0 && (
             <BarChart title="Avg Salary by City — Attorneys" rows={cityByAttorney} money />
           )}
-          {/* ========================================== */}
         </div>
       );
     }
@@ -1264,6 +1290,38 @@ export default function Page() {
                     </select>
                   </div>
 
+                  {/* NEW: Contract-only + Hourly range (conditional) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={contractOnly}
+                        onChange={(e) => {
+                          setContractOnly(e.target.checked);
+                          if (!e.target.checked) setHourlyRange('');
+                        }}
+                      />
+                      <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract only</span>
+                    </label>
+                  </div>
+
+                  {contractOnly && (
+                    <div>
+                      <Label>Hourly rate</Label>
+                      <select
+                        value={hourlyRange}
+                        onChange={(e) => setHourlyRange(e.target.value)}
+                        style={selectStyle}
+                      >
+                        {hourlyOptions.map((o) => (
+                          <option key={o.value || 'any-hourly'} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <Label>Sort by</Label>
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
@@ -1278,6 +1336,7 @@ export default function Page() {
                     </select>
                   </div>
                 </div>
+
                 <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                   <Button onClick={fetchClientRows}>Apply filters</Button>
                   <Button
