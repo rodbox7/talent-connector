@@ -572,9 +572,10 @@ export default function Page() {
                 onChange={(e) => setPwd(e.target.value)}
               />
             </div>
-            {/* slightly more space and centered under password */}
-            <div style={{ marginTop: 14, ...formNarrow }}>
-              <Button onClick={login} style={{ width: '100%' }}>
+
+            {/* CHANGED: centered button beneath password and nudged down */}
+            <div style={{ ...formNarrow, marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+              <Button onClick={login} style={{ display: 'inline-block', minWidth: 220 }}>
                 Log in
               </Button>
             </div>
