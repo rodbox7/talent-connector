@@ -572,7 +572,7 @@ export default function Page() {
                 onChange={(e) => setPwd(e.target.value)}
               />
             </div>
-            {/* ONLY CHANGE: slightly more space and centered under password */}
+            {/* slightly more space and centered under password */}
             <div style={{ marginTop: 14, ...formNarrow }}>
               <Button onClick={login} style={{ width: '100%' }}>
                 Log in
@@ -1127,7 +1127,7 @@ export default function Page() {
                   </Tag>
                   <Button
                     onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid '#1F2937' }}
+                    style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
                   >
                     Compensation Insights
                   </Button>
