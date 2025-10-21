@@ -419,9 +419,9 @@ export default function Page() {
       const qStr = search.trim();
       if (qStr) {
         const like = `%${qStr}%`;
-      q = q.or(
-  `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like},notes.ilike.${like}`
-);
+        q = q.or(
+          `name.ilike.${like},city.ilike.${like},state.ilike.${like},titles_csv.ilike.${like},law_csv.ilike.${like},notes.ilike.${like}`
+        );
       }
       if (fCity) q = q.eq('city', fCity);
       if (fState) q = q.eq('state', fState);
@@ -552,7 +552,9 @@ export default function Page() {
                 </button>
               ))}
             </div>
-            <div>
+
+            {/* Centered login fields */}
+            <div style={formNarrow}>
               <Label>Email</Label>
               <Input
                 type="email"
@@ -561,7 +563,7 @@ export default function Page() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 10, ...formNarrow }}>
               <Label>Password</Label>
               <Input
                 type="password"
@@ -570,11 +572,12 @@ export default function Page() {
                 onChange={(e) => setPwd(e.target.value)}
               />
             </div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, ...formNarrow }}>
               <Button onClick={login} style={{ width: '100%' }}>
                 Log in
               </Button>
             </div>
+
             {err ? (
               <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
             ) : null}
@@ -608,97 +611,106 @@ export default function Page() {
             </div>
 
             <Card style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <Label>Full name</Label>
-                  <Input placeholder="Attorney" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Title(s) (CSV)</Label>
-                  <Input
-                    placeholder="Attorney, Paralegal, etc."
-                    value={titles}
-                    onChange={(e) => setTitles(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Type of Law (CSV)</Label>
-                  <Input
-                    placeholder="Litigation, Immigration"
-                    value={law}
-                    onChange={(e) => setLaw(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>City</Label>
-                  <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
-                </div>
-                <div>
-                  <Label>State</Label>
-                  <Input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Years of experience</Label>
-                  <Input
-                    placeholder="Years"
-                    inputMode="numeric"
-                    value={years}
-                    onChange={(e) => setYears(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Years in most recent job</Label>
-                  <Input
-                    placeholder="e.g., 3"
-                    inputMode="numeric"
-                    value={recentYears}
-                    onChange={(e) => setRecentYears(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Salary desired</Label>
-                  <Input
-                    placeholder="e.g., 120000"
-                    inputMode="numeric"
-                    value={salary}
-                    onChange={(e) => setSalary(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Date entered</Label>
-                  <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <input
-                      type="checkbox"
-                      checked={contract}
-                      onChange={(e) => setContract(e.target.checked)}
+              <div style={{ fontWeight: 800, marginBottom: 14, ...formWide }}>Add candidate</div>
+
+              {/* Centered form content */}
+              <div style={{ ...formWide }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <Label>Description</Label>
+                    <Input
+                      placeholder="AM Law 100 Litigation Paralegal"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                     />
-                    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
-                  </label>
-                  {contract ? (
-                    <div style={{ flex: 1 }}>
-                      <Input
-                        placeholder="Hourly rate (e.g., 80)"
-                        inputMode="numeric"
-                        value={hourly}
-                        onChange={(e) => setHourly(e.target.value)}
+                  </div>
+                  <div>
+                    <Label>Title(s) (CSV)</Label>
+                    <Input
+                      placeholder="Attorney, Paralegal, etc."
+                      value={titles}
+                      onChange={(e) => setTitles(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Type of Law (CSV)</Label>
+                    <Input
+                      placeholder="Litigation, Immigration"
+                      value={law}
+                      onChange={(e) => setLaw(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <Input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Years of experience</Label>
+                    <Input
+                      placeholder="Years"
+                      inputMode="numeric"
+                      value={years}
+                      onChange={(e) => setYears(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Years in most recent job</Label>
+                    <Input
+                      placeholder="e.g., 3"
+                      inputMode="numeric"
+                      value={recentYears}
+                      onChange={(e) => setRecentYears(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Salary desired</Label>
+                    <Input
+                      placeholder="e.g., 120000"
+                      inputMode="numeric"
+                      value={salary}
+                      onChange={(e) => setSalary(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Date entered</Label>
+                    <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <input
+                        type="checkbox"
+                        checked={contract}
+                        onChange={(e) => setContract(e.target.checked)}
                       />
-                    </div>
-                  ) : null}
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <Label>Candidate Notes</Label>
-                  <TextArea
-                    placeholder="Short summary: strengths, availability, fit notes."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
+                      <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
+                    </label>
+                    {contract ? (
+                      <div style={{ flex: 1 }}>
+                        <Input
+                          placeholder="Hourly rate (e.g., 80)"
+                          inputMode="numeric"
+                          value={hourly}
+                          onChange={(e) => setHourly(e.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <Label>Candidate Notes</Label>
+                    <TextArea
+                      placeholder="Short summary: strengths, availability, fit notes."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
-              <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+
+              <div style={{ marginTop: 14, display: 'flex', gap: 10, ...formWide }}>
                 <Button onClick={addCandidate}>Add candidate</Button>
                 {addMsg ? (
                   <div
@@ -1180,7 +1192,7 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* NEW: Salary Range Dropdown */}
+                  {/* Salary Range Dropdown */}
                   <div>
                     <Label>Salary range</Label>
                     <select
@@ -1196,7 +1208,7 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* NEW: Years Range Dropdown */}
+                  {/* Years Range Dropdown */}
                   <div>
                     <Label>Years of experience</Label>
                     <select
@@ -1538,3 +1550,7 @@ const selectStyle = {
 };
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
+
+// Center/narrow form helpers (added)
+const formNarrow = { maxWidth: 420, margin: '0 auto' };
+const formWide = { maxWidth: 1000, margin: '0 auto' };
