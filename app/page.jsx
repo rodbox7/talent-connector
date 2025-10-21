@@ -321,7 +321,7 @@ export default function Page() {
   const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
   const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
 
-  // NEW: contract-only and hourly range UI
+  // Contract-only and hourly range UI
   const [contractOnly, setContractOnly] = React.useState(false);
   const [hourlyRange, setHourlyRange] = React.useState(''); // "min-max"
 
@@ -442,7 +442,7 @@ export default function Page() {
       if (s.min != null) q = q.gte('salary', s.min);
       if (s.max != null) q = q.lte('salary', s.max);
 
-      // NEW: Contract-only and hourly range filter
+      // Contract-only and hourly range filter
       if (contractOnly) {
         q = q.eq('contract', true);
         const hr = parseRange(hourlyRange);
@@ -496,8 +496,8 @@ export default function Page() {
     setFLaw('');
     setSalaryRange('');
     setYearsRange('');
-    setContractOnly(false);     // NEW
-    setHourlyRange('');         // NEW
+    setContractOnly(false);
+    setHourlyRange('');
     setSortBy('date_desc');
     setExpandedId(null);
     fetchClientRows();
@@ -1031,19 +1031,19 @@ export default function Page() {
         }
 
         // By City broken up by Title (Paralegal / Attorney)
-        const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
+        const withCityState2 = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
         const lcIncludes = (hay, needle) =>
           (hay || '').toLowerCase().split(',').map(s => s.trim()).some(t => t.includes(needle));
         const filterByTitle = (rows, needleLC) =>
           rows.filter(r => lcIncludes(r.titles_csv, needleLC));
 
         const byCitySalaryParalegal = groupAvg(
-          filterByTitle(withCityState, 'paralegal'),
+          filterByTitle(withCityState2, 'paralegal'),
           'city_full',
           'salary'
         );
         const byCitySalaryAttorney = groupAvg(
-          filterByTitle(withCityState, 'attorney'),
+          filterByTitle(withCityState2, 'attorney'),
           'city_full',
           'salary'
         );
@@ -1119,7 +1119,7 @@ export default function Page() {
       return opts;
     })();
 
-    // NEW: hourly options $25–$50 up to $275–$300 in $25 steps
+    // Hourly options $25–$50 up to $275–$300 in $25 steps
     const hourlyOptions = React.useMemo(() => {
       const list = [{ label: 'Any hourly', value: '' }];
       let start = 25;
@@ -1128,7 +1128,6 @@ export default function Page() {
         list.push({ label: `$${start}–$${end}`, value: `${start}-${end}` });
         start = end;
       }
-      // add the final 275–300
       if (!list.find(o => o.value === '275-300')) {
         list.push({ label: '$275–$300', value: '275-300' });
       }
@@ -1290,7 +1289,7 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* NEW: Contract-only + Hourly range (conditional) */}
+                  {/* Contract-only + Hourly range (conditional) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
@@ -1554,7 +1553,7 @@ function AdminPanel() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div>
+            <div>
             <Label>Role</Label>
             <select value={role} onChange={(e) => setRole(e.target.value)} style={selectStyle}>
               <option value="client">Client</option>
