@@ -317,11 +317,11 @@ export default function Page() {
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
-  // Dropdown ranges (kept from your working version)
+  // Dropdown ranges (working version)
   const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
   const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
 
-  // NEW: contract filters
+  // Contract filters
   const [onlyContract, setOnlyContract] = React.useState(false);
   const [hourlyRange, setHourlyRange] = React.useState(''); // "min-max"
 
@@ -400,7 +400,6 @@ export default function Page() {
     })();
   }, [user]);
 
-  // Helper to parse "min-max" or "min-" strings into numbers (or null)
   function parseRange(val) {
     if (!val) return { min: null, max: null };
     const [minStr, maxStr] = val.split('-');
@@ -432,17 +431,14 @@ export default function Page() {
       if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
       if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
 
-      // Years range
       const y = parseRange(yearsRange);
       if (y.min != null) q = q.gte('years', y.min);
       if (y.max != null) q = q.lte('years', y.max);
 
-      // Salary range
       const s = parseRange(salaryRange);
       if (s.min != null) q = q.gte('salary', s.min);
       if (s.max != null) q = q.lte('salary', s.max);
 
-      // NEW: Contract filter + hourly range
       if (onlyContract) {
         q = q.eq('contract', true);
         const hr = parseRange(hourlyRange);
@@ -541,7 +537,35 @@ export default function Page() {
               Invitation-only access
             </div>
 
-            {/* Centered login fields */}
+            {/* RESTORED: role picker buttons */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              {['recruiter', 'client', 'admin'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: '1px solid #1F2937',
+                    background: mode === m ? '#1F2937' : '#0B1220',
+                    color: '#E5E7EB',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {m[0].toUpperCase() + m.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Centered login fields + centered login button */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
               <div style={{ width: '100%' }}>
                 <Label>Email</Label>
@@ -561,8 +585,8 @@ export default function Page() {
                   onChange={(e) => setPwd(e.target.value)}
                 />
               </div>
-              <div style={{ width: '100%', marginTop: 4, display: 'flex', justifyContent: 'center' }}>
-                <Button onClick={login} style={{ minWidth: 120 }}>
+              <div style={{ width: '100%', marginTop: 6, display: 'flex', justifyContent: 'center' }}>
+                <Button onClick={login} style={{ minWidth: 140 }}>
                   Log in
                 </Button>
               </div>
@@ -930,7 +954,6 @@ export default function Page() {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    // Build dropdown options (same as your working version)
     const yearsOptions = [
       { label: 'Any', value: '' },
       { label: '0–2 years', value: '0-2' },
@@ -945,14 +968,13 @@ export default function Page() {
       for (let start = 40000; start < 500000; start += 20000) {
         const end = start + 20000;
         if (end <= 500000) {
-          opts.push({ label: `$${(start/1000).toFixed(0)}k–$${(end/1000).toFixed(0)}k`, value: `${start}-${end}` });
+          opts.push({ label: `$${(start / 1000).toFixed(0)}k–$${(end / 1000).toFixed(0)}k`, value: `${start}-${end}` });
         }
       }
       opts.push({ label: '$500k+', value: '500000-' });
       return opts;
     })();
 
-    // NEW: hourly range options (25–50 up to 275–300)
     const hourlyOptions = (() => {
       const ranges = [{ label: 'Any', value: '' }];
       let start = 25;
@@ -961,11 +983,9 @@ export default function Page() {
         ranges.push({ label: `$${start}–$${end}/hr`, value: `${start}-${end}` });
         start = end;
       }
-      // include the last exact 275–300 above; no 300+ per your spec
       return ranges;
     })();
 
-    // Insights helpers (unchanged)
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -1198,7 +1218,6 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* Salary range dropdown */}
                   <div>
                     <Label>Salary range</Label>
                     <select
@@ -1227,7 +1246,6 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* Years range dropdown */}
                   <div>
                     <Label>Years of experience</Label>
                     <select
@@ -1250,7 +1268,6 @@ export default function Page() {
                     </select>
                   </div>
 
-                  {/* NEW: Contract-only checkbox */}
                   <div>
                     <Label>Contract availability</Label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 42 }}>
@@ -1269,7 +1286,6 @@ export default function Page() {
                     </div>
                   </div>
 
-                  {/* NEW: Hourly range dropdown (shows only if Contract is checked) */}
                   {onlyContract ? (
                     <div>
                       <Label>Hourly rate range</Label>
