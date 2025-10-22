@@ -267,66 +267,69 @@ export default function Page() {
     }
   }
 
-  async function refreshMyRecent() {
-    if (!user || user.role !== 'recruiter') return;
-    setLoadingList(true);
-    const { data, error } = await supabase
-      .from('candidates')
-      .select(
-        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes'
-      )
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (!error && data) setMyRecent(data);
-    setLoadingList(false);
-  }
-  React.useEffect(() => {
-    if (user?.role === 'recruiter') refreshMyRecent();
-  }, [user]);
-
   async function addCandidate() {
-    setAddMsg('');
-    try {
-      if (!user || user.role !== 'recruiter') {
-        setAddMsg('You must be logged in as recruiter.');
-        return;
-      }
-      const payload = {
-        name: name.trim(),
-        titles_csv: titles.trim(),
-        law_csv: law.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        years: years ? Number(years) : null,
-        recent_role_years: recentYears ? Number(recentYears) : null,
-        salary: salary ? Number(salary) : null,
-        contract: !!contract,
-        hourly: contract ? (hourly ? Number(hourly) : null) : null,
-        // store as plain YYYY-MM-DD (string/date column recommended)
-        date_entered: dateEntered || null,
-        notes: notes.trim() || null,
-        created_by: user.id,
-      };
-      const { error } = await supabase.from('candidates').insert(payload);
-      if (error) throw error;
-
-      setAddMsg('Candidate added');
-      setName('');
-      setCity('');
-      setState('');
-      setYears('');
-      setRecentYears('');
-      setSalary('');
-      setContract(false);
-      setHourly('');
-      setNotes('');
-      await refreshMyRecent();
-    } catch (e) {
-      console.error(e);
-      setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
+  setAddMsg('');
+  try {
+    if (!user || user.role !== 'recruiter') {
+      setAddMsg('You must be logged in as recruiter.');
+      return;
     }
+    const payload = {
+      name: name.trim(),
+      titles_csv: titles.trim(),
+      law_csv: law.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      years: years ? Number(years) : null,
+      recent_role_years: recentYears ? Number(recentYears) : null,
+      salary: salary ? Number(salary) : null,
+      contract: !!contract,
+      hourly: contract ? (hourly ? Number(hourly) : null) : null,
+      // keep date_entered in local (today) timezone
+      date_entered: (() => {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })(),
+      notes: notes.trim() || null,
+      created_by: user.id,
+    };
+    const { error } = await supabase.from('candidates').insert(payload);
+    if (error) throw error;
+
+    setAddMsg('Candidate added');
+
+    // ---------- CLEAR ALL FIELDS (this is what you wanted) ----------
+    setName('');
+    setTitles('');           // clear titles
+    setLaw('');              // clear law
+    setCity('');
+    setState('');
+    setYears('');
+    setRecentYears('');
+    setSalary('');
+    setContract(false);
+    setHourly('');
+    setNotes('');
+
+    // reset date picker back to "today" (local, not UTC)
+    {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setDateEntered(`${yyyy}-${mm}-${dd}`);
+    }
+    // ---------------------------------------------------------------
+
+    await refreshMyRecent();
+  } catch (e) {
+    console.error(e);
+    setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
   }
+}
 
   /* ---------- Client state & functions ---------- */
   const [cCountToday, setCCountToday] = React.useState(0);
