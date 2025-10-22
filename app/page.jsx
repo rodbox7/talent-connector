@@ -355,11 +355,17 @@ export default function Page() {
   React.useEffect(() => {
     if (user?.role !== 'client') return;
     (async () => {
-      const { count } = await supabase
-        .from('candidates')
-        .select('id', { count: 'exact', head: true })
-        .gte('date_entered', todayStartIso);
-      setCCountToday(count || 0);
+      try {
+        const { count, error } = await supabase
+          .from('candidates')
+          .select('id', { count: 'exact', head: true })
+          .gte('date_entered', todayStartIso);
+        if (error) throw error;
+        setCCountToday(count || 0);
+      } catch (e) {
+        console.error(e);
+        setCCountToday(0);
+      }
     })();
   }, [user, todayStartIso]);
 
@@ -1030,7 +1036,7 @@ export default function Page() {
           }
         }
 
-        // By City broken up by Title (Paralegal / Attorney)
+        // By City broken up by Title (Paralegal / Attorney) — renamed var to avoid re-declare
         const withCityState2 = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
         const lcIncludes = (hay, needle) =>
           (hay || '').toLowerCase().split(',').map(s => s.trim()).some(t => t.includes(needle));
@@ -1067,12 +1073,13 @@ export default function Page() {
     }
 
     function BarChart({ title, rows, money = true }) {
-      const max = Math.max(...rows.map((r) => r.avg), 1);
+      const safeRows = Array.isArray(rows) ? rows : [];
+      const max = Math.max(...safeRows.map((r) => r.avg), 1);
       return (
         <Card style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            {rows.map((r) => (
+            {safeRows.map((r) => (
               <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
                 <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {r.label}
@@ -1091,7 +1098,7 @@ export default function Page() {
                 </div>
               </div>
             ))}
-            {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
+            {safeRows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
           </div>
         </Card>
       );
@@ -1553,7 +1560,7 @@ function AdminPanel() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-            <div>
+          <div>
             <Label>Role</Label>
             <select value={role} onChange={(e) => setRole(e.target.value)} style={selectStyle}>
               <option value="client">Client</option>
