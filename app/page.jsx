@@ -22,8 +22,8 @@ const Card = ({ children, style }) => (
   </div>
 );
 
-const Label = ({ children }) => (
-  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 6 }}>{children}</div>
+const Label = ({ children, style }) => (
+  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 6, ...(style || {}) }}>{children}</div>
 );
 
 const Input = (props) => (
@@ -95,11 +95,13 @@ const Tag = ({ children, style }) => (
 );
 
 /* ---------- helpers ---------- */
-function formatDate(val) {
+// Show date safely with *no timezone drift*.
+// If it's an ISO-like string, prefer the literal YYYY-MM-DD part.
+function renderDate(val) {
   if (!val) return '—';
-  // If already plain date (YYYY-MM-DD), render at local midnight
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
-    return new Date(val + 'T00:00:00').toLocaleDateString();
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
   }
   try {
     return new Date(val).toLocaleDateString();
@@ -181,7 +183,6 @@ export default function Page() {
   const [hourly, setHourly] = React.useState('');
   const [dateEntered, setDateEntered] = React.useState(() => {
     const d = new Date();
-    // default as local YYYY-MM-DD
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
@@ -209,9 +210,7 @@ export default function Page() {
       salary: row.salary ?? '',
       contract: !!row.contract,
       hourly: row.hourly ?? '',
-      date_entered: (row.date_entered ? new Date(row.date_entered + 'T00:00:00') : new Date(row.created_at))
-        .toISOString()
-        .slice(0, 10),
+      date_entered: (row.date_entered ? (String(row.date_entered).slice(0,10)) : new Date(row.created_at).toISOString().slice(0,10)),
       notes: row.notes || '',
     });
   }
@@ -242,7 +241,7 @@ export default function Page() {
           : editForm.hourly === ''
           ? null
           : Number(editForm.hourly),
-        // SAVE AS PLAIN 'YYYY-MM-DD'
+        // store as plain YYYY-MM-DD (string/date column recommended)
         date_entered: editForm.date_entered || null,
         notes: String(editForm.notes || '').trim() || null,
       };
@@ -304,7 +303,7 @@ export default function Page() {
         salary: salary ? Number(salary) : null,
         contract: !!contract,
         hourly: contract ? (hourly ? Number(hourly) : null) : null,
-        // SAVE AS PLAIN 'YYYY-MM-DD'
+        // store as plain YYYY-MM-DD (string/date column recommended)
         date_entered: dateEntered || null,
         notes: notes.trim() || null,
         created_by: user.id,
@@ -336,6 +335,9 @@ export default function Page() {
   // dropdown ranges
   const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
   const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
+  // NEW contract-only + hourly range (client sees billable=1.66x)
+  const [contractOnly, setContractOnly] = React.useState(false);
+  const [hourlyBillRange, setHourlyBillRange] = React.useState(''); // "25-50" ... "300-"
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
@@ -373,7 +375,7 @@ export default function Page() {
       const { count } = await supabase
         .from('candidates')
         .select('id', { count: 'exact', head: true })
-        .gte('date_entered', todayStr); // compare as 'YYYY-MM-DD'
+        .gte('date_entered', todayStr);
       setCCountToday(count || 0);
     })();
   }, [user, todayStr]);
@@ -415,13 +417,23 @@ export default function Page() {
     })();
   }, [user]);
 
-  // Helper to parse "min-max" or "min-" strings into numbers (or null)
+  // Helpers
   function parseRange(val) {
     if (!val) return { min: null, max: null };
     const [minStr, maxStr] = val.split('-');
     const min = minStr ? Number(minStr) : null;
     const max = maxStr ? Number(maxStr) : null;
     return { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null };
+  }
+
+  // Convert a client billable range back to recruiter hourly range
+  function billToRecruiterRange(val) {
+    const r = parseRange(val);
+    const k = 1.66; // bill = 1.66 * pay
+    let min = null, max = null;
+    if (r.min != null) min = Math.ceil(r.min / k);
+    if (r.max != null) max = Math.floor(r.max / k);
+    return { min, max };
   }
 
   async function fetchClientRows() {
@@ -447,15 +459,23 @@ export default function Page() {
       if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
       if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
 
-      // Apply years range
+      // Years range
       const y = parseRange(yearsRange);
       if (y.min != null) q = q.gte('years', y.min);
       if (y.max != null) q = q.lte('years', y.max);
 
-      // Apply salary range
+      // Salary range
       const s = parseRange(salaryRange);
       if (s.min != null) q = q.gte('salary', s.min);
       if (s.max != null) q = q.lte('salary', s.max);
+
+      // Contract-only + Hourly billable range -> convert to recruiter hourly
+      if (contractOnly) {
+        q = q.eq('contract', true);
+        const hr = billToRecruiterRange(hourlyBillRange);
+        if (hr.min != null) q = q.gte('hourly', hr.min);
+        if (hr.max != null) q = q.lte('hourly', hr.max);
+      }
 
       switch (sortBy) {
         case 'date_asc':
@@ -503,6 +523,8 @@ export default function Page() {
     setFLaw('');
     setSalaryRange('');
     setYearsRange('');
+    setContractOnly(false);
+    setHourlyBillRange('');
     setSortBy('date_desc');
     setExpandedId(null);
     fetchClientRows();
@@ -545,12 +567,14 @@ export default function Page() {
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
               Invitation-only access
             </div>
+
+            {/* Role tabs */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: 8,
-                marginBottom: 12,
+                marginBottom: 16,
               }}
             >
               {['recruiter', 'client', 'admin'].map((m) => (
@@ -571,29 +595,34 @@ export default function Page() {
                 </button>
               ))}
             </div>
-            <div>
-              <Label>Email</Label>
-              <Input
-                type="email"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+
+            {/* Center the inputs + button */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ width: '100%', maxWidth: 400 }}>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div style={{ width: '100%', maxWidth: 400, marginTop: 10 }}>
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  placeholder="your password"
+                  value={pwd}
+                  onChange={(e) => setPwd(e.target.value)}
+                />
+              </div>
+              <div style={{ marginTop: 14, width: '100%', maxWidth: 400, display: 'flex', justifyContent: 'center' }}>
+                <Button onClick={login} style={{ width: '100%' }}>
+                  Log in
+                </Button>
+              </div>
             </div>
-            <div style={{ marginTop: 10 }}>
-              <Label>Password</Label>
-              <Input
-                type="password"
-                placeholder="your password"
-                value={pwd}
-                onChange={(e) => setPwd(e.target.value)}
-              />
-            </div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              <Button onClick={login} style={{ width: '100%' }}>
-                Log in
-              </Button>
-            </div>
+
             {err ? (
               <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
             ) : null}
@@ -628,99 +657,106 @@ export default function Page() {
 
             <Card style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <Label>Description</Label>
-                  <Input
-                    placeholder="AM Law 100 Litigation Paralegal"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Title(s) (CSV)</Label>
-                  <Input
-                    placeholder="Attorney, Paralegal, etc."
-                    value={titles}
-                    onChange={(e) => setTitles(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Type of Law (CSV)</Label>
-                  <Input
-                    placeholder="Litigation, Immigration"
-                    value={law}
-                    onChange={(e) => setLaw(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>City</Label>
-                  <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
-                </div>
-                <div>
-                  <Label>State</Label>
-                  <Input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Years of experience</Label>
-                  <Input
-                    placeholder="Years"
-                    inputMode="numeric"
-                    value={years}
-                    onChange={(e) => setYears(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Years in most recent job</Label>
-                  <Input
-                    placeholder="e.g., 3"
-                    inputMode="numeric"
-                    value={recentYears}
-                    onChange={(e) => setRecentYears(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Salary desired</Label>
-                  <Input
-                    placeholder="e.g., 120000"
-                    inputMode="numeric"
-                    value={salary}
-                    onChange={(e) => setSalary(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Date entered</Label>
-                  <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <input
-                      type="checkbox"
-                      checked={contract}
-                      onChange={(e) => setContract(e.target.checked)}
-                    />
-                    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
-                  </label>
-                  {contract ? (
-                    <div style={{ flex: 1 }}>
+
+              {/* Center the form grid within the card */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: '100%', maxWidth: 980 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <Label>Description</Label>
                       <Input
-                        placeholder="Hourly rate (e.g., 80)"
-                        inputMode="numeric"
-                        value={hourly}
-                        onChange={(e) => setHourly(e.target.value)}
+                        placeholder="AM Law 100 Litigation Paralegal"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                       />
                     </div>
-                  ) : null}
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <Label>Candidate Notes</Label>
-                  <TextArea
-                    placeholder="Short summary: strengths, availability, fit notes."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
+                    <div>
+                      <Label>Title(s) (CSV)</Label>
+                      <Input
+                        placeholder="Attorney, Paralegal, etc."
+                        value={titles}
+                        onChange={(e) => setTitles(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Type of Law (CSV)</Label>
+                      <Input
+                        placeholder="Litigation, Immigration"
+                        value={law}
+                        onChange={(e) => setLaw(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>City</Label>
+                      <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>State</Label>
+                      <Input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Years of experience</Label>
+                      <Input
+                        placeholder="Years"
+                        inputMode="numeric"
+                        value={years}
+                        onChange={(e) => setYears(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Years in most recent job</Label>
+                      <Input
+                        placeholder="e.g., 3"
+                        inputMode="numeric"
+                        value={recentYears}
+                        onChange={(e) => setRecentYears(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Salary desired</Label>
+                      <Input
+                        placeholder="e.g., 120000"
+                        inputMode="numeric"
+                        value={salary}
+                        onChange={(e) => setSalary(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Date entered</Label>
+                      <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <input
+                          type="checkbox"
+                          checked={contract}
+                          onChange={(e) => setContract(e.target.checked)}
+                        />
+                        <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
+                      </label>
+                      {contract ? (
+                        <div style={{ flex: 1 }}>
+                          <Input
+                            placeholder="Hourly rate (e.g., 80)"
+                            inputMode="numeric"
+                            value={hourly}
+                            onChange={(e) => setHourly(e.target.value)}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <Label>Candidate Notes</Label>
+                      <TextArea
+                        placeholder="Short summary: strengths, availability, fit notes."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
+
               <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
                 <Button onClick={addCandidate}>Add candidate</Button>
                 {addMsg ? (
@@ -889,10 +925,10 @@ export default function Page() {
                         <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
                         <div style={{ color: '#E5E7EB' }}>
                           {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                          {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                          {c.contract && c.hourly ? `  /  $${Math.round(c.hourly * 1.66)}/hr` : ''}
                         </div>
                         <div style={{ color: '#9CA3AF' }}>
-                          {formatDate(c.date_entered || c.created_at)}
+                          {renderDate(c.date_entered || c.created_at)}
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <Button
@@ -934,7 +970,7 @@ export default function Page() {
         `• Type of law: ${c?.law_csv || ''}`,
         `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
         `• Years: ${c?.years ?? ''}`,
-        c?.contract && c?.hourly ? `• Contract: $${c.hourly}/hr` : '',
+        c?.contract && c?.hourly ? `• Contract: $${Math.round(c.hourly * 1.66)}/hr` : '',
         c?.salary ? `• Salary: $${c.salary}` : '',
         ``,
         `My email: ${user.email || ''}`,
@@ -1088,6 +1124,17 @@ export default function Page() {
       return opts;
     })();
 
+    const hourlyBillOptions = (() => {
+      const ranges = [{ label: 'Any', value: '' }];
+      ranges.push({ label: '$25–$50/hr', value: '25-50' });
+      for (let start = 50; start < 300; start += 25) {
+        const end = start + 25;
+        if (end <= 300) ranges.push({ label: `$${start}–$${end}/hr`, value: `${start}-${end}` });
+      }
+      ranges.push({ label: '$300+/hr', value: '300-' });
+      return ranges;
+    })();
+
     function InsightsView() {
       if (!insights) return null;
       return (
@@ -1210,17 +1257,11 @@ export default function Page() {
                       onChange={(e) => setSalaryRange(e.target.value)}
                       style={selectStyle}
                     >
-                      {(() => {
-                        const opts = [{ label: 'Any', value: '' }, { label: 'Under $40,000', value: '0-40000' }];
-                        for (let start = 40000; start < 500000; start += 20000) {
-                          const end = start + 20000;
-                          if (end <= 500000) {
-                            opts.push({ label: `$${(start/1000).toFixed(0)}k–$${(end/1000).toFixed(0)}k`, value: `${start}-${end}` });
-                          }
-                        }
-                        opts.push({ label: '$500k+', value: '500000-' });
-                        return opts.map(o => <option key={o.value || 'any-sal'} value={o.value}>{o.label}</option>);
-                      })()}
+                      {salaryOptions.map((o) => (
+                        <option key={o.value || 'any-sal'} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1231,17 +1272,43 @@ export default function Page() {
                       onChange={(e) => setYearsRange(e.target.value)}
                       style={selectStyle}
                     >
-                      {[
-                        { label: 'Any', value: '' },
-                        { label: '0–2 years', value: '0-2' },
-                        { label: '3–5 years', value: '3-5' },
-                        { label: '6–10 years', value: '6-10' },
-                        { label: '11–20 years', value: '11-20' },
-                        { label: '21+ years', value: '21-' },
-                      ].map((o) => (
-                        <option key={o.value || 'any-yrs'} value={o.value}>{o.label}</option>
+                      {yearsOptions.map((o) => (
+                        <option key={o.value || 'any-yrs'} value={o.value}>
+                          {o.label}
+                        </option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Contract-only + Hourly Billable Range */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={contractOnly}
+                        onChange={(e) => {
+                          setContractOnly(e.target.checked);
+                          if (!e.target.checked) setHourlyBillRange('');
+                        }}
+                      />
+                      <span style={{ color: '#E5E7EB', fontSize: 13 }}>Only show available for contract</span>
+                    </label>
+                    {contractOnly ? (
+                      <div style={{ flex: 1 }}>
+                        <Label style={{ marginBottom: 4 }}>Hourly (billable)</Label>
+                        <select
+                          value={hourlyBillRange}
+                          onChange={(e) => setHourlyBillRange(e.target.value)}
+                          style={selectStyle}
+                        >
+                          {hourlyBillOptions.map((o) => (
+                            <option key={o.value || 'any-hr'} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div>
@@ -1304,10 +1371,10 @@ export default function Page() {
                           </div>
                           <div style={{ color: '#E5E7EB' }}>
                             {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                            {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                            {c.contract && c.hourly ? `  /  $${Math.round(c.hourly * 1.66)}/hr` : ''}
                           </div>
                           <div style={{ color: '#9CA3AF' }}>
-                            {formatDate(c.date_entered || c.created_at)}
+                            {renderDate(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             <Button
