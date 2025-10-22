@@ -927,7 +927,12 @@ export default function Page() {
   }
 
   /* ---------- Client UI ---------- */
-  if (user.role === 'client') {
+  if (user.role === 'client') {// Convert recruiter-entered hourly to client-facing rate (×1.66)
+const clientRate = (hr) => {
+  const n = Number(hr);
+  return Number.isFinite(n) ? Math.round(n * 1.66) : null;
+};
+
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
@@ -940,7 +945,7 @@ export default function Page() {
         `• Type of law: ${c?.law_csv || ''}`,
         `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
         `• Years: ${c?.years ?? ''}`,
-        c?.contract && c?.hourly ? `• Contract: $${c.hourly}/hr` : '',
+       c?.contract && c?.hourly ? `• Contract: $${clientRate(c.hourly)}/hr` : '',
         c?.salary ? `• Salary: $${c.salary}` : '',
         ``,
         `My email: ${user.email || ''}`,
@@ -1364,8 +1369,7 @@ export default function Page() {
                             {c.city || '—'}, {c.state || '—'}
                           </div>
                           <div style={{ color: '#E5E7EB' }}>
-                            {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                            {c.contract && c.hourly ? `  /  $${c.hourly}/hr` : ''}
+                           {c.contract && c.hourly ? `  /  $${clientRate(c.hourly)}/hr` : ''}
                           </div>
                           <div style={{ color: '#9CA3AF' }}>
                             {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
