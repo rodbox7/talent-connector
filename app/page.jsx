@@ -317,16 +317,10 @@ export default function Page() {
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
-  // Dropdown ranges (working version)
+  // Dropdown ranges
   const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
   const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
-  // NEW: recent years in most recent job filter (dropdown range)
-const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max" or "min-"
-
-
-  // Contract filters
-  const [onlyContract, setOnlyContract] = React.useState(false);
-  const [hourlyRange, setHourlyRange] = React.useState(''); // "min-max"
+  const [recentYearsRange, setRecentYearsRange] = React.useState(''); // NEW
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
@@ -339,6 +333,10 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
   const [fState, setFState] = React.useState('');
   const [fTitle, setFTitle] = React.useState('');
   const [fLaw, setFLaw] = React.useState('');
+
+  // Contract-only + hourly range dropdown (client-facing ranges)
+  const [contractOnly, setContractOnly] = React.useState(false);
+  const [hourlyRange, setHourlyRange] = React.useState(''); // "min-max" or "min-"; CLIENT ranges (displayed), we convert to base/1.66 for DB
 
   const [clientRows, setClientRows] = React.useState([]);
   const [clientLoading, setClientLoading] = React.useState(false);
@@ -403,6 +401,7 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
     })();
   }, [user]);
 
+  // Helpers
   function parseRange(val) {
     if (!val) return { min: null, max: null };
     const [minStr, maxStr] = val.split('-');
@@ -419,7 +418,7 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
       let q = supabase
         .from('candidates')
         .select(
-          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,notes,date_entered,created_at'
+          'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,notes,date_entered,created_at'
         );
 
       const qStr = search.trim();
@@ -434,19 +433,30 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
       if (fTitle) q = q.ilike('titles_csv', `%${fTitle}%`);
       if (fLaw) q = q.ilike('law_csv', `%${fLaw}%`);
 
+      // Apply years of experience range
       const y = parseRange(yearsRange);
       if (y.min != null) q = q.gte('years', y.min);
       if (y.max != null) q = q.lte('years', y.max);
 
+      // Apply "years in most recent job" range (NEW)
+      const ry = parseRange(recentYearsRange);
+      if (ry.min != null) q = q.gte('recent_role_years', ry.min);
+      if (ry.max != null) q = q.lte('recent_role_years', ry.max);
+
+      // Apply salary range
       const s = parseRange(salaryRange);
       if (s.min != null) q = q.gte('salary', s.min);
       if (s.max != null) q = q.lte('salary', s.max);
 
-      if (onlyContract) {
+      // Contract-only + hourly range (client-facing; convert to base hourly / 1.66)
+      if (contractOnly) {
         q = q.eq('contract', true);
         const hr = parseRange(hourlyRange);
-        if (hr.min != null) q = q.gte('hourly', hr.min);
-        if (hr.max != null) q = q.lte('hourly', hr.max);
+        const toBase = (v) => (v == null ? null : v / 1.66);
+        const minBase = toBase(hr.min);
+        const maxBase = toBase(hr.max);
+        if (minBase != null) q = q.gte('hourly', Math.floor(minBase));
+        if (maxBase != null) q = q.lte('hourly', Math.ceil(maxBase));
       }
 
       switch (sortBy) {
@@ -495,7 +505,8 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
     setFLaw('');
     setSalaryRange('');
     setYearsRange('');
-    setOnlyContract(false);
+    setRecentYearsRange(''); // NEW
+    setContractOnly(false);
     setHourlyRange('');
     setSortBy('date_desc');
     setExpandedId(null);
@@ -540,13 +551,13 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
               Invitation-only access
             </div>
 
-            {/* RESTORED: role picker buttons */}
+            {/* Role tabs */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: 8,
-                marginBottom: 12,
+                marginBottom: 16,
               }}
             >
               {['recruiter', 'client', 'admin'].map((m) => (
@@ -568,9 +579,9 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
               ))}
             </div>
 
-            {/* Centered login fields + centered login button */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
-              <div style={{ width: '100%' }}>
+            {/* Centered form fields */}
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div>
                 <Label>Email</Label>
                 <Input
                   type="email"
@@ -579,7 +590,7 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div style={{ width: '100%' }}>
+              <div>
                 <Label>Password</Label>
                 <Input
                   type="password"
@@ -588,11 +599,11 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
                   onChange={(e) => setPwd(e.target.value)}
                 />
               </div>
-              <div style={{ width: '100%', marginTop: 6, display: 'flex', justifyContent: 'center' }}>
-                <Button onClick={login} style={{ minWidth: 140 }}>
-                  Log in
-                </Button>
-              </div>
+            </div>
+
+            {/* Centered & evenly spaced login button */}
+            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center' }}>
+              <Button onClick={login} style={{ minWidth: 160 }}>Log in</Button>
             </div>
 
             {err ? (
@@ -629,15 +640,13 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
 
             <Card style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                  gap: 14,
-                  alignItems: 'center',
-                  justifyItems: 'stretch',
-                }}
-              >
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: 14,
+                justifyItems: 'stretch',
+                alignItems: 'start'
+              }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <Label>Description</Label>
                   <Input
@@ -730,7 +739,7 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
                   />
                 </div>
               </div>
-              <div style={{ marginTop: 14, display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
                 <Button onClick={addCandidate}>Add candidate</Button>
                 {addMsg ? (
                   <div
@@ -930,12 +939,7 @@ const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max"
   }
 
   /* ---------- Client UI ---------- */
-  if (user.role === 'client') {// Convert recruiter-entered hourly to client-facing rate (×1.66)
-const clientRate = (hr) => {
-  const n = Number(hr);
-  return Number.isFinite(n) ? Math.round(n * 1.66) : null;
-};
-
+  if (user.role === 'client') {
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
@@ -948,7 +952,7 @@ const clientRate = (hr) => {
         `• Type of law: ${c?.law_csv || ''}`,
         `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
         `• Years: ${c?.years ?? ''}`,
-       c?.contract && c?.hourly ? `• Contract: $${clientRate(c.hourly)}/hr` : '',
+        c?.contract && c?.hourly ? `• Contract: $${Math.round(c.hourly * 1.66)}/hr (bill rate)` : '',
         c?.salary ? `• Salary: $${c.salary}` : '',
         ``,
         `My email: ${user.email || ''}`,
@@ -962,52 +966,7 @@ const clientRate = (hr) => {
       )}&body=${encodeURIComponent(body)}`;
     }
 
-    const yearsOptions = [
-      { label: 'Any', value: '' },
-      { label: '0–2 years', value: '0-2' },
-      { label: '3–5 years', value: '3-5' },
-      { label: '6–10 years', value: '6-10' },
-      { label: '11–20 years', value: '11-20' },
-      { label: '21+ years', value: '21-' },
-    ];
-
-    const salaryOptions = (() => {
-      const opts = [{ label: 'Any', value: '' }, { label: 'Under $40,000', value: '0-40000' }];
-      for (let start = 40000; start < 500000; start += 20000) {
-        const end = start + 20000;
-        if (end <= 500000) {
-          opts.push({ label: `$${(start / 1000).toFixed(0)}k–$${(end / 1000).toFixed(0)}k`, value: `${start}-${end}` });
-        }
-      }
-      opts.push({ label: '$500k+', value: '500000-' });
-      return opts;
-    })();
-
-    const hourlyOptions = (() => {
-      const ranges = [{ label: 'Any', value: '' }];
-      let start = 25;
-      while (start < 300) {
-        const end = start + 25;
-        ranges.push({ label: `$${start}–$${end}/hr`, value: `${start}-${end}` });
-        start = end;
-      }
-      return ranges;
-    })();
-
-    // NEW: "Years in most recent job" dropdown options
-const recentYearsOptions = [
-  { label: 'Any', value: '' },
-  { label: '0–5 years', value: '0-5' },
-  { label: '6–10 years', value: '6-10' },
-  { label: '11–15 years', value: '11-15' },
-  { label: '16–20 years', value: '16-20' },
-  { label: '21–25 years', value: '21-25' },
-  { label: '26–30 years', value: '26-30' },
-  { label: '31–35 years', value: '31-35' },
-  { label: '35+ years', value: '35-' },
-];
-
-
+    // Insights helpers
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -1125,6 +1084,53 @@ const recentYearsOptions = [
       );
     }
 
+    // Build dropdown options
+    const yearsOptions = [
+      { label: 'Any', value: '' },
+      { label: '0–2 years', value: '0-2' },
+      { label: '3–5 years', value: '3-5' },
+      { label: '6–10 years', value: '6-10' },
+      { label: '11–20 years', value: '11-20' },
+      { label: '21+ years', value: '21-' },
+    ];
+
+    const recentYearsOptions = [
+      { label: 'Any', value: '' },
+      { label: '0–5 years', value: '0-5' },
+      { label: '6–10 years', value: '6-10' },
+      { label: '11–15 years', value: '11-15' },
+      { label: '16–20 years', value: '16-20' },
+      { label: '21–25 years', value: '21-25' },
+      { label: '26–30 years', value: '26-30' },
+      { label: '31–35 years', value: '31-35' },
+      { label: '35+ years', value: '35-' },
+    ];
+
+    const salaryOptions = (() => {
+      const opts = [{ label: 'Any', value: '' }, { label: 'Under $40,000', value: '0-40000' }];
+      for (let start = 40000; start < 500000; start += 20000) {
+        const end = start + 20000;
+        if (end <= 500000) {
+          opts.push({ label: `$${(start/1000).toFixed(0)}k–$${(end/1000).toFixed(0)}k`, value: `${start}-${end}` });
+        }
+      }
+      opts.push({ label: '$500k+', value: '500000-' });
+      return opts;
+    })();
+
+    // Hourly ranges for client (bill rate), 25–50 up to 300 in $25 steps
+    const hourlyOptions = (() => {
+      const opts = [{ label: 'Any', value: '' }];
+      for (let start = 25; start < 300; start += 25) {
+        const end = start + 25;
+        if (end <= 300) {
+          opts.push({ label: `$${start}–$${end}/hr`, value: `${start}-${end}` });
+        }
+      }
+      opts.push({ label: '$300+/hr', value: '300-' });
+      return opts;
+    })();
+
     function InsightsView() {
       if (!insights) return null;
       return (
@@ -1190,7 +1196,7 @@ const recentYearsOptions = [
                   <div>
                     <Label>Keyword</Label>
                     <Input
-                      placeholder="name, notes, law, title, city/state"
+                      placeholder="description, notes, law, title, city/state"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
@@ -1240,6 +1246,7 @@ const recentYearsOptions = [
                     </select>
                   </div>
 
+                  {/* Salary Range Dropdown */}
                   <div>
                     <Label>Salary range</Label>
                     <select
@@ -1247,27 +1254,15 @@ const recentYearsOptions = [
                       onChange={(e) => setSalaryRange(e.target.value)}
                       style={selectStyle}
                     >
-                      {(() => {
-                        const opts = [{ label: 'Any', value: '' }, { label: 'Under $40,000', value: '0-40000' }];
-                        for (let start = 40000; start < 500000; start += 20000) {
-                          const end = start + 20000;
-                          if (end <= 500000) {
-                            opts.push({
-                              label: `$${(start / 1000).toFixed(0)}k–$${(end / 1000).toFixed(0)}k`,
-                              value: `${start}-${end}`,
-                            });
-                          }
-                        }
-                        opts.push({ label: '$500k+', value: '500000-' });
-                        return opts.map((o) => (
-                          <option key={o.value || 'any-salary'} value={o.value}>
-                            {o.label}
-                          </option>
-                        ));
-                      })()}
+                      {salaryOptions.map((o) => (
+                        <option key={o.value || 'any-salary'} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
+                  {/* Years of experience */}
                   <div>
                     <Label>Years of experience</Label>
                     <select
@@ -1275,14 +1270,7 @@ const recentYearsOptions = [
                       onChange={(e) => setYearsRange(e.target.value)}
                       style={selectStyle}
                     >
-                      {[
-                        { label: 'Any', value: '' },
-                        { label: '0–2 years', value: '0-2' },
-                        { label: '3–5 years', value: '3-5' },
-                        { label: '6–10 years', value: '6-10' },
-                        { label: '11–20 years', value: '11-20' },
-                        { label: '21+ years', value: '21-' },
-                      ].map((o) => (
+                      {yearsOptions.map((o) => (
                         <option key={o.value || 'any-years'} value={o.value}>
                           {o.label}
                         </option>
@@ -1290,43 +1278,40 @@ const recentYearsOptions = [
                     </select>
                   </div>
 
+                  {/* NEW: Years in most recent job */}
                   <div>
-  <Label>Years in most recent job</Label>
-  <select
-    value={recentYearsRange}
-    onChange={(e) => setRecentYearsRange(e.target.value)}
-    style={selectStyle}
-  >
-    {recentYearsOptions.map((o) => (
-      <option key={o.value || 'any-recent-years'} value={o.value}>
-        {o.label}
-      </option>
-    ))}
-  </select>
-</div>
+                    <Label>Years in most recent job</Label>
+                    <select
+                      value={recentYearsRange}
+                      onChange={(e) => setRecentYearsRange(e.target.value)}
+                      style={selectStyle}
+                    >
+                      {recentYearsOptions.map((o) => (
+                        <option key={o.value || 'any-recent-years'} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-
+                  {/* Contract-only + Hourly range (bill rate) */}
                   <div>
                     <Label>Contract availability</Label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 42 }}>
-                      <input
-                        id="onlyContract"
-                        type="checkbox"
-                        checked={onlyContract}
-                        onChange={(e) => {
-                          setOnlyContract(e.target.checked);
-                          if (!e.target.checked) setHourlyRange('');
-                        }}
-                      />
-                      <label htmlFor="onlyContract" style={{ color: '#E5E7EB', fontSize: 13 }}>
-                        Show contract-only candidates
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={contractOnly}
+                          onChange={(e) => setContractOnly(e.target.checked)}
+                        />
+                        <span style={{ color: '#E5E7EB', fontSize: 13 }}>Only show contract-available</span>
                       </label>
                     </div>
                   </div>
 
-                  {onlyContract ? (
+                  {contractOnly && (
                     <div>
-                      <Label>Hourly rate range</Label>
+                      <Label>Hourly bill rate</Label>
                       <select
                         value={hourlyRange}
                         onChange={(e) => setHourlyRange(e.target.value)}
@@ -1339,8 +1324,6 @@ const recentYearsOptions = [
                         ))}
                       </select>
                     </div>
-                  ) : (
-                    <div />
                   )}
 
                   <div>
@@ -1363,14 +1346,8 @@ const recentYearsOptions = [
                     onClick={clearClientFilters}
                     style={{ background: '#111827', border: '1px solid #1F2937' }}
                   >
-                    // Apply recent years in most recent job range
-const ry = parseRange(recentYearsRange);
-if (ry.min != null) q = q.gte('recent_role_years', ry.min);
-if (ry.max != null) q = q.lte('recent_role_years', ry.max);
-
                     Clear filters
                   </Button>
-                  setRecentYearsRange('');
                   {clientErr ? (
                     <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
                   ) : null}
@@ -1408,7 +1385,10 @@ if (ry.max != null) q = q.lte('recent_role_years', ry.max);
                             {c.city || '—'}, {c.state || '—'}
                           </div>
                           <div style={{ color: '#E5E7EB' }}>
-                           {c.contract && c.hourly ? `  /  $${clientRate(c.hourly)}/hr` : ''}
+                            {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
+                            {c.contract && c.hourly
+                              ? `  /  $${Math.round(c.hourly * 1.66)}/hr`
+                              : ''}
                           </div>
                           <div style={{ color: '#9CA3AF' }}>
                             {(c.date_entered ? new Date(c.date_entered) : new Date(c.created_at)).toLocaleDateString()}
