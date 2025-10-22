@@ -320,6 +320,9 @@ export default function Page() {
   // Dropdown ranges (working version)
   const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
   const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
+  // NEW: recent years in most recent job filter (dropdown range)
+const [recentYearsRange, setRecentYearsRange] = React.useState(''); // "min-max" or "min-"
+
 
   // Contract filters
   const [onlyContract, setOnlyContract] = React.useState(false);
@@ -991,6 +994,20 @@ const clientRate = (hr) => {
       return ranges;
     })();
 
+    // NEW: "Years in most recent job" dropdown options
+const recentYearsOptions = [
+  { label: 'Any', value: '' },
+  { label: '0–5 years', value: '0-5' },
+  { label: '6–10 years', value: '6-10' },
+  { label: '11–15 years', value: '11-15' },
+  { label: '16–20 years', value: '16-20' },
+  { label: '21–25 years', value: '21-25' },
+  { label: '26–30 years', value: '26-30' },
+  { label: '31–35 years', value: '31-35' },
+  { label: '35+ years', value: '35-' },
+];
+
+
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -1274,6 +1291,22 @@ const clientRate = (hr) => {
                   </div>
 
                   <div>
+  <Label>Years in most recent job</Label>
+  <select
+    value={recentYearsRange}
+    onChange={(e) => setRecentYearsRange(e.target.value)}
+    style={selectStyle}
+  >
+    {recentYearsOptions.map((o) => (
+      <option key={o.value || 'any-recent-years'} value={o.value}>
+        {o.label}
+      </option>
+    ))}
+  </select>
+</div>
+
+
+                  <div>
                     <Label>Contract availability</Label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 42 }}>
                       <input
@@ -1330,8 +1363,14 @@ const clientRate = (hr) => {
                     onClick={clearClientFilters}
                     style={{ background: '#111827', border: '1px solid #1F2937' }}
                   >
+                    // Apply recent years in most recent job range
+const ry = parseRange(recentYearsRange);
+if (ry.min != null) q = q.gte('recent_role_years', ry.min);
+if (ry.max != null) q = q.lte('recent_role_years', ry.max);
+
                     Clear filters
                   </Button>
+                  setRecentYearsRange('');
                   {clientErr ? (
                     <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
                   ) : null}
