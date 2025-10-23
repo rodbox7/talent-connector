@@ -1437,7 +1437,7 @@ export default function Page() {
                               padding: '8px 10px',
                               borderRadius: 8,
                               background: '#7F1D1D',
-                              border: '1px solid '#B91C1C',
+                              border: '1px solid #B91C1C',
                               color: 'white',
                               fontWeight: 700,
                               fontSize: 13,
