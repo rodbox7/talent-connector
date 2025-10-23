@@ -1243,7 +1243,7 @@ export default function Page() {
                   </Tag>
                   <Button
                     onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid '#1F2937' }}
+                    style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
                   >
                     Compensation Insights
                   </Button>
