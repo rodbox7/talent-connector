@@ -1277,11 +1277,19 @@ export default function Page() {
         });
 
         // KPIs
-        const salVals = rows.map(r => Number(r.salary)).filter(Number.isFinite);
-        const salStats = statsFrom(salVals);
+        // Exclude missing/zero/negative salaries
+const salVals = rows
+  .map(r => Number(r.salary))
+  .filter(v => Number.isFinite(v) && v > 0);
+const salStats = statsFrom(salVals);
 
-        const hourlyVals = rows.filter(r => r.contract).map(r => Number(r.hourly_billable)).filter(Number.isFinite);
-        const hourlyStats = statsFrom(hourlyVals);
+// Exclude missing/zero/negative hourly billable values
+const hourlyVals = rows
+  .filter(r => r.contract)
+  .map(r => Number(r.hourly_billable))
+  .filter(v => Number.isFinite(v) && v > 0);
+const hourlyStats = statsFrom(hourlyVals);
+
 
         // Aggregations (within filtered rows)
         const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
@@ -1569,16 +1577,17 @@ export default function Page() {
                     </select>
                   </div>
                   <div>
-                    <Label>State</Label>
-                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {states.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+  <Label>State</Label>
+  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+    <option value="">Any</option>
+    {STATES.map((s) => (
+      <option key={s} value={s}>
+        {s}
+      </option>
+    ))}
+  </select>
+</div>
+
                   <div>
                     <Label>Title</Label>
                     <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
