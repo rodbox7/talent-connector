@@ -195,7 +195,14 @@ function statsFrom(values) {
 
 // Substring match against CSV field (case-insensitive)
 function matchesCSV(csv, needle) {
-  // Compute YYYY-MM-DD date ranges for presets
+  if (!needle) return true;
+  return String(csv || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .some((s) => s.includes(String(needle).trim().toLowerCase()));
+}
+
+// Compute YYYY-MM-DD date ranges for presets
 function presetRange(preset) {
   const toYMD = (d) => {
     const yyyy = d.getFullYear();
@@ -227,12 +234,6 @@ function presetRange(preset) {
     case 'ALL':      return { start: '', end: '' }; // no date filter
     default:         return { start: '', end: '' };
   }
-}
-  if (!needle) return true;
-  return String(csv || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .some((s) => s.includes(String(needle).trim().toLowerCase()));
 }
 
 /* ---------- Page ---------- */
