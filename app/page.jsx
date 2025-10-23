@@ -5,6 +5,15 @@ import { supabase } from '../lib/supabaseClient';
 const NYC =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
+// US states (2-letter)
+const STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+];
+
 /* ---------- Small UI helpers ---------- */
 const Card = ({ children, style }) => (
   <div
@@ -237,12 +246,6 @@ export default function Page() {
   const [editingId, setEditingId] = React.useState(null);
   const [editForm, setEditForm] = React.useState({});
 
-  // Recruiter dropdown sources
-  const [rStates, setRStates] = React.useState([]);               // ['CA','MA',...]
-  const [rCitiesByState, setRCitiesByState] = React.useState({}); // { MA: ['Boston','Brookline'], ... }
-  const [rCityMode, setRCityMode] = React.useState('select');     // 'select' | 'other'
-  const [otherCity, setOtherCity] = React.useState('');
-
   function startEdit(row) {
     setEditingId(row.id);
     setEditForm({
@@ -258,7 +261,6 @@ export default function Page() {
       hourly: row.hourly ?? '',
       date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
       notes: row.notes || '',
-      // NEW: On Assignment
       on_assignment: !!row.on_assignment,
       est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
     });
@@ -274,6 +276,11 @@ export default function Page() {
   async function saveEdit() {
     if (!editingId) return;
     try {
+      // Guard: if city present but no state, block save
+      if (String(editForm.city || '').trim() && !String(editForm.state || '').trim()) {
+        alert('Please select a state for this city.');
+        return;
+      }
       const payload = {
         name: String(editForm.name || '').trim(),
         titles_csv: String(editForm.titles_csv || '').trim(),
@@ -292,11 +299,8 @@ export default function Page() {
           : Number(editForm.hourly),
         date_entered: editForm.date_entered || null,
         notes: String(editForm.notes || '').trim() || null,
-        // NEW: On Assignment fields
         on_assignment: !!editForm.on_assignment,
-        est_available_date: editForm.on_assignment
-          ? (editForm.est_available_date || null)
-          : null,
+        est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
       };
       const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
       if (error) throw error;
@@ -320,41 +324,6 @@ export default function Page() {
     }
   }
 
-  // Build State/City lists for recruiter form from existing candidates
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('candidates')
-          .select('city,state')
-          .limit(2000);
-        if (error) throw error;
-
-        const states = new Set();
-        const citiesBy = new Map();
-
-        for (const r of data || []) {
-          const st = normState(r.state || '').trim();
-          const ct = toTitleCaseCity((r.city || '').trim());
-          if (!st) continue;
-          states.add(st);
-          if (!citiesBy.has(st)) citiesBy.set(st, new Set());
-          if (ct) citiesBy.get(st).add(ct);
-        }
-
-        const stateArr = [...states].sort();
-        const mapObj = {};
-        for (const st of stateArr) {
-          mapObj[st] = [...(citiesBy.get(st) || new Set())].sort();
-        }
-        setRStates(stateArr);
-        setRCitiesByState(mapObj);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, []);
-
   // Fetch the recruiter's recent candidates list
   async function refreshMyRecent() {
     if (!user || user.role !== 'recruiter') return;
@@ -376,6 +345,11 @@ export default function Page() {
     try {
       if (!user || user.role !== 'recruiter') {
         setAddMsg('You must be logged in as recruiter.');
+        return;
+      }
+      // Guard: if city typed, require state
+      if (city.trim() && !state.trim()) {
+        setAddMsg('Please select a state for this city.');
         return;
       }
       const payload = {
@@ -410,8 +384,6 @@ export default function Page() {
       setContract(false);
       setHourly('');
       setNotes('');
-      setRCityMode('select');
-      setOtherCity('');
       // reset date picker back to "today"
       {
         const d = new Date();
@@ -785,86 +757,29 @@ export default function Page() {
                       />
                     </div>
 
-                    {/* State dropdown */}
+                    {/* State dropdown (fixed 50-state list) */}
                     <div>
                       <Label>State</Label>
                       <select
                         value={state}
-                        onChange={(e) => {
-                          const v = normState(e.target.value);
-                          setState(v);
-                          setCity('');
-                          setRCityMode('select');
-                          setOtherCity('');
-                        }}
+                        onChange={(e) => setState(normState(e.target.value))}
                         style={selectStyle}
                       >
                         <option value="">Select state</option>
-                        {rStates.map((s) => (
+                        {STATES.map((s) => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
                     </div>
 
-                    {/* City dropdown with "Other..." */}
+                    {/* City free-form input */}
                     <div>
                       <Label>City</Label>
-                      {rCityMode === 'select' ? (
-                        <select
-                          value={city}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (v === '__OTHER__') {
-                              setRCityMode('other');
-                              setCity('');
-                            } else {
-                              setCity(v);
-                            }
-                          }}
-                          style={selectStyle}
-                          disabled={!state}
-                        >
-                          {!state ? (
-                            <option value="">Select state first</option>
-                          ) : (
-                            <>
-                              <option value="">Select city</option>
-                              {(rCitiesByState[state] || []).map((c) => (
-                                <option key={c} value={c}>{c}</option>
-                              ))}
-                              <option value="__OTHER__">Other…</option>
-                            </>
-                          )}
-                        </select>
-                      ) : (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <Input
-                            placeholder="Type city"
-                            value={otherCity}
-                            onChange={(e) => setOtherCity(e.target.value)}
-                          />
-                          <Button
-                            onClick={() => {
-                              const cleaned = toTitleCaseCity(otherCity.trim());
-                              setCity(cleaned);
-                              setRCityMode('select');
-                              setOtherCity('');
-                            }}
-                            style={{ background: '#0EA5E9' }}
-                          >
-                            Use
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setRCityMode('select');
-                              setOtherCity('');
-                            }}
-                            style={{ background: '#111827', border: '1px solid #1F2937' }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
+                      <Input
+                        placeholder="e.g., New York"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
                     </div>
 
                     <div>
@@ -987,6 +902,7 @@ export default function Page() {
                               onChange={(e) => changeEditField('law_csv', e.target.value)}
                             />
                           </div>
+
                           <div>
                             <Label>City</Label>
                             <Input
@@ -994,13 +910,21 @@ export default function Page() {
                               onChange={(e) => changeEditField('city', e.target.value)}
                             />
                           </div>
+
                           <div>
                             <Label>State</Label>
-                            <Input
-                              value={editForm.state}
-                              onChange={(e) => changeEditField('state', e.target.value)}
-                            />
+                            <select
+                              value={editForm.state || ''}
+                              onChange={(e) => changeEditField('state', normState(e.target.value))}
+                              style={selectStyle}
+                            >
+                              <option value="">Select state</option>
+                              {STATES.map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
                           </div>
+
                           <div>
                             <Label>Years</Label>
                             <Input
@@ -1701,7 +1625,7 @@ function AdminPanel() {
 
   // Directory controls
   const [q, setQ] = React.useState('');
-  const [editingId, setEditingId] = React.useState(null);
+  the const [editingId, setEditingId] = React.useState(null);
   const [editDraft, setEditDraft] = React.useState({ role: 'client', org: '', account_manager_email: '' });
   const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
 
@@ -1813,7 +1737,6 @@ function AdminPanel() {
   async function resendInvite(row) {
     try {
       setBusy(row.id, true);
-      // Reuse /api/admin/invite with a generated tempPw (server may ignore password and send a magic link)
       const res = await fetch('/api/admin/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
