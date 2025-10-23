@@ -1250,9 +1250,9 @@ export default function Page() {
 
       {/* Charts */}
       <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
-      <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
+      <BarChart title="Avg Hourly Bill Rate by Title" rows={insights.byTitleHourly} money />
       <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
-      <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
+      <BarChart title="Avg Hourly Bill Rate by City" rows={insights.byCityHourly} money />
       <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
     </div>
   );
