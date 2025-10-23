@@ -123,7 +123,7 @@ function formatMDY(val) {
   if (!val) return '';
   if (typeof val === 'string') {
     const m = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return m[2] + '/' + m[3] + '/' + m[1];
+    if (m) return m[2] + '/' + m[3] + '/' + m[1]; // MM/DD/YYYY
   }
   try {
     const d = new Date(val);
@@ -157,6 +157,31 @@ function toTitleCaseCity(s) {
 function normState(s) {
   if (!s) return '';
   return s.trim().toUpperCase();
+}
+
+// Stats (avg/median/p25/p75) for a numeric array
+function statsFrom(values) {
+  const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  const n = v.length;
+  if (!n) return { n: 0, avg: null, median: null, p25: null, p75: null };
+  const avg = Math.round(v.reduce((a, c) => a + c, 0) / n);
+  const q = (p) => {
+    const idx = (p / 100) * (n - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if (lo === hi) return v[lo];
+    const t = idx - lo;
+    return Math.round(v[lo] * (1 - t) + v[hi] * t);
+  };
+  return { n, avg, median: q(50), p25: q(25), p75: q(75) };
+}
+
+// Substring match against CSV field (case-insensitive)
+function matchesCSV(csv, needle) {
+  if (!needle) return true;
+  return String(csv || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .some((s) => s.includes(String(needle).trim().toLowerCase()));
 }
 
 /* ---------- Page ---------- */
@@ -429,6 +454,14 @@ export default function Page() {
   // Insights view
   const [showInsights, setShowInsights] = React.useState(false);
   const [insights, setInsights] = React.useState(null);
+
+  // Insights filters (for KPI + charts)
+  const [iTitle, setITitle] = React.useState('');
+  const [iLaw, setILaw] = React.useState('');
+  const [iCity, setICity] = React.useState('');
+  const [iState, setIState] = React.useState('');
+  const [iYearsRange, setIYearsRange] = React.useState(''); // "min-max"
+  const [iContractOnly, setIContractOnly] = React.useState(false);
 
   // TODAY as plain local YYYY-MM-DD
   const todayStr = React.useMemo(() => {
@@ -976,7 +1009,7 @@ export default function Page() {
                             ) : null}
                           </div>
 
-                          {/* NEW: On Assignment controls */}
+                          {/* On Assignment controls */}
                           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, alignItems: 'center' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <input
@@ -1102,6 +1135,19 @@ export default function Page() {
       return `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
     }
 
+    // KPI tile
+    function Kpi({ label, value, sub }) {
+      return (
+        <Card style={{ padding: 16 }}>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>
+            {value ?? '—'}
+          </div>
+          {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
+        </Card>
+      );
+    }
+
     // Insights helpers
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
@@ -1123,41 +1169,65 @@ export default function Page() {
     function explodeCSVToRows(items, csvKey) {
       const rows = [];
       for (const it of items) {
-        const raw = (it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
+        const raw = String(it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
         for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
       }
       return rows;
     }
 
-    // UPDATED: billable hourly applied in insights
+    // Load Insights with filters + KPIs
     async function loadInsights() {
       try {
         const { data, error } = await supabase
           .from('candidates')
-          .select('titles_csv,city,state,years,salary,hourly')
-          .limit(2000);
+          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract')
+          .limit(5000);
         if (error) throw error;
 
+        const yrs = (r) => Number(r.years);
+        const pass = (r) => {
+          if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
+          if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
+          if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
+          if (iState && String(r.state || '').trim() !== iState.trim()) return false;
+          if (iContractOnly && !r.contract) return false;
+
+          if (iYearsRange) {
+            const [minStr, maxStr] = iYearsRange.split('-');
+            const min = minStr ? Number(minStr) : null;
+            const max = maxStr ? Number(maxStr) : null;
+            const y = yrs(r);
+            if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
+            if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
+          }
+          return true;
+        };
+
         // Add client-facing billable hourly (1.66x)
-        const rows = (data || []).map((r) => {
+        const rows = (data || []).filter(pass).map((r) => {
           const h = Number(r.hourly);
           const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
           return { ...r, hourly_billable: billable };
         });
 
-        // Expand titles CSV
+        // KPIs
+        const salVals = rows.map(r => Number(r.salary)).filter(Number.isFinite);
+        const salStats = statsFrom(salVals);
+
+        const hourlyVals = rows.filter(r => r.contract).map(r => Number(r.hourly_billable)).filter(Number.isFinite);
+        const hourlyStats = statsFrom(hourlyVals);
+
+        // Aggregations (within filtered rows)
         const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
           ...r,
           title_one: r[_csvKey('titles_csv')],
         }));
 
-        // City, State label
         const withCityState = rows.map((r) => ({
           ...r,
           city_full: [r.city, r.state].filter(Boolean).join(', '),
         }));
 
-        // Aggregations (hourly uses hourly_billable)
         const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
         const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
         const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
@@ -1189,11 +1259,13 @@ export default function Page() {
         }
 
         setInsights({
+          kpi: { salary: salStats, hourly: hourlyStats },
           byTitleSalary,
           byTitleHourly,   // billable
           byCitySalary,
           byCityHourly,    // billable
           byYearsSalary: yearsAgg,
+          sampleN: rows.length,
         });
         setShowInsights(true);
       } catch (e) {
@@ -1259,6 +1331,77 @@ export default function Page() {
               </Button>
             </div>
           </div>
+
+          {/* Insights Filters */}
+          <Card style={{ marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
+              <div>
+                <Label>Title</Label>
+                <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {titleOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Type of Law</Label>
+                <select value={iLaw} onChange={(e)=>setILaw(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {lawOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>State</Label>
+                <select value={iState} onChange={(e)=>setIState(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>City</Label>
+                <select value={iCity} onChange={(e)=>setICity(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Years of experience</Label>
+                <select value={iYearsRange} onChange={(e)=>setIYearsRange(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  <option value="0-2">0–2 years</option>
+                  <option value="3-5">3–5 years</option>
+                  <option value="6-10">6–10 years</option>
+                  <option value="11-20">11–20 years</option>
+                  <option value="21-">21+ years</option>
+                </select>
+              </div>
+              <div style={{ display:'flex', alignItems:'end', gap:10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={iContractOnly} onChange={(e)=>setIContractOnly(e.target.checked)} />
+                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract only</span>
+                </label>
+              </div>
+            </div>
+            <div style={{ marginTop: 12, display:'flex', gap:8 }}>
+              <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937' }}>Apply</Button>
+              <Button
+                onClick={() => { setITitle(''); setILaw(''); setIState(''); setICity(''); setIYearsRange(''); setIContractOnly(false); }}
+                style={{ background:'#111827', border:'1px solid #1F2937' }}
+              >
+                Clear
+              </Button>
+            </div>
+          </Card>
+
+          {/* KPI row */}
+          {insights?.kpi ? (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
+              <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
+              <Kpi label="p25–p75 Salary" value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'} />
+              <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
+              <Kpi label="Sample Size" value={insights.sampleN} />
+              <Kpi label="Filter" value={[iTitle,iLaw,[iCity,iState].filter(Boolean).join(', ')].filter(Boolean).join(' • ') || 'All'} />
+            </div>
+          ) : null}
 
           {/* Charts */}
           <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
@@ -1609,7 +1752,7 @@ export default function Page() {
   );
 }
 
-/* ---------- Admin Panel (enhanced) ---------- */
+/* ---------- Admin Panel (with fixes) ---------- */
 function AdminPanel() {
   const [list, setList] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -1623,16 +1766,11 @@ function AdminPanel() {
   const [amEmail, setAmEmail] = React.useState('');
   const [tempPw, setTempPw] = React.useState('');
 
- // Directory controls
-const [q, setQ] = React.useState('');
-const [editingId, setEditingId] = React.useState(null);
-const [editDraft, setEditDraft] = React.useState({
-  role: 'client',
-  org: '',
-  account_manager_email: '',
-});
-const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
-
+  // Directory controls
+  const [q, setQ] = React.useState('');
+  const [editingId, setEditingId] = React.useState(null);
+  const [editDraft, setEditDraft] = React.useState({ role: 'client', org: '', account_manager_email: '' });
+  const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
 
   React.useEffect(() => {
     loadProfiles();
