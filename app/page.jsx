@@ -110,6 +110,24 @@ function renderDate(val) {
   }
 }
 
+// Format YYYY-MM-DD or date-ish to MM/DD/YYYY without timezone drift
+function formatMDY(val) {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[2] + '/' + m[3] + '/' + m[1];
+  }
+  try {
+    const d = new Date(val);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return mm + '/' + dd + '/' + yyyy;
+  } catch {
+    return String(val);
+  }
+}
+
 // Numeric guard so NaN never hits the DB
 const numOrNull = (v) => {
   const n = Number(v);
@@ -1438,7 +1456,7 @@ export default function Page() {
                               fontWeight: 700,
                             }}
                           >
-                            Currently on assignment — est. available {renderDate(c.est_available_date) || 'TBD'}
+                            Currently on assignment — est. available {formatMDY(c.est_available_date) || 'TBD'}
                           </div>
                         ) : null}
 
