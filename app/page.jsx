@@ -1194,39 +1194,43 @@ export default function Page() {
       return ranges;
     })();
 
-    function InsightsView() {
-      if (!insights) return null;
-      return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-  <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-    Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
-    <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
-  </div>
-  <div style={{ display: 'flex', gap: 10 }}>
-    <Button
-      onClick={() => setShowInsights(false)}
-      style={{ background: '#0B1220', border: '1px solid #1F2937' }}
-    >
-      Back to Candidate Search
-    </Button>
-    <Button
-      onClick={loadInsights}
-      style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
-    >
-      Refresh
-    </Button>
-  </div>
-</div>
+   function InsightsView() {
+  if (!insights) return null;
 
-
-          <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
-          <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
-          <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
-          <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
-          <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+  return (
+    <div style={{ width: 'min(1150px, 100%)' }}>
+      {/* Header with Back + Refresh */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+          Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
+          <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
         </div>
-      );
-    }
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button
+            onClick={() => setShowInsights(false)}
+            style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+          >
+            Back to Candidate Search
+          </Button>
+          <Button
+            onClick={loadInsights}
+            style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+          >
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
+      <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
+      <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
+      <BarChart title="Avg Hourly by City" rows={insights.byCityHourly} money />
+      <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+    </div>
+  );
+}
+
 
     return (
       <div style={pageWrap}>
