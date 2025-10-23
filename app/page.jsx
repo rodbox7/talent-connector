@@ -37,4 +37,3 @@ function buildMailto(c) {
   // IMPORTANT: do not encode the 'to' address
   return `mailto:${to}?${params.join('&')}`;
 }
-
