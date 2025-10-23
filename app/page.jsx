@@ -1085,8 +1085,7 @@ export default function Page() {
         `Sent from Talent Connector`,
       ]
         .filter(Boolean)
-        .join('
-');
+        .join('\\n');
 
       const base = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
       return cc ? `${base}&cc=${encodeURIComponent(cc)}` : base;
