@@ -1623,11 +1623,16 @@ function AdminPanel() {
   const [amEmail, setAmEmail] = React.useState('');
   const [tempPw, setTempPw] = React.useState('');
 
-  // Directory controls
-  const [q, setQ] = React.useState('');
-  the const [editingId, setEditingId] = React.useState(null);
-  const [editDraft, setEditDraft] = React.useState({ role: 'client', org: '', account_manager_email: '' });
-  const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
+ // Directory controls
+const [q, setQ] = React.useState('');
+const [editingId, setEditingId] = React.useState(null);
+const [editDraft, setEditDraft] = React.useState({
+  role: 'client',
+  org: '',
+  account_manager_email: '',
+});
+const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
+
 
   React.useEffect(() => {
     loadProfiles();
