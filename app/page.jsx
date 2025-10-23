@@ -328,6 +328,7 @@ export default function Page() {
         date_entered: dateEntered || null,
         notes: notes.trim() || null,
         created_by: user.id,
+        created_by_email: user.email || null,
       };
       const { error } = await supabase.from('candidates').insert(payload);
       if (error) throw error;
@@ -1060,15 +1061,17 @@ export default function Page() {
   if (user.role === 'client') {
     function buildMailto(c) {
       const sales = user.amEmail || 'info@youragency.com';
-      const recruiterEmail = recruiterEmailById?.[c?.created_by];
+      // Prefer denormalized recruiter email on the candidate row
+      const recruiterEmail = c?.created_by_email || recruiterEmailById?.[c?.created_by];
 
       const to = sales || recruiterEmail || 'info@youragency.com';
-      const cc = sales && recruiterEmail && sales.toLowerCase() !== recruiterEmail.toLowerCase()
+      const cc = recruiterEmail && (!sales || sales.toLowerCase() !== recruiterEmail.toLowerCase())
         ? recruiterEmail
         : '';
 
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
-      const NL = '\n'; // keep as a single-line literal
+      const NL = '
+';
       const body = [
         'Hello,',
         '',
@@ -1086,8 +1089,11 @@ export default function Page() {
         'Sent from Talent Connector',
       ].filter(Boolean).join(NL);
 
-      const base = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-      return cc ? `${base}&cc=${encodeURIComponent(cc)}` : base;
+      const params = new URLSearchParams();
+      if (cc) params.set('cc', cc);
+      params.set('subject', subj);
+      params.set('body', body);
+      return `mailto:${encodeURIComponent(to)}?${params.toString()}`;
     }
 
     // Insights helpers (unchanged)
