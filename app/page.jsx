@@ -195,6 +195,39 @@ function statsFrom(values) {
 
 // Substring match against CSV field (case-insensitive)
 function matchesCSV(csv, needle) {
+  // Compute YYYY-MM-DD date ranges for presets
+function presetRange(preset) {
+  const toYMD = (d) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const today = new Date();
+  const end = toYMD(today);
+
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const q = Math.floor(today.getMonth() / 3); // 0..3
+  const startOfQuarter = new Date(today.getFullYear(), q * 3, 1);
+
+  const backDays = (n) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - n);
+    return toYMD(d);
+  };
+
+  switch (preset) {
+    case 'LAST_30':  return { start: backDays(30),  end };
+    case 'LAST_60':  return { start: backDays(60),  end };
+    case 'LAST_90':  return { start: backDays(90),  end };
+    case 'LAST_180': return { start: backDays(180), end };
+    case 'YTD':      return { start: toYMD(startOfYear),  end };
+    case 'THIS_Q':   return { start: toYMD(startOfQuarter), end };
+    case 'ALL':      return { start: '', end: '' }; // no date filter
+    default:         return { start: '', end: '' };
+  }
+}
   if (!needle) return true;
   return String(csv || '')
     .split(',')
@@ -480,8 +513,15 @@ export default function Page() {
   const [iState, setIState] = React.useState('');
   const [iYearsRange, setIYearsRange] = React.useState(''); // "min-max"
   const [iContractOnly, setIContractOnly] = React.useState(false);
+  // Insights date preset (drives iStartDate/iEndDate)
+  const [iPreset, setIPreset] = React.useState('LAST_180'); // choose your default
   const [iStartDate, setIStartDate] = React.useState('');   // YYYY-MM-DD inclusive
   const [iEndDate, setIEndDate] = React.useState('');       // YYYY-MM-DD inclusive
+  React.useEffect(() => {
+  const { start, end } = presetRange(iPreset);
+  setIStartDate(start);
+  setIEndDate(end);
+}, [iPreset]);
 
   // TODAY as plain local YYYY-MM-DD
   const todayStr = React.useMemo(() => {
@@ -1399,14 +1439,19 @@ export default function Page() {
                   <option value="21-">21+ years</option>
                 </select>
               </div>
-              <div style={{ gridColumn: '1 / span 2' }}>
-                <Label>Start date</Label>
-                <Input type="date" value={iStartDate} onChange={(e) => setIStartDate(e.target.value)} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <Label>End date</Label>
-                <Input type="date" value={iEndDate} onChange={(e) => setIEndDate(e.target.value)} />
-              </div>
+            <div>
+  <Label>Date range</Label>
+  <select value={iPreset} onChange={(e) => setIPreset(e.target.value)} style={selectStyle}>
+    <option value="LAST_30">Last 30 days</option>
+    <option value="LAST_60">Last 60 days</option>
+    <option value="LAST_90">Last 90 days</option>
+    <option value="LAST_180">Last 180 days</option>
+    <option value="YTD">Year to date</option>
+    <option value="THIS_Q">This quarter</option>
+    <option value="ALL">All time</option>
+  </select>
+</div>
+
               <div style={{ display:'flex', alignItems:'end', gap:10 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={iContractOnly} onChange={(e)=>setIContractOnly(e.target.checked)} />
@@ -1417,16 +1462,16 @@ export default function Page() {
             <div style={{ marginTop: 12, display:'flex', gap:8 }}>
               <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937' }}>Apply</Button>
               <Button
-                onClick={() => {
-                  setITitle('');
-                  setILaw('');
-                  setIState('');
-                  setICity('');
-                  setIYearsRange('');
-                  setIContractOnly(false);
-                  setIStartDate('');
-                  setIEndDate('');
-                }}
+               onClick={() => {
+  setITitle('');
+  setILaw('');
+  setIState('');
+  setICity('');
+  setIYearsRange('');
+  setIContractOnly(false);
+  setIPreset('LAST_180'); // or 'ALL' if you prefer all-time as default
+}}
+
                 style={{ background:'#111827', border:'1px solid #1F2937' }}
               >
                 Clear
