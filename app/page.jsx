@@ -1197,19 +1197,27 @@ export default function Page() {
     function InsightsView() {
       if (!insights) return null;
       return (
-        <div style={{ width: 'min(1150px, 100%)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-              Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
-              <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
-            </div>
-            <Button
-              onClick={loadInsights}
-              style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
-            >
-              Refresh
-            </Button>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+    Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
+    <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
+  </div>
+  <div style={{ display: 'flex', gap: 10 }}>
+    <Button
+      onClick={() => setShowInsights(false)}
+      style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+    >
+      Back to Candidate Search
+    </Button>
+    <Button
+      onClick={loadInsights}
+      style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+    >
+      Refresh
+    </Button>
+  </div>
+</div>
+
 
           <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
           <BarChart title="Avg Hourly by Title" rows={insights.byTitleHourly} money />
