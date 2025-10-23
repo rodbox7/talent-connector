@@ -397,6 +397,8 @@ export default function Page() {
   // Insights view
   const [showInsights, setShowInsights] = React.useState(false);
   const [insights, setInsights] = React.useState(null);
+  // Map of recruiter user id -> email (for CC on client outreach)
+  const [recruiterEmailById, setRecruiterEmailById] = React.useState({});
 
   // TODAY as plain local YYYY-MM-DD
   const todayStr = React.useMemo(() => {
@@ -561,6 +563,27 @@ export default function Page() {
       const { data, error } = await q.limit(200);
       if (error) throw error;
       setClientRows(data || []);
+
+      // --- fetch recruiter emails for CC (so both Sales and Recruiter get the outreach) ---
+      try {
+        const ids = Array.from(new Set((data || []).map(r => r.created_by).filter(Boolean)));
+        if (ids.length) {
+          const { data: profs, error: perr } = await supabase
+            .from('profiles')
+            .select('id,email')
+            .in('id', ids);
+          if (!perr && Array.isArray(profs)) {
+            const map = {};
+            for (const p of profs) if (p?.id && p?.email) map[p.id] = p.email;
+            setRecruiterEmailById(map);
+          }
+        } else {
+          setRecruiterEmailById({});
+        }
+      } catch (e) {
+        console.error('Failed to fetch recruiter emails', e);
+        // Non-fatal; link will still go to Sales contact
+      }
     } catch (e) {
       console.error(e);
       setClientErr('Error loading client view.');
@@ -1036,7 +1059,14 @@ export default function Page() {
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
     function buildMailto(c) {
-      const to = user.amEmail || 'info@youragency.com';
+      const sales = user.amEmail || 'info@youragency.com';
+      const recruiterEmail = recruiterEmailById?.[c?.created_by];
+
+      const to = sales || recruiterEmail || 'info@youragency.com';
+      const cc = sales && recruiterEmail && sales.toLowerCase() !== recruiterEmail.toLowerCase()
+        ? recruiterEmail
+        : '';
+
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
       const body = [
         `Hello,`,
@@ -1055,10 +1085,11 @@ export default function Page() {
         `Sent from Talent Connector`,
       ]
         .filter(Boolean)
-        .join('\n');
-      return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
-        subj
-      )}&body=${encodeURIComponent(body)}`;
+        .join('
+');
+
+      const base = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+      return cc ? `${base}&cc=${encodeURIComponent(cc)}` : base;
     }
 
     // Insights helpers (unchanged)
