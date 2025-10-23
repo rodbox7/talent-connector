@@ -1061,7 +1061,7 @@ export default function Page() {
   if (user.role === 'client') {
     function buildMailto(c) {
       const sales = user.amEmail || 'info@youragency.com';
-      // Prefer denormalized recruiter email on the candidate row
+      // Prefer denormalized recruiter email on the candidate row; fallback to map if present
       const recruiterEmail = c?.created_by_email || recruiterEmailById?.[c?.created_by];
 
       const to = sales || recruiterEmail || 'info@youragency.com';
@@ -1070,8 +1070,7 @@ export default function Page() {
         : '';
 
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
-      const NL = '
-';
+      const NL = String.fromCharCode(10); // robust newline (avoids editor wrapping issues)
       const body = [
         'Hello,',
         '',
@@ -1090,7 +1089,7 @@ export default function Page() {
       ].filter(Boolean).join(NL);
 
       const params = new URLSearchParams();
-      if (cc) params.set('cc', cc);
+      if (cc) params.set('cc', cc); // put cc first for better client compatibility
       params.set('subject', subj);
       params.set('body', body);
       return `mailto:${encodeURIComponent(to)}?${params.toString()}`;
