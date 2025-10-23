@@ -1071,51 +1071,78 @@ export default function Page() {
       return rows;
     }
 
-    async function loadInsights() {
-      try {
-        const { data, error } = await supabase
-          .from('candidates')
-          .select('titles_csv,city,state,years,salary,hourly')
-          .limit(2000);
-        if (error) throw error;
+   async function loadInsights() {
+  try {
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('titles_csv,city,state,years,salary,hourly')
+      .limit(2000);
+    if (error) throw error;
 
-        const byTitleSalary = groupAvg(
-          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
-          'title_one',
-          'salary'
-        );
-        const byTitleHourly = groupAvg(
-          explodeCSVToRows(data, 'titles_csv').map((r) => ({ ...r, title_one: r[_csvKey('titles_csv')] })),
-          'title_one',
-          'hourly'
-        );
-        const withCityState = data.map((r) => ({ ...r, city_full: [r.city, r.state].filter(Boolean).join(', ') }));
-        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
-        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly');
+    // Enrich each row with client-facing billable hourly (1.66x)
+    const rows = (data || []).map((r) => {
+      const h = Number(r.hourly);
+      const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
+      return { ...r, hourly_billable: billable };
+    });
 
-        const buckets = [
-          { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
-          { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
-          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
-          { label: '11-20 yrs', check: (y) => y >= 11 && y <= 20 },
-          { label: '21+ yrs', check: (y) => y >= 21 },
-        ];
-        const yearsAgg = [];
-        for (const b of buckets) {
-          const vals = data
-            .map((r) => Number(r.salary))
-            .filter((v, i) => {
-              const y = Number(data[i].years);
-              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
-            });
-          if (vals.length) {
-            yearsAgg.push({
-              label: b.label,
-              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
-              n: vals.length,
-            });
-          }
-        }
+    // Explode titles CSV once and tag a single "title_one"
+    const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
+      ...r,
+      title_one: r[_csvKey('titles_csv')],
+    }));
+
+    // Build "City, State" label
+    const withCityState = rows.map((r) => ({
+      ...r,
+      city_full: [r.city, r.state].filter(Boolean).join(', '),
+    }));
+
+    // Aggregations (note: hourly now uses hourly_billable)
+    const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
+    const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
+    const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
+    const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
+
+    // Years-of-experience salary buckets (salary stays as-is)
+    const buckets = [
+      { label: '0-2 yrs', check: (y) => y >= 0 && y <= 2 },
+      { label: '3-5 yrs', check: (y) => y >= 3 && y <= 5 },
+      { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
+      { label: '11-20 yrs', check: (y) => y >= 11 && y <= 20 },
+      { label: '21+ yrs', check: (y) => y >= 21 },
+    ];
+
+    const yearsAgg = [];
+    for (const b of buckets) {
+      const vals = rows
+        .map((r) => Number(r.salary))
+        .filter((v, i) => {
+          const y = Number(rows[i].years);
+          return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+        });
+      if (vals.length) {
+        yearsAgg.push({
+          label: b.label,
+          avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
+          n: vals.length,
+        });
+      }
+    }
+
+    setInsights({
+      byTitleSalary,
+      byTitleHourly,   // now billable
+      byCitySalary,
+      byCityHourly,    // now billable
+      byYearsSalary: yearsAgg,
+    });
+    setShowInsights(true);
+  } catch (e) {
+    console.error(e);
+    alert('Failed to load insights.');
+  }
+}
 
         setInsights({
           byTitleSalary,
