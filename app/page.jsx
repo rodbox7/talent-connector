@@ -136,6 +136,24 @@ function formatMDY(val) {
   }
 }
 
+// YYYY-MM-DD from date/ISO string (no tz drift)
+function ymd(val) {
+  if (!val) return null;
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  try {
+    const d = new Date(val);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch {
+    return null;
+  }
+}
+
 // Numeric guard so NaN never hits the DB
 const numOrNull = (v) => {
   const n = Number(v);
@@ -462,6 +480,8 @@ export default function Page() {
   const [iState, setIState] = React.useState('');
   const [iYearsRange, setIYearsRange] = React.useState(''); // "min-max"
   const [iContractOnly, setIContractOnly] = React.useState(false);
+  const [iStartDate, setIStartDate] = React.useState('');   // YYYY-MM-DD inclusive
+  const [iEndDate, setIEndDate] = React.useState('');       // YYYY-MM-DD inclusive
 
   // TODAY as plain local YYYY-MM-DD
   const todayStr = React.useMemo(() => {
@@ -1175,12 +1195,12 @@ export default function Page() {
       return rows;
     }
 
-    // Load Insights with filters + KPIs
+    // Load Insights with filters + KPIs + DATE RANGE
     async function loadInsights() {
       try {
         const { data, error } = await supabase
           .from('candidates')
-          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract')
+          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
           .limit(5000);
         if (error) throw error;
 
@@ -1191,6 +1211,11 @@ export default function Page() {
           if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
           if (iState && String(r.state || '').trim() !== iState.trim()) return false;
           if (iContractOnly && !r.contract) return false;
+
+          // Date range on "market recency": prefer date_entered; fallback created_at
+          const recency = ymd(r.date_entered) || ymd(r.created_at);
+          if (iStartDate && (!recency || recency < iStartDate)) return false;
+          if (iEndDate   && (!recency || recency > iEndDate))   return false;
 
           if (iYearsRange) {
             const [minStr, maxStr] = iYearsRange.split('-');
@@ -1334,7 +1359,7 @@ export default function Page() {
 
           {/* Insights Filters */}
           <Card style={{ marginTop: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
               <div>
                 <Label>Title</Label>
                 <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
@@ -1374,6 +1399,14 @@ export default function Page() {
                   <option value="21-">21+ years</option>
                 </select>
               </div>
+              <div style={{ gridColumn: '1 / span 2' }}>
+                <Label>Start date</Label>
+                <Input type="date" value={iStartDate} onChange={(e) => setIStartDate(e.target.value)} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <Label>End date</Label>
+                <Input type="date" value={iEndDate} onChange={(e) => setIEndDate(e.target.value)} />
+              </div>
               <div style={{ display:'flex', alignItems:'end', gap:10 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={iContractOnly} onChange={(e)=>setIContractOnly(e.target.checked)} />
@@ -1384,7 +1417,16 @@ export default function Page() {
             <div style={{ marginTop: 12, display:'flex', gap:8 }}>
               <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937' }}>Apply</Button>
               <Button
-                onClick={() => { setITitle(''); setILaw(''); setIState(''); setICity(''); setIYearsRange(''); setIContractOnly(false); }}
+                onClick={() => {
+                  setITitle('');
+                  setILaw('');
+                  setIState('');
+                  setICity('');
+                  setIYearsRange('');
+                  setIContractOnly(false);
+                  setIStartDate('');
+                  setIEndDate('');
+                }}
                 style={{ background:'#111827', border:'1px solid #1F2937' }}
               >
                 Clear
@@ -1399,7 +1441,18 @@ export default function Page() {
               <Kpi label="p25–p75 Salary" value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'} />
               <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
               <Kpi label="Sample Size" value={insights.sampleN} />
-              <Kpi label="Filter" value={[iTitle,iLaw,[iCity,iState].filter(Boolean).join(', ')].filter(Boolean).join(' • ') || 'All'} />
+              <Kpi
+                label="Filter"
+                value={
+                  [
+                    iTitle,
+                    iLaw,
+                    [iCity, iState].filter(Boolean).join(', '),
+                    (iStartDate || iEndDate) ? `${iStartDate || '…'} → ${iEndDate || '…'}` : null,
+                    iContractOnly ? 'Contract only' : null,
+                  ].filter(Boolean).join(' • ') || 'All'
+                }
+              />
             </div>
           ) : null}
 
@@ -1436,7 +1489,7 @@ export default function Page() {
                   </Tag>
                   <Button
                     onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+                    style={{ background: '#0EA5E9', border: '1px solid '#1F2937' }}
                   >
                     Compensation Insights
                   </Button>
@@ -1627,7 +1680,7 @@ export default function Page() {
                     {clientRows.map((c) => (
                       <div
                         key={c.id}
-                        style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
+                        style={{ border: '1px solid '#1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
                       >
                         {/* Red banner if on assignment */}
                         {c.on_assignment ? (
@@ -1752,14 +1805,13 @@ export default function Page() {
   );
 }
 
-/* ---------- Admin Panel (with fixes) ---------- */
+/* ---------- Admin Panel ---------- */
 function AdminPanel() {
   const [list, setList] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [flash, setFlash] = React.useState('');
 
-  // Invite form
   const [email, setEmail] = React.useState('');
   const [role, setRole] = React.useState('client');
   const [org, setOrg] = React.useState('');
@@ -1775,15 +1827,6 @@ function AdminPanel() {
   React.useEffect(() => {
     loadProfiles();
   }, []);
-
-  function toast(okMsg = '', errMsg = '') {
-    if (okMsg) setFlash(okMsg);
-    if (errMsg) setErr(errMsg);
-    if (okMsg || errMsg) {
-      setTimeout(() => { setFlash(''); setErr(''); }, 2500);
-    }
-  }
-
   async function loadProfiles() {
     setLoading(true);
     setErr('');
@@ -1800,6 +1843,12 @@ function AdminPanel() {
       setErr('Error loading profiles.');
     }
     setLoading(false);
+  }
+
+  function toast(okMsg = '', errMsg = '') {
+    if (okMsg) setFlash(okMsg);
+    if (errMsg) setErr(errMsg);
+    if (okMsg || errMsg) setTimeout(() => { setFlash(''); setErr(''); }, 2500);
   }
 
   async function invite() {
