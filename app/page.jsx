@@ -1068,10 +1068,11 @@ export default function Page() {
         : '';
 
       const subj = `Talent Connector Candidate – ${c?.name || ''}`;
+      const NL = '\n'; // keep as a single-line literal
       const body = [
-        `Hello,`,
-        ``,
-        `I'm interested in this candidate:`,
+        'Hello,',
+        '',
+        "I'm interested in this candidate:",
         `• Name: ${c?.name || ''}`,
         `• Titles: ${c?.titles_csv || ''}`,
         `• Type of law: ${c?.law_csv || ''}`,
@@ -1079,13 +1080,11 @@ export default function Page() {
         `• Years: ${c?.years ?? ''}`,
         c?.contract && c?.hourly ? `• Contract: $${Math.round(c.hourly * 1.66)}/hr` : '',
         c?.salary ? `• Salary: $${c.salary}` : '',
-        ``,
+        '',
         `My email: ${user.email || ''}`,
-        ``,
-        `Sent from Talent Connector`,
-      ]
-        .filter(Boolean)
-        .join('\\n');
+        '',
+        'Sent from Talent Connector',
+      ].filter(Boolean).join(NL);
 
       const base = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
       return cc ? `${base}&cc=${encodeURIComponent(cc)}` : base;
