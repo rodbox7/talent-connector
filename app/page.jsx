@@ -110,6 +110,12 @@ function renderDate(val) {
   }
 }
 
+// Numeric guard so NaN never hits the DB
+const numOrNull = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
 /* ---------- Page ---------- */
 export default function Page() {
   const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
@@ -212,6 +218,9 @@ export default function Page() {
       hourly: row.hourly ?? '',
       date_entered: (row.date_entered ? (String(row.date_entered).slice(0,10)) : new Date(row.created_at).toISOString().slice(0,10)),
       notes: row.notes || '',
+      // NEW: On Assignment fields
+      on_assignment: !!row.on_assignment,
+      est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
     });
   }
   function cancelEdit() {
@@ -231,19 +240,17 @@ export default function Page() {
         law_csv: String(editForm.law_csv || '').trim(),
         city: String(editForm.city || '').trim(),
         state: String(editForm.state || '').trim(),
-        years: editForm.years === '' ? null : Number(editForm.years),
-        recent_role_years:
-          editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
-        salary: editForm.salary === '' ? null : Number(editForm.salary),
+        years: numOrNull(editForm.years),
+        recent_role_years: numOrNull(editForm.recent_role_years),
+        salary: numOrNull(editForm.salary),
         contract: !!editForm.contract,
-        hourly: !editForm.contract
-          ? null
-          : editForm.hourly === ''
-          ? null
-          : Number(editForm.hourly),
+        hourly: editForm.contract ? numOrNull(editForm.hourly) : null,
         // store as plain YYYY-MM-DD (string/date column recommended)
         date_entered: editForm.date_entered || null,
         notes: String(editForm.notes || '').trim() || null,
+        // NEW: On Assignment
+        on_assignment: !!editForm.on_assignment,
+        est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
       };
       const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
       if (error) throw error;
@@ -266,85 +273,78 @@ export default function Page() {
       alert(`Delete failed${e?.message ? `: ${e.message}` : ''}`);
     }
   }
-// Fetch the recruiter's recent candidates list
-async function refreshMyRecent() {
-  if (!user || user.role !== 'recruiter') return;
-  setLoadingList(true);
-  const { data, error } = await supabase
-    .from('candidates')
-    .select(
-      'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes'
-    )
-    .eq('created_by', user.id)
-    .order('created_at', { ascending: false })
-    .limit(50);
-  if (!error && data) setMyRecent(data);
-  setLoadingList(false);
-}
+
+  // Fetch the recruiter's recent candidates list (use * to avoid breaking when new cols are added)
+  async function refreshMyRecent() {
+    if (!user || user.role !== 'recruiter') return;
+    setLoadingList(true);
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('*')
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (!error && data) setMyRecent(data);
+    setLoadingList(false);
+  }
 
   async function addCandidate() {
-  setAddMsg('');
-  try {
-    if (!user || user.role !== 'recruiter') {
-      setAddMsg('You must be logged in as recruiter.');
-      return;
-    }
-    const payload = {
-      name: name.trim(),
-      titles_csv: titles.trim(),
-      law_csv: law.trim(),
-      city: city.trim(),
-      state: state.trim(),
-      years: years ? Number(years) : null,
-      recent_role_years: recentYears ? Number(recentYears) : null,
-      salary: salary ? Number(salary) : null,
-      contract: !!contract,
-      hourly: contract ? (hourly ? Number(hourly) : null) : null,
-      // keep date_entered in local (today) timezone
-      date_entered: (() => {
+    setAddMsg('');
+    try {
+      if (!user || user.role !== 'recruiter') {
+        setAddMsg('You must be logged in as recruiter.');
+        return;
+      }
+      const payload = {
+        name: name.trim(),
+        titles_csv: titles.trim(),
+        law_csv: law.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        years: numOrNull(years),
+        recent_role_years: numOrNull(recentYears),
+        salary: numOrNull(salary),
+        contract: !!contract,
+        hourly: contract ? numOrNull(hourly) : null,
+        // IMPORTANT: use the recruiter-selected date
+        date_entered: dateEntered || null,
+        notes: notes.trim() || null,
+        created_by: user.id,
+      };
+      const { error } = await supabase.from('candidates').insert(payload);
+      if (error) throw error;
+
+      setAddMsg('Candidate added');
+
+      // ---------- CLEAR ALL FIELDS ----------
+      setName('');
+      setTitles('');
+      setLaw('');
+      setCity('');
+      setState('');
+      setYears('');
+      setRecentYears('');
+      setSalary('');
+      setContract(false);
+      setHourly('');
+      setNotes('');
+
+      // reset date picker back to "today" (local, not UTC)
+      {
         const d = new Date();
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-      })(),
-      notes: notes.trim() || null,
-      created_by: user.id,
-    };
-    const { error } = await supabase.from('candidates').insert(payload);
-    if (error) throw error;
+        setDateEntered(`${yyyy}-${mm}-${dd}`);
+      }
+      // -------------------------------------
 
-    setAddMsg('Candidate added');
-
-    // ---------- CLEAR ALL FIELDS (this is what you wanted) ----------
-    setName('');
-    setTitles('');           // clear titles
-    setLaw('');              // clear law
-    setCity('');
-    setState('');
-    setYears('');
-    setRecentYears('');
-    setSalary('');
-    setContract(false);
-    setHourly('');
-    setNotes('');
-
-    // reset date picker back to "today" (local, not UTC)
-    {
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      setDateEntered(`${yyyy}-${mm}-${dd}`);
+      await refreshMyRecent();
+    } catch (e) {
+      console.error(e);
+      setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
     }
-    // ---------------------------------------------------------------
-
-    await refreshMyRecent();
-  } catch (e) {
-    console.error(e);
-    setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
   }
-}
 
   /* ---------- Client state & functions ---------- */
   const [cCountToday, setCCountToday] = React.useState(0);
@@ -356,6 +356,8 @@ async function refreshMyRecent() {
   // NEW contract-only + hourly range (client sees billable=1.66x)
   const [contractOnly, setContractOnly] = React.useState(false);
   const [hourlyBillRange, setHourlyBillRange] = React.useState(''); // "25-50" ... "300-"
+  // NEW: filter for years in most recent role (min only, simple & useful)
+  const [recentMin, setRecentMin] = React.useState('');
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
@@ -435,6 +437,11 @@ async function refreshMyRecent() {
     })();
   }, [user]);
 
+  // Ensure recruiter recent list loads right after login
+  React.useEffect(() => {
+    if (user?.role === 'recruiter') refreshMyRecent();
+  }, [user]);
+
   // Helpers
   function parseRange(val) {
     if (!val) return { min: null, max: null };
@@ -461,9 +468,8 @@ async function refreshMyRecent() {
     try {
       let q = supabase
         .from('candidates')
-        .select(
-          'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,notes,date_entered,created_at'
-        );
+        // Use * to avoid breaking when new columns (like on_assignment) are added
+        .select('*');
 
       const qStr = search.trim();
       if (qStr) {
@@ -482,6 +488,11 @@ async function refreshMyRecent() {
       if (y.min != null) q = q.gte('years', y.min);
       if (y.max != null) q = q.lte('years', y.max);
 
+      // Most recent role min years
+      if (recentMin && Number.isFinite(Number(recentMin))) {
+        q = q.gte('recent_role_years', Number(recentMin));
+      }
+
       // Salary range
       const s = parseRange(salaryRange);
       if (s.min != null) q = q.gte('salary', s.min);
@@ -496,6 +507,12 @@ async function refreshMyRecent() {
       }
 
       switch (sortBy) {
+        case 'recent_desc':
+          q = q.order('recent_role_years', { ascending: false, nullsFirst: false });
+          break;
+        case 'recent_asc':
+          q = q.order('recent_role_years', { ascending: true, nullsFirst: true });
+          break;
         case 'date_asc':
           q = q.order('date_entered', { ascending: true });
           break;
@@ -541,6 +558,7 @@ async function refreshMyRecent() {
     setFLaw('');
     setSalaryRange('');
     setYearsRange('');
+    setRecentMin('');
     setContractOnly(false);
     setHourlyBillRange('');
     setSortBy('date_desc');
@@ -896,6 +914,29 @@ async function refreshMyRecent() {
                               />
                             ) : null}
                           </div>
+
+                          {/* NEW: On Assignment controls */}
+                          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 14, alignItems: 'end' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.on_assignment}
+                                onChange={(e) => changeEditField('on_assignment', e.target.checked)}
+                              />
+                              <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
+                            </label>
+                            {editForm.on_assignment ? (
+                              <div style={{ maxWidth: 240 }}>
+                                <Label>Estimated date available</Label>
+                                <Input
+                                  type="date"
+                                  value={editForm.est_available_date}
+                                  onChange={(e) => changeEditField('est_available_date', e.target.value)}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+
                           <div style={{ gridColumn: '1 / -1' }}>
                             <Label>Notes</Label>
                             <TextArea
@@ -1202,7 +1243,7 @@ async function refreshMyRecent() {
                   </Tag>
                   <Button
                     onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+                    style={{ background: '#0EA5E9', border: '1px solid '#1F2937' }}
                   >
                     Compensation Insights
                   </Button>
@@ -1329,6 +1370,17 @@ async function refreshMyRecent() {
                     ) : null}
                   </div>
 
+                  {/* NEW: Recent job years (min) */}
+                  <div>
+                    <Label>Years in most recent job (min)</Label>
+                    <Input
+                      placeholder="e.g., 2"
+                      inputMode="numeric"
+                      value={recentMin}
+                      onChange={(e) => setRecentMin(e.target.value)}
+                    />
+                  </div>
+
                   <div>
                     <Label>Sort by</Label>
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={selectStyle}>
@@ -1340,6 +1392,9 @@ async function refreshMyRecent() {
                       <option value="hourly_asc">Hourly (low → high)</option>
                       <option value="years_desc">Years (high → low)</option>
                       <option value="years_asc">Years (low → high)</option>
+                      {/* NEW sorts */}
+                      <option value="recent_desc">Recent job years (high → low)</option>
+                      <option value="recent_asc">Recent job years (low → high)</option>
                     </select>
                   </div>
                 </div>
@@ -1370,6 +1425,23 @@ async function refreshMyRecent() {
                         key={c.id}
                         style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
                       >
+                        {/* NEW: Red banner if currently on assignment */}
+                        {c.on_assignment ? (
+                          <div
+                            style={{
+                              background: '#7F1D1D',
+                              border: '1px solid #991B1B',
+                              color: '#FECACA',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              marginBottom: 8,
+                              fontWeight: 700,
+                            }}
+                          >
+                            Currently on assignment — est. available {renderDate(c.est_available_date) || 'TBD'}
+                          </div>
+                        ) : null}
+
                         <div
                           style={{
                             display: 'grid',
@@ -1440,8 +1512,8 @@ async function refreshMyRecent() {
               </Card>
             </div>
           ) : (
-            <InsightsView />
-          )}
+            <InsightsView />)
+        }
         </div>
       </div>
     );
