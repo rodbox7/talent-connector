@@ -1552,22 +1552,38 @@ export default function Page() {
   );
 }
 
-/* ---------- Admin Panel ---------- */
+/* ---------- Admin Panel (enhanced) ---------- */
 function AdminPanel() {
   const [list, setList] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [flash, setFlash] = React.useState('');
 
+  // Invite form
   const [email, setEmail] = React.useState('');
   const [role, setRole] = React.useState('client');
   const [org, setOrg] = React.useState('');
   const [amEmail, setAmEmail] = React.useState('');
   const [tempPw, setTempPw] = React.useState('');
 
+  // Directory controls
+  const [q, setQ] = React.useState('');
+  const [editingId, setEditingId] = React.useState(null);
+  const [editDraft, setEditDraft] = React.useState({ role: 'client', org: '', account_manager_email: '' });
+  const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
+
   React.useEffect(() => {
     loadProfiles();
   }, []);
+
+  function toast(okMsg = '', errMsg = '') {
+    if (okMsg) setFlash(okMsg);
+    if (errMsg) setErr(errMsg);
+    if (okMsg || errMsg) {
+      setTimeout(() => { setFlash(''); setErr(''); }, 2500);
+    }
+  }
+
   async function loadProfiles() {
     setLoading(true);
     setErr('');
@@ -1590,7 +1606,8 @@ function AdminPanel() {
     setFlash('');
     setErr('');
     try {
-      if (!email || !tempPw) {
+      const em = (email || '').trim().toLowerCase();
+      if (!em || !tempPw) {
         setErr('Email and temp password are required.');
         return;
       }
@@ -1598,24 +1615,20 @@ function AdminPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
+          email: em,
           role,
           org: org.trim() || null,
-          amEmail: amEmail.trim() || null,
+          amEmail: (amEmail || '').trim() || null,
           password: tempPw,
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
-        setErr(json?.error || 'Invite failed');
+        setErr(json?.error || 'Invite failed.');
         return;
       }
-      setFlash(`Invited ${email} as ${role}`);
-      setEmail('');
-      setRole('client');
-      setOrg('');
-      setAmEmail('');
-      setTempPw('');
+      setEmail(''); setRole('client'); setOrg(''); setAmEmail(''); setTempPw('');
+      toast(`Invited ${em} as ${role}`);
       await loadProfiles();
     } catch (e) {
       console.error(e);
@@ -1623,8 +1636,125 @@ function AdminPanel() {
     }
   }
 
+  function startEdit(row) {
+    setEditingId(row.id);
+    setEditDraft({
+      role: row.role || 'client',
+      org: row.org || '',
+      account_manager_email: row.account_manager_email || '',
+    });
+  }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditDraft({ role: 'client', org: '', account_manager_email: '' });
+  }
+  function setBusy(id, v) {
+    setRowBusy((s) => ({ ...s, [id]: !!v }));
+  }
+
+  async function saveEdit(id) {
+    try {
+      setBusy(id, true);
+      const payload = {
+        role: editDraft.role,
+        org: (editDraft.org || '').trim() || null,
+        account_manager_email: (editDraft.account_manager_email || '').trim() || null,
+      };
+      const { error } = await supabase.from('profiles').update(payload).eq('id', id);
+      if (error) throw error;
+      toast('Saved changes');
+      await loadProfiles();
+      cancelEdit();
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Update failed.');
+    } finally {
+      setBusy(id, false);
+    }
+  }
+
+  async function resendInvite(row) {
+    try {
+      setBusy(row.id, true);
+      // Reuse /api/admin/invite with a generated tempPw (server may ignore password and send a magic link)
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: row.email,
+          role: row.role,
+          org: row.org || null,
+          amEmail: row.account_manager_email || null,
+          password: null, // let server decide
+          resend: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Resend failed.');
+      toast(`Resent invite to ${row.email}`);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Resend failed.');
+    } finally {
+      setBusy(row.id, false);
+    }
+  }
+
+  async function resetPassword(row) {
+    try {
+      const newPw = prompt('Set a new temporary password for this user (min 8 chars):');
+      if (!newPw) return;
+      if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
+      setBusy(row.id, true);
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: row.email, password: newPw }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Reset failed.');
+      toast('Temporary password set');
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Password reset failed.');
+    } finally {
+      setBusy(row.id, false);
+    }
+  }
+
+  async function deleteUser(row) {
+    try {
+      if (!confirm(`Delete user ${row.email}? This cannot be undone.`)) return;
+      setBusy(row.id, true);
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
+      toast(`Deleted ${row.email}`);
+      await loadProfiles();
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Delete failed.');
+    } finally {
+      setBusy(row.id, false);
+    }
+  }
+
+  // Filtered list
+  const filtered = React.useMemo(() => {
+    const s = (q || '').trim().toLowerCase();
+    if (!s) return list;
+    return list.filter((r) =>
+      [r.email, r.org, r.account_manager_email].some((x) => (x || '').toLowerCase().includes(s))
+    );
+  }, [q, list]);
+
   return (
     <>
+      {/* Invite */}
       <Card style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
@@ -1678,8 +1808,23 @@ function AdminPanel() {
         </div>
       </Card>
 
+      {/* Directory */}
       <Card style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Directory</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontWeight: 800 }}>Directory</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Input
+              placeholder="Search email / org / sales contact"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ width: 300 }}
+            />
+            <Button onClick={loadProfiles} style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
         ) : (
@@ -1692,22 +1837,101 @@ function AdminPanel() {
                   <th style={thStyle}>Org</th>
                   <th style={thStyle}>Sales contact</th>
                   <th style={thStyle}>Created</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {list.map((r) => (
-                  <tr key={r.id}>
-                    <td style={tdStyle}>{r.email}</td>
-                    <td style={tdStyle}>{r.role}</td>
-                    <td style={tdStyle}>{r.org || '—'}</td>
-                    <td style={tdStyle}>{r.account_manager_email || '—'}</td>
-                    <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-                {list.length === 0 ? (
+                {filtered.map((r) => {
+                  const busy = !!rowBusy[r.id];
+                  const isEditing = editingId === r.id;
+                  return (
+                    <tr key={r.id}>
+                      <td style={tdStyle}>{r.email}</td>
+                      <td style={tdStyle}>
+                        {isEditing ? (
+                          <select
+                            value={editDraft.role}
+                            onChange={(e) => setEditDraft((s) => ({ ...s, role: e.target.value }))}
+                            style={selectStyle}
+                          >
+                            <option value="client">Client</option>
+                            <option value="recruiter">Recruiter</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : (
+                          r.role
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        {isEditing ? (
+                          <Input
+                            value={editDraft.org}
+                            onChange={(e) => setEditDraft((s) => ({ ...s, org: e.target.value }))}
+                          />
+                        ) : (r.org || '—')}
+                      </td>
+                      <td style={tdStyle}>
+                        {isEditing ? (
+                          <Input
+                            type="email"
+                            value={editDraft.account_manager_email}
+                            onChange={(e) => setEditDraft((s) => ({ ...s, account_manager_email: e.target.value }))}
+                          />
+                        ) : (r.account_manager_email || '—')}
+                      </td>
+                      <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        {!isEditing ? (
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <Button
+                              onClick={() => startEdit(r)}
+                              style={{ background: '#111827', border: '1px solid #1F2937' }}
+                              disabled={busy}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => resendInvite(r)}
+                              style={{ background: '#2563EB' }}
+                              disabled={busy}
+                            >
+                              Resend invite
+                            </Button>
+                            <Button
+                              onClick={() => resetPassword(r)}
+                              style={{ background: '#0C4A6E' }}
+                              disabled={busy}
+                            >
+                              Reset password
+                            </Button>
+                            <Button
+                              onClick={() => deleteUser(r)}
+                              style={{ background: '#B91C1C', border: '1px solid #7F1D1D' }}
+                              disabled={busy}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <Button onClick={() => saveEdit(r.id)} disabled={busy}>Save</Button>
+                            <Button
+                              onClick={cancelEdit}
+                              style={{ background: '#111827', border: '1px solid #1F2937' }}
+                              disabled={busy}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ ...tdStyle, color: '#9CA3AF' }}>
-                      No users yet.
+                    <td colSpan={6} style={{ ...tdStyle, color: '#9CA3AF' }}>
+                      No users found.
                     </td>
                   </tr>
                 ) : null}
