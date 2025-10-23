@@ -1487,12 +1487,13 @@ export default function Page() {
                   <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
-                  <Button
-                    onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid '#1F2937' }}
-                  >
-                    Compensation Insights
-                  </Button>
+                 <Button
+  onClick={loadInsights}
+  style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+>
+  Compensation Insights
+</Button>
+
                   <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
                     Log out
                   </Button>
@@ -1678,10 +1679,11 @@ export default function Page() {
                 ) : (
                   <div style={{ display: 'grid', gap: 10 }}>
                     {clientRows.map((c) => (
-                      <div
-                        key={c.id}
-                        style={{ border: '1px solid '#1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
-                      >
+                     <div
+  key={c.id}
+  style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
+>
+
                         {/* Red banner if on assignment */}
                         {c.on_assignment ? (
                           <div
