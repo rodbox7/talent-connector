@@ -266,6 +266,21 @@ export default function Page() {
       alert(`Delete failed${e?.message ? `: ${e.message}` : ''}`);
     }
   }
+// Fetch the recruiter's recent candidates list
+async function refreshMyRecent() {
+  if (!user || user.role !== 'recruiter') return;
+  setLoadingList(true);
+  const { data, error } = await supabase
+    .from('candidates')
+    .select(
+      'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes'
+    )
+    .eq('created_by', user.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (!error && data) setMyRecent(data);
+  setLoadingList(false);
+}
 
   async function addCandidate() {
   setAddMsg('');
