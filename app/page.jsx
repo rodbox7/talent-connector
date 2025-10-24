@@ -179,7 +179,7 @@ const Button = ({ children, ...rest }) => (
     style={{
       padding: '10px 14px',
       borderRadius: 10,
-      border: '1px solid '#243041'",
+      border: '1px solid #243041', // ✅ fixed the quotes
       background: '#3B82F6',
       color: 'white',
       fontWeight: 600,
@@ -190,6 +190,7 @@ const Button = ({ children, ...rest }) => (
     {children}
   </button>
 );
+
 
 const Tag = ({ children, style }) => (
   <span
