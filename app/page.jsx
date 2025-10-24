@@ -1492,7 +1492,14 @@ const hourlyStats = statsFrom(hourlyVals);
           {insights?.kpi ? (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
               <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
-              <Kpi label="p25–p75 Salary" value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'} />
+<Kpi
+  label="Typical Salary Range"
+  value={
+    (insights.kpi.salary.p25 && insights.kpi.salary.p75)
+      ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}`
+      : '—'
+  }
+/>
               <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
               <Kpi label="Sample Size" value={insights.sampleN} />
               <Kpi
