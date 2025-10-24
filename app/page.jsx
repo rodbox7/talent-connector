@@ -1581,7 +1581,9 @@ export default function Page() {
                     iTitle,
                     iLaw,
                     [iCity, iState].filter(Boolean).join(', '),
-                    (iStartDate || iEndDate) ? `${iStartDate || '…'} → ${iEndDate || '…'}` : null,
+                    (iStartDate || iEndDate)
+  ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
+  : null,
                     iContractOnly ? 'Contract only' : null,
                   ].filter(Boolean).join(' • ') || 'All'
                 }
