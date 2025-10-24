@@ -455,6 +455,11 @@ export default function Page() {
     if (!error && data) setMyRecent(data);
     setLoadingList(false);
   }
+  React.useEffect(() => {
+  if (user?.role === 'recruiter') {
+    refreshMyRecent();
+  }
+}, [user?.id, user?.role]);
 
   async function addCandidate() {
     setAddMsg('');
