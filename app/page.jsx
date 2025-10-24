@@ -13,6 +13,60 @@ const STATES = [
   'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
 ];
+// Major US metros (alpha)
+const MAJOR_METROS = [
+  'Atlanta, GA',
+  'Austin, TX',
+  'Baltimore, MD',
+  'Birmingham, AL',
+  'Boston, MA',
+  'Buffalo, NY',
+  'Charlotte, NC',
+  'Chicago, IL',
+  'Cincinnati, OH',
+  'Cleveland, OH',
+  'Columbus, OH',
+  'Dallas–Fort Worth, TX',
+  'Denver, CO',
+  'Detroit, MI',
+  'Hartford, CT',
+  'Honolulu, HI',
+  'Houston, TX',
+  'Indianapolis, IN',
+  'Jacksonville, FL',
+  'Kansas City, MO',
+  'Las Vegas, NV',
+  'Los Angeles, CA',
+  'Louisville, KY',
+  'Memphis, TN',
+  'Miami, FL',
+  'Milwaukee, WI',
+  'Minneapolis–St. Paul, MN',
+  'Nashville, TN',
+  'New Orleans, LA',
+  'New York City, NY',
+  'Oklahoma City, OK',
+  'Orlando, FL',
+  'Philadelphia, PA',
+  'Phoenix, AZ',
+  'Pittsburgh, PA',
+  'Portland, OR',
+  'Providence, RI',
+  'Raleigh–Durham, NC',
+  'Richmond, VA',
+  'Sacramento, CA',
+  'Salt Lake City, UT',
+  'San Antonio, TX',
+  'San Diego, CA',
+  'San Francisco–Oakland, CA',
+  'San Jose, CA',
+  'Seattle, WA',
+  'St. Louis, MO',
+  'Tampa–St. Petersburg, FL',
+  'Tucson, AZ',
+  'Washington, DC',
+];
+
 
 /* ---------- NEW: Title/Practice options ---------- */
 // Role titles
@@ -1072,14 +1126,25 @@ export default function Page() {
                     </div>
 
                     {/* City free-form input */}
-                    <div>
-                      <Label>City</Label>
-                      <Input
-                        placeholder="e.g., New York"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                      />
-                    </div>
+                   <div>
+  <Label>Metro Area</Label>
+  <select
+    value={city ? `${city}${state ? `, ${state}` : ''}` : ''}
+    onChange={(e) => {
+      const v = e.target.value; // e.g., "Chicago, IL"
+      const [c, st] = v.split(',').map(s => s.trim());
+      setCity(c || '');
+      setState(st || '');
+    }}
+    style={selectStyle}
+  >
+    <option value="">Select a metro</option>
+    {MAJOR_METROS.map((m) => (
+      <option key={m} value={m}>{m}</option>
+    ))}
+  </select>
+</div>
+
 
                     <div>
                       <Label>Years of experience</Label>
