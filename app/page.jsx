@@ -956,7 +956,7 @@ export default function Page() {
     width: '100%',
     backdropFilter: 'blur(1px)',
     background:
-      'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 16%, rgba(0,0,0,0.75) 100%)',
+      'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'center',
