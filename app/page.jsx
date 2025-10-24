@@ -236,8 +236,24 @@ function presetRange(preset) {
   }
 }
 
+// Hook: true when viewport <= breakpoint px
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia(`(max-width:${breakpoint}px)`);
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 /* ---------- Page ---------- */
 export default function Page() {
+  const isMobile = useIsMobile(768); // breakpoint for responsive tweaks
+
   const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = React.useState('');
   const [pwd, setPwd] = React.useState('');
@@ -515,14 +531,14 @@ export default function Page() {
   const [iYearsRange, setIYearsRange] = React.useState(''); // "min-max"
   const [iContractOnly, setIContractOnly] = React.useState(false);
   // Insights date preset (drives iStartDate/iEndDate)
-  const [iPreset, setIPreset] = React.useState('LAST_180'); // choose your default
+  const [iPreset, setIPreset] = React.useState('LAST_180');
   const [iStartDate, setIStartDate] = React.useState('');   // YYYY-MM-DD inclusive
   const [iEndDate, setIEndDate] = React.useState('');       // YYYY-MM-DD inclusive
   React.useEffect(() => {
-  const { start, end } = presetRange(iPreset);
-  setIStartDate(start);
-  setIEndDate(end);
-}, [iPreset]);
+    const { start, end } = presetRange(iPreset);
+    setIStartDate(start);
+    setIEndDate(end);
+  }, [iPreset]);
 
   // TODAY as plain local YYYY-MM-DD
   const todayStr = React.useMemo(() => {
@@ -716,7 +732,7 @@ export default function Page() {
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    padding: '40px 16px',
+    padding: isMobile ? '16px 12px' : '40px 16px',
   };
 
   /* ---------- Logged-out ---------- */
@@ -825,7 +841,7 @@ export default function Page() {
               {/* Center the form grid within the card */}
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: '100%', maxWidth: 980 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
                     <div style={{ gridColumn: '1 / -1' }}>
                       <Label>Description</Label>
                       <Input
@@ -1119,9 +1135,9 @@ export default function Page() {
                           padding: 12,
                           background: '#0B1220',
                           display: 'grid',
-                          gridTemplateColumns:
-                            '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
+                          gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
                           gap: 10,
+                          rowGap: isMobile ? 8 : 10,
                           alignItems: 'center',
                           fontSize: 13,
                         }}
@@ -1144,16 +1160,16 @@ export default function Page() {
                         <div style={{ color: '#9CA3AF' }}>
                           {renderDate(c.date_entered || c.created_at)}
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
                           <Button
                             onClick={() => startEdit(c)}
-                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                            style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
                           >
                             Edit
                           </Button>
                           <Button
                             onClick={() => removeCandidate(c.id)}
-                            style={{ background: '#B91C1C', border: '1px solid #7F1D1D' }}
+                            style={{ background: '#B91C1C', border: '1px solid #7F1D1D', width: isMobile ? '100%' : undefined }}
                           >
                             Delete
                           </Button>
@@ -1276,20 +1292,17 @@ export default function Page() {
           return { ...r, hourly_billable: billable };
         });
 
-        // KPIs
-        // Exclude missing/zero/negative salaries
-const salVals = rows
-  .map(r => Number(r.salary))
-  .filter(v => Number.isFinite(v) && v > 0);
-const salStats = statsFrom(salVals);
+        // KPIs (ignore zeros/missing)
+        const salVals = rows
+          .map(r => Number(r.salary))
+          .filter(v => Number.isFinite(v) && v > 0);
+        const salStats = statsFrom(salVals);
 
-// Exclude missing/zero/negative hourly billable values
-const hourlyVals = rows
-  .filter(r => r.contract)
-  .map(r => Number(r.hourly_billable))
-  .filter(v => Number.isFinite(v) && v > 0);
-const hourlyStats = statsFrom(hourlyVals);
-
+        const hourlyVals = rows
+          .filter(r => r.contract)
+          .map(r => Number(r.hourly_billable))
+          .filter(v => Number.isFinite(v) && v > 0);
+        const hourlyStats = statsFrom(hourlyVals);
 
         // Aggregations (within filtered rows)
         const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
@@ -1393,13 +1406,13 @@ const hourlyStats = statsFrom(hourlyVals);
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
                 onClick={() => setShowInsights(false)}
-                style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+                style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
               >
                 Back to Candidate Search
               </Button>
               <Button
                 onClick={loadInsights}
-                style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+                style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
               >
                 Refresh
               </Button>
@@ -1408,7 +1421,7 @@ const hourlyStats = statsFrom(hourlyVals);
 
           {/* Insights Filters */}
           <Card style={{ marginTop: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
               <div>
                 <Label>Title</Label>
                 <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
@@ -1448,18 +1461,19 @@ const hourlyStats = statsFrom(hourlyVals);
                   <option value="21-">21+ years</option>
                 </select>
               </div>
-            <div>
-  <Label>Date range</Label>
-  <select value={iPreset} onChange={(e) => setIPreset(e.target.value)} style={selectStyle}>
-    <option value="LAST_30">Last 30 days</option>
-    <option value="LAST_60">Last 60 days</option>
-    <option value="LAST_90">Last 90 days</option>
-    <option value="LAST_180">Last 180 days</option>
-    <option value="YTD">Year to date</option>
-    <option value="THIS_Q">This quarter</option>
-    <option value="ALL">All time</option>
-  </select>
-</div>
+
+              <div>
+                <Label>Date range</Label>
+                <select value={iPreset} onChange={(e) => setIPreset(e.target.value)} style={selectStyle}>
+                  <option value="LAST_30">Last 30 days</option>
+                  <option value="LAST_60">Last 60 days</option>
+                  <option value="LAST_90">Last 90 days</option>
+                  <option value="LAST_180">Last 180 days</option>
+                  <option value="YTD">Year to date</option>
+                  <option value="THIS_Q">This quarter</option>
+                  <option value="ALL">All time</option>
+                </select>
+              </div>
 
               <div style={{ display:'flex', alignItems:'end', gap:10 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1468,20 +1482,19 @@ const hourlyStats = statsFrom(hourlyVals);
                 </label>
               </div>
             </div>
-            <div style={{ marginTop: 12, display:'flex', gap:8 }}>
-              <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937' }}>Apply</Button>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
+              <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}>Apply</Button>
               <Button
-               onClick={() => {
-  setITitle('');
-  setILaw('');
-  setIState('');
-  setICity('');
-  setIYearsRange('');
-  setIContractOnly(false);
-  setIPreset('LAST_180'); // or 'ALL' if you prefer all-time as default
-}}
-
-                style={{ background:'#111827', border:'1px solid #1F2937' }}
+                onClick={() => {
+                  setITitle('');
+                  setILaw('');
+                  setIState('');
+                  setICity('');
+                  setIYearsRange('');
+                  setIContractOnly(false);
+                  setIPreset('LAST_180');
+                }}
+                style={{ background:'#111827', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}
               >
                 Clear
               </Button>
@@ -1490,16 +1503,12 @@ const hourlyStats = statsFrom(hourlyVals);
 
           {/* KPI row */}
           {insights?.kpi ? (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
               <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
-<Kpi
-  label="Typical Salary Range"
-  value={
-    (insights.kpi.salary.p25 && insights.kpi.salary.p75)
-      ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}`
-      : '—'
-  }
-/>
+              <Kpi
+                label="Typical Salary Range"
+                value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'}
+              />
               <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
               <Kpi label="Sample Size" value={insights.sampleN} />
               <Kpi
@@ -1535,27 +1544,29 @@ const hourlyStats = statsFrom(hourlyVals);
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  gap: 12,
+                  flexDirection: isMobile ? 'column' : 'row',
                   justifyContent: 'space-between',
                   marginBottom: 10,
+                  width: '100%',
                 }}
               >
                 <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
                   Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
                   <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
-                 <Button
-  onClick={loadInsights}
-  style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
->
-  Compensation Insights
-</Button>
-
-                  <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+                  <Button
+                    onClick={loadInsights}
+                    style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+                  >
+                    Compensation Insights
+                  </Button>
+                  <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
                     Log out
                   </Button>
                 </div>
@@ -1563,7 +1574,7 @@ const hourlyStats = statsFrom(hourlyVals);
 
               <Card style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
                   <div>
                     <Label>Keyword</Label>
                     <Input
@@ -1584,17 +1595,17 @@ const hourlyStats = statsFrom(hourlyVals);
                     </select>
                   </div>
                   <div>
-  <Label>State</Label>
-  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-    <option value="">Any</option>
-    {STATES.map((s) => (
-      <option key={s} value={s}>
-        {s}
-      </option>
-    ))}
-  </select>
-</div>
-
+                    <Label>State</Label>
+                    {/* fixed 50-state list */}
+                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <Label>Title</Label>
                     <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
@@ -1741,11 +1752,10 @@ const hourlyStats = statsFrom(hourlyVals);
                 ) : (
                   <div style={{ display: 'grid', gap: 10 }}>
                     {clientRows.map((c) => (
-                     <div
-  key={c.id}
-  style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
->
-
+                      <div
+                        key={c.id}
+                        style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
+                      >
                         {/* Red banner if on assignment */}
                         {c.on_assignment ? (
                           <div
@@ -1767,8 +1777,9 @@ const hourlyStats = statsFrom(hourlyVals);
                         <div
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '1.2fr 1fr 0.6fr 0.8fr auto',
+                            gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr 0.6fr 0.8fr auto',
                             gap: 10,
+                            rowGap: isMobile ? 8 : 10,
                             alignItems: 'center',
                           }}
                         >
@@ -1788,10 +1799,10 @@ const hourlyStats = statsFrom(hourlyVals);
                           <div style={{ color: '#9CA3AF' }}>
                             {renderDate(c.date_entered || c.created_at)}
                           </div>
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
                             <Button
                               onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                              style={{ background: '#111827', border: '1px solid #1F2937' }}
+                              style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
                             >
                               Additional information
                             </Button>
@@ -1806,6 +1817,8 @@ const hourlyStats = statsFrom(hourlyVals);
                                 color: 'white',
                                 fontWeight: 600,
                                 textDecoration: 'none',
+                                width: isMobile ? '100%' : undefined,
+                                textAlign: 'center',
                               }}
                             >
                               Email for more information
