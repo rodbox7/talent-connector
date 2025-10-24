@@ -1816,6 +1816,24 @@ export default function Page() {
                 </div>
               </Card>
 
+              {/* Help / Request Support box */}
+<Card style={{ marginTop: 14 }}>
+  <div style={{ fontWeight: 800, marginBottom: 8 }}>Need assistance?</div>
+  <div style={{ color: '#E5E7EB', fontSize: 14, lineHeight: 1.5 }}>
+    If You Aren&apos;t Finding What You Are Looking For,&nbsp;
+    <a
+      href="https://bhsg.com/partner-with-us"
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: '#93C5FD', textDecoration: 'underline', fontWeight: 600 }}
+    >
+      Click Here To Request Our Help With Your Search
+    </a>
+    .
+  </div>
+</Card>
+
+
               <Card style={{ marginTop: 14 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
                 {clientRows.length === 0 ? (
