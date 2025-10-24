@@ -2017,6 +2017,33 @@ export default function Page() {
                 </div>
               </Card>
 
+              <Card style={{ marginTop: 12 }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ fontWeight: 800 }}>Need a hand?</div>
+    <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
+      If you aren’t finding what you’re looking for, we can help.
+    </div>
+    <a
+      href="https://bhsg.com/partner-with-us"
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'inline-block',
+        padding: '10px 14px',
+        borderRadius: 10,
+        border: '1px solid #243041',
+        background: '#2563EB',
+        color: 'white',
+        fontWeight: 600,
+        textDecoration: 'none',
+        width: 'fit-content',
+      }}
+    >
+      Request our help with your search
+    </a>
+  </div>
+</Card>
+
               <Card style={{ marginTop: 14 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
                 {clientRows.length === 0 ? (
