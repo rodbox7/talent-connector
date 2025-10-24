@@ -14,6 +14,111 @@ const STATES = [
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
 ];
 
+/* ---------- NEW: Title/Practice options ---------- */
+// Role titles
+const TITLE_OPTIONS = [
+  'Administrative',
+  'Legal Support',
+  'Paralegal',
+  'Attorney',
+];
+
+// Type of Law / Practice Areas
+const LAW_OPTIONS = [
+  "40's Act",
+  'Administrative',
+  'Administrative Manager',
+  'Antitrust',
+  'Appellate',
+  'Asbestos',
+  'Associate',
+  'Attorney',
+  'Banking',
+  'Bankruptcy',
+  'Commercial Litigation',
+  'Commercial Real Estate',
+  'Compliance',
+  'Conflicts',
+  'Conflicts Analyst',
+  'Construction',
+  'Contracts',
+  'Corporate',
+  'Criminal',
+  'Data Privacy/Cybersecurity',
+  'Docketing',
+  'Document Review',
+  'Employee Benefits/Executive Comp/ERISA',
+  'Energy',
+  'Entertainment',
+  'Environmental',
+  'Family',
+  'FCPA',
+  'FDA',
+  'Finance',
+  'Financial Services',
+  'FinTech',
+  'Foreclosure',
+  'Foreign Filing',
+  'Foreign Language Review',
+  'Franchise',
+  'General Counsel',
+  'Government Contracts',
+  'Government Contracts Attorney',
+  'Healthcare',
+  'HSR',
+  'Immigration',
+  'In House Associate',
+  'Insurance Coverage',
+  'Insurance Defense',
+  'Insurance Litigation',
+  'Insurance Regulatory',
+  'International Arbitration',
+  'International Trade',
+  'Labor & Employment',
+  'Law Clerk',
+  'Law Student',
+  'Leasing',
+  'Legal JD',
+  'Legal Malpractice',
+  'Legal Marketing',
+  'Legal Support',
+  'Life Sciences',
+  'Litigation',
+  'Litigation Technology',
+  'Medical Malpractice',
+  'Mergers and Acquisitions',
+  'MRS Project Manager',
+  'Mutual Fund',
+  'Nurse',
+  'Oil & Gas',
+  'Paralegal',
+  'Partner',
+  'Patent Agent',
+  'Patent Counsel',
+  'Patent Litigation',
+  'Patent Prosecution',
+  'Personal Injury',
+  'Project Finance',
+  'Project Manager',
+  'Public Finance',
+  'Real Estate Finance',
+  'Regulatory',
+  'Residential Real Estate',
+  'Restructuring',
+  'Securities',
+  'Securities Litigation',
+  'Syndication',
+  'Tax',
+  'Technology',
+  'Technology Transactions',
+  'Toxic Tort',
+  'Trade Attorney',
+  'Trademark',
+  'Trust & Estate',
+  "Worker's Compensation",
+  'White Collar Litigation',
+];
+
 /* ---------- Small UI helpers ---------- */
 const Card = ({ children, style }) => (
   <div
@@ -74,7 +179,7 @@ const Button = ({ children, ...rest }) => (
     style={{
       padding: '10px 14px',
       borderRadius: 10,
-      border: '1px solid #243041',
+      border: '1px solid '#243041'",
       background: '#3B82F6',
       color: 'white',
       fontWeight: 600,
@@ -456,10 +561,10 @@ export default function Page() {
     setLoadingList(false);
   }
   React.useEffect(() => {
-  if (user?.role === 'recruiter') {
-    refreshMyRecent();
-  }
-}, [user?.id, user?.role]);
+    if (user?.role === 'recruiter') {
+      refreshMyRecent();
+    }
+  }, [user?.id, user?.role]);
 
   async function addCandidate() {
     setAddMsg('');
@@ -919,21 +1024,35 @@ export default function Page() {
                         onChange={(e) => setName(e.target.value)}
                       />
                     </div>
+
+                    {/* REPLACED: Title dropdown */}
                     <div>
-                      <Label>Title(s) (CSV)</Label>
-                      <Input
-                        placeholder="Attorney, Paralegal, etc."
+                      <Label>Title</Label>
+                      <select
                         value={titles}
                         onChange={(e) => setTitles(e.target.value)}
-                      />
+                        style={selectStyle}
+                      >
+                        <option value="">Select title</option>
+                        {TITLE_OPTIONS.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
+
+                    {/* REPLACED: Type of Law dropdown */}
                     <div>
-                      <Label>Type of Law (CSV)</Label>
-                      <Input
-                        placeholder="Litigation, Immigration"
+                      <Label>Type of Law</Label>
+                      <select
                         value={law}
                         onChange={(e) => setLaw(e.target.value)}
-                      />
+                        style={selectStyle}
+                      >
+                        <option value="">Select type of law</option>
+                        {LAW_OPTIONS.map((l) => (
+                          <option key={l} value={l}>{l}</option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* State dropdown (fixed 50-state list) */}
@@ -1067,19 +1186,35 @@ export default function Page() {
                               onChange={(e) => changeEditField('name', e.target.value)}
                             />
                           </div>
+
+                          {/* REPLACED: Title dropdown */}
                           <div>
-                            <Label>Title(s) (CSV)</Label>
-                            <Input
-                              value={editForm.titles_csv}
+                            <Label>Title</Label>
+                            <select
+                              value={editForm.titles_csv || ''}
                               onChange={(e) => changeEditField('titles_csv', e.target.value)}
-                            />
+                              style={selectStyle}
+                            >
+                              <option value="">Select title</option>
+                              {TITLE_OPTIONS.map((t) => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
                           </div>
+
+                          {/* REPLACED: Type of Law dropdown */}
                           <div>
-                            <Label>Type of Law (CSV)</Label>
-                            <Input
-                              value={editForm.law_csv}
+                            <Label>Type of Law</Label>
+                            <select
+                              value={editForm.law_csv || ''}
                               onChange={(e) => changeEditField('law_csv', e.target.value)}
-                            />
+                              style={selectStyle}
+                            >
+                              <option value="">Select type of law</option>
+                              {LAW_OPTIONS.map((l) => (
+                                <option key={l} value={l}>{l}</option>
+                              ))}
+                            </select>
                           </div>
 
                           <div>
@@ -1587,8 +1722,8 @@ export default function Page() {
                     iLaw,
                     [iCity, iState].filter(Boolean).join(', '),
                     (iStartDate || iEndDate)
-  ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
-  : null,
+                      ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
+                      : null,
                     iContractOnly ? 'Contract only' : null,
                   ].filter(Boolean).join(' • ') || 'All'
                 }
@@ -1815,24 +1950,6 @@ export default function Page() {
                   ) : null}
                 </div>
               </Card>
-
-              {/* Help / Request Support box */}
-<Card style={{ marginTop: 14 }}>
-  <div style={{ fontWeight: 800, marginBottom: 8 }}>Need assistance?</div>
-  <div style={{ color: '#E5E7EB', fontSize: 14, lineHeight: 1.5 }}>
-    If You Aren&apos;t Finding What You Are Looking For,&nbsp;
-    <a
-      href="https://bhsg.com/partner-with-us"
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{ color: '#93C5FD', textDecoration: 'underline', fontWeight: 600 }}
-    >
-      Click Here To Request Our Help With Your Search
-    </a>
-    .
-  </div>
-</Card>
-
 
               <Card style={{ marginTop: 14 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
