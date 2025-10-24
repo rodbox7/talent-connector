@@ -174,8 +174,32 @@ function toTitleCaseCity(s) {
 // Normalize state to 2-letter uppercase
 function normState(s) {
   if (!s) return '';
-  return s.trim().toUpperCase();
+  return s.trim().toUpperCase(); 
 }
+
+function displayCompRecruiter(c) {
+  const bill = (c.contract && Number.isFinite(Number(c.hourly)))
+    ? Math.round(Number(c.hourly) * 1.66)
+    : null;
+  if (Number.isFinite(Number(c.salary)) && Number(c.salary) > 0) {
+    return `$${Number(c.salary).toLocaleString()}${bill ? `  /  $${bill}/hr` : ''}`;
+  }
+  if (bill) return `$${bill}/hr`;
+  return '—';
+}
+
+function displayCompClient(c) {
+  // Client-facing shows billable hourly (1.66x)
+  const bill = (c.contract && Number.isFinite(Number(c.hourly)))
+    ? Math.round(Number(c.hourly) * 1.66)
+    : null;
+  if (Number.isFinite(Number(c.salary)) && Number(c.salary) > 0) {
+    return `$${Number(c.salary).toLocaleString()}${bill ? `  /  $${bill}/hr` : ''}`;
+  }
+  if (bill) return `$${bill}/hr`;
+  return '—';
+}
+
 
 // Stats (avg/median/p25/p75) for a numeric array
 function statsFrom(values) {
@@ -742,7 +766,7 @@ export default function Page() {
         <div style={overlay}>
           <Card style={{ width: 520, padding: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
-              Talent Connector
+              Talent Connector-Powered by Beacon Hill Legal
             </div>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
               Invitation-only access
@@ -827,7 +851,7 @@ export default function Page() {
               }}
             >
               <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                Talent Connector-Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                 <span style={{ color: '#9CA3AF' }}>RECRUITER workspace</span>
               </div>
               <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
@@ -1153,12 +1177,12 @@ export default function Page() {
                         </div>
                         <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
                         <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
-                        <div style={{ color: '#E5E7EB' }}>
-                          {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                          {c.contract && c.hourly ? `  /  $${Math.round(c.hourly * 1.66)}/hr` : ''}
-                        </div>
+                       <div style={{ color: '#E5E7EB' }}>
+  {displayCompRecruiter(c)}
+</div>
+
                         <div style={{ color: '#9CA3AF' }}>
-                          {renderDate(c.date_entered || c.created_at)}
+                          {formatMDY(c.date_entered || c.created_at)}
                         </div>
                         <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
                           <Button
@@ -1553,7 +1577,7 @@ export default function Page() {
                 }}
               >
                 <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                  Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                  Talent Connector-Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
@@ -1575,37 +1599,40 @@ export default function Page() {
               <Card style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                  <div>
-                    <Label>Keyword</Label>
-                    <Input
-                      placeholder="description, law, title, city/state, notes"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>City</Label>
-                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {cities.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>State</Label>
-                    {/* fixed 50-state list */}
-                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {STATES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                 <div style={{ minWidth: 0 }}>
+  <Label>Keyword</Label>
+  <Input
+    placeholder="description, law, title, city/state, notes"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    style={{ width: '100%' }}
+  />
+</div>
+
+                 <div style={{ minWidth: 0 }}>
+  <Label>City</Label>
+  <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
+    <option value="">Any</option>
+    {cities.map((c) => (
+      <option key={c} value={c}>
+        {c}
+      </option>
+    ))}
+  </select>
+</div>
+
+                 <div style={{ minWidth: 0 }}>
+  <Label>State</Label>
+  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+    <option value="">Any</option>
+    {states.map((s) => (
+      <option key={s} value={s}>
+        {s}
+      </option>
+    ))}
+  </select>
+</div>
+
                   <div>
                     <Label>Title</Label>
                     <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
@@ -1797,7 +1824,7 @@ export default function Page() {
                             {c.contract && c.hourly ? `  /  $${Math.round(c.hourly * 1.66)}/hr` : ''}
                           </div>
                           <div style={{ color: '#9CA3AF' }}>
-                            {renderDate(c.date_entered || c.created_at)}
+                            {formatMDY(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
                             <Button
@@ -1868,7 +1895,7 @@ export default function Page() {
             }}
           >
             <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-              Talent Connector <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              Talent Connector-Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
               <span style={{ color: '#9CA3AF' }}>ADMIN workspace</span>
             </div>
             <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
