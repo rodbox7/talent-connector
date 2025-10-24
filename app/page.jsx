@@ -174,7 +174,7 @@ function toTitleCaseCity(s) {
 // Normalize state to 2-letter uppercase
 function normState(s) {
   if (!s) return '';
-  return s.trim().toUpperCase(); 
+  return s.trim().toUpperCase();
 }
 
 function displayCompRecruiter(c) {
@@ -199,7 +199,6 @@ function displayCompClient(c) {
   if (bill) return `$${bill}/hr`;
   return '—';
 }
-
 
 // Stats (avg/median/p25/p75) for a numeric array
 function statsFrom(values) {
@@ -255,7 +254,7 @@ function presetRange(preset) {
     case 'LAST_180': return { start: backDays(180), end };
     case 'YTD':      return { start: toYMD(startOfYear),  end };
     case 'THIS_Q':   return { start: toYMD(startOfQuarter), end };
-    case 'ALL':      return { start: '', end: '' }; // no date filter
+    case 'ALL':      return { start: '', end: '' };
     default:         return { start: '', end: '' };
   }
 }
@@ -529,6 +528,7 @@ export default function Page() {
   const [sortBy, setSortBy] = React.useState('date_desc');
 
   const [cities, setCities] = React.useState([]);
+  // keep states from DB if you want, but render fixed STATES below
   const [states, setStates] = React.useState([]);
   const [titleOptions, setTitleOptions] = React.useState([]);
   const [lawOptions, setLawOptions] = React.useState([]);
@@ -640,9 +640,138 @@ export default function Page() {
     return { min, max };
   }
 
- fetchClientRows
+  // ---------- FETCH CLIENT ROWS ----------
+  async function fetchClientRows() {
+    try {
+      setClientErr('');
+      setClientLoading(true);
+      setExpandedId(null);
 
- fetchClientRows
+      // Pull a generous slice and filter client-side for simplicity.
+      const { data, error } = await supabase
+        .from('candidates')
+        .select(
+          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date'
+        )
+        .limit(2000);
+      if (error) throw error;
+
+      const { min: salMin, max: salMax } = parseRange(salaryRange);
+      const { min: yrsMin, max: yrsMax } = parseRange(yearsRange);
+      const hrRecRange = billToRecruiterRange(hourlyBillRange);
+
+      const term = (search || '').trim().toLowerCase();
+
+      const rows = (data || []).filter((r) => {
+        // Keyword search across a few fields
+        if (term) {
+          const blob = [
+            r.name,
+            r.titles_csv,
+            r.law_csv,
+            r.city,
+            r.state,
+            r.notes,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          if (!blob.includes(term)) return false;
+        }
+
+        if (fCity && String(r.city || '') !== fCity) return false;
+        if (fState && String(r.state || '') !== fState) return false;
+        if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
+        if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
+
+        // Salary range (ignore 0/blank)
+        if (salMin != null || salMax != null) {
+          const s = Number(r.salary);
+          const has = Number.isFinite(s) && s > 0;
+          if (!has) return false;
+          if (salMin != null && s < salMin) return false;
+          if (salMax != null && s > salMax) return false;
+        }
+
+        // Years of experience
+        if (yrsMin != null || yrsMax != null) {
+          const y = Number(r.years);
+          if (!Number.isFinite(y)) return false;
+          if (yrsMin != null && y < yrsMin) return false;
+          if (yrsMax != null && y > yrsMax) return false;
+        }
+
+        // Contract-only + hourly billable range (converted back to recruiter hourly)
+        if (contractOnly && !r.contract) return false;
+        if (contractOnly && hourlyBillRange) {
+          const h = Number(r.hourly);
+          if (!(Number.isFinite(h) && h > 0)) return false;
+          if (hrRecRange.min != null && h < hrRecRange.min) return false;
+          if (hrRecRange.max != null && h > hrRecRange.max) return false;
+        }
+
+        return true;
+      });
+
+      // Sorting
+      const sorted = rows.sort((a, b) => {
+        switch (sortBy) {
+          case 'date_asc':
+            return (ymd(a.date_entered || a.created_at) || '').localeCompare(
+              ymd(b.date_entered || b.created_at) || ''
+            );
+          case 'salary_desc':
+          case 'salary_asc': {
+            const sa = Number(a.salary) || -Infinity;
+            const sb = Number(b.salary) || -Infinity;
+            return sortBy === 'salary_desc' ? sb - sa : sa - sb;
+          }
+          case 'hourly_desc':
+          case 'hourly_asc': {
+            const ha = a.contract && Number.isFinite(Number(a.hourly)) ? Math.round(Number(a.hourly) * 1.66) : -Infinity;
+            const hb = b.contract && Number.isFinite(Number(b.hourly)) ? Math.round(Number(b.hourly) * 1.66) : -Infinity;
+            return sortBy === 'hourly_desc' ? hb - ha : ha - hb;
+          }
+          case 'years_desc':
+          case 'years_asc': {
+            const ya = Number(a.years);
+            const yb = Number(b.years);
+            const A = Number.isFinite(ya) ? ya : -Infinity;
+            const B = Number.isFinite(yb) ? yb : -Infinity;
+            return sortBy === 'years_desc' ? B - A : A - B;
+          }
+          case 'date_desc':
+          default:
+            return (ymd(b.date_entered || b.created_at) || '').localeCompare(
+              ymd(a.date_entered || a.created_at) || ''
+            );
+        }
+      });
+
+      setClientRows(sorted);
+    } catch (e) {
+      console.error(e);
+      setClientErr('Failed to load candidates.');
+    } finally {
+      setClientLoading(false);
+    }
+  }
+
+  // ---------- CLEAR FILTERS (instant reload) ----------
+  function clearClientFilters() {
+    setSearch('');
+    setFCity('');
+    setFState('');
+    setFTitle('');
+    setFLaw('');
+    setSalaryRange('');
+    setYearsRange('');
+    setContractOnly(false);
+    setHourlyBillRange('');
+    setSortBy('date_desc');
+    // immediately reload rows
+    fetchClientRows();
+  }
 
   React.useEffect(() => {
     if (user?.role === 'client') fetchClientRows();
@@ -676,7 +805,8 @@ export default function Page() {
         <div style={overlay}>
           <Card style={{ width: 520, padding: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
-              Talent Connector-Powered by Beacon Hill Legal
+              {/* Branding with spaces around dash */}
+              Talent Connector – Powered by Beacon Hill Legal
             </div>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
               Invitation-only access
@@ -761,7 +891,7 @@ export default function Page() {
               }}
             >
               <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                Talent Connector-Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                 <span style={{ color: '#9CA3AF' }}>RECRUITER workspace</span>
               </div>
               <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
@@ -1087,10 +1217,9 @@ export default function Page() {
                         </div>
                         <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
                         <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
-                       <div style={{ color: '#E5E7EB' }}>
-  {displayCompRecruiter(c)}
-</div>
-
+                        <div style={{ color: '#E5E7EB' }}>
+                          {displayCompRecruiter(c)}
+                        </div>
                         <div style={{ color: '#9CA3AF' }}>
                           {formatMDY(c.date_entered || c.created_at)}
                         </div>
@@ -1487,7 +1616,7 @@ export default function Page() {
                 }}
               >
                 <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                  Talent Connector-Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                  Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
@@ -1509,39 +1638,39 @@ export default function Page() {
               <Card style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                 <div style={{ minWidth: 0 }}>
-  <Label>Keyword</Label>
-  <Input
-    placeholder="description, law, title, city/state, notes"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    style={{ width: '100%' }}
-  />
-</div>
+                  <div style={{ minWidth: 0 }}>
+                    <Label>Keyword</Label>
+                    <Input
+                      placeholder="description, law, title, city/state, notes"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
 
-                 <div style={{ minWidth: 0 }}>
-  <Label>City</Label>
-  <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-    <option value="">Any</option>
-    {cities.map((c) => (
-      <option key={c} value={c}>
-        {c}
-      </option>
-    ))}
-  </select>
-</div>
+                  <div style={{ minWidth: 0 }}>
+                    <Label>City</Label>
+                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {cities.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                 <div style={{ minWidth: 0 }}>
-  <Label>State</Label>
-  <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-    <option value="">Any</option>
-    {states.map((s) => (
-      <option key={s} value={s}>
-        {s}
-      </option>
-    ))}
-  </select>
-</div>
+                  <div style={{ minWidth: 0 }}>
+                    <Label>State</Label>
+                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div>
                     <Label>Title</Label>
@@ -1730,8 +1859,7 @@ export default function Page() {
                             {c.city || '—'}, {c.state || '—'}
                           </div>
                           <div style={{ color: '#E5E7EB' }}>
-                            {c.salary ? `$${c.salary.toLocaleString()}` : '—'}
-                            {c.contract && c.hourly ? `  /  $${Math.round(c.hourly * 1.66)}/hr` : ''}
+                            {displayCompClient(c)}
                           </div>
                           <div style={{ color: '#9CA3AF' }}>
                             {formatMDY(c.date_entered || c.created_at)}
@@ -1805,7 +1933,7 @@ export default function Page() {
             }}
           >
             <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-              Talent Connector-Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
               <span style={{ color: '#9CA3AF' }}>ADMIN workspace</span>
             </div>
             <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
