@@ -1439,106 +1439,108 @@ export default function Page() {
     }
 
     async function loadInsights() {
-      try {
-        const { data, error } = await supabase
-          .from('candidates')
-          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
-          .limit(5000);
-        if (error) throw error;
+  try {
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
+      .limit(5000);
+    if (error) throw error;
 
-        const pass = (r) => {
-          if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
-          if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
-          if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
-          if (iState && String(r.state || '').trim() !== iState.trim()) return false;
-          if (iContractOnly && !r.contract) return false;
+    const pass = (r) => {
+      if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
+      if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
+      if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
+      if (iState && String(r.state || '').trim() !== iState.trim()) return false;
+      if (iContractOnly && !r.contract) return false;
 
-          const recency = ymd(r.date_entered) || ymd(r.created_at);
-          if (iStartDate && (!recency || recency < iStartDate)) return false;
-          if (iEndDate   && (!recency || recency > iEndDate))   return false;
+      const recency = ymd(r.date_entered) || ymd(r.created_at);
+      if (iStartDate && (!recency || recency < iStartDate)) return false;
+      if (iEndDate   && (!recency || recency > iEndDate))   return false;
 
-          if (iYearsRange) {
-            const [minStr, maxStr] = iYearsRange.split('-');
-            const min = minStr ? Number(minStr) : null;
-            const max = maxStr ? Number(maxStr) : null;
-            const y = Number(r.years);
-            if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
-            if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
-          }
-          return true;
-        };
+      if (iYearsRange) {
+        const [minStr, maxStr] = iYearsRange.split('-');
+        const min = minStr ? Number(minStr) : null;
+        const max = maxStr ? Number(maxStr) : null;
+        const y = Number(r.years);
+        if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
+        if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
+      }
+      return true;
+    };
 
-        const rows = (data || []).filter(pass).map((r) => {
-          const h = Number(r.hourly);
-          const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
-          return { ...r, hourly_billable: billable };
+    const rows = (data || []).filter(pass).map((r) => {
+      const h = Number(r.hourly);
+      const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
+      return { ...r, hourly_billable: billable };
+    });
+
+    const salVals = rows
+      .map(r => Number(r.salary))
+      .filter(v => Number.isFinite(v) && v > 0);
+    const salStats = statsFrom(salVals);
+
+    const hourlyVals = rows
+      .filter(r => r.contract)
+      .map(r => Number(r.hourly_billable))
+      .filter(v => Number.isFinite(v) && v > 0);
+    const hourlyStats = statsFrom(hourlyVals);
+
+    const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
+      ...r,
+      title_one: r[_csvKey('titles_csv')],
+    }));
+
+    const withCityState = rows.map((r) => ({
+      ...r,
+      city_full: [r.city, r.state].filter(Boolean).join(', '),
+    }));
+
+    const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
+    const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
+    const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
+    const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
+
+    const buckets = [
+      { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
+      { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
+      { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
+      { label: '11-20 yrs',check: (y) => y >= 11 && y <= 20 },
+      { label: '21+ yrs',  check: (y) => y >= 21 },
+    ];
+    const yearsAgg = [];
+    for (const b of buckets) {
+      const vals = rows
+        .map((r) => Number(r.salary))
+        .filter((v, i) => {
+          const y = Number(rows[i].years);
+          return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
         });
-
-        const salVals = rows
-          .map(r => Number(r.salary))
-          .filter(v => Number.isFinite(v) && v > 0);
-        const salStats = statsFrom(salVals);
-
-        const hourlyVals = rows
-          .filter(r => r.contract)
-          .map(r => Number(r.hourly_billable))
-          .filter(v => Number.isFinite(v) && v > 0);
-        const hourlyStats = statsFrom(hourlyVals);
-
-        const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
-          ...r,
-          title_one: r[_csvKey('titles_csv')],
-        }));
-
-        const withCityState = rows.map((r) => ({
-          ...r,
-          city_full: [r.city, r.state].filter(Boolean).join(', '),
-        }));
-
-        const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
-        const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
-        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
-        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
-
-        const buckets = [
-          { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
-          { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
-          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
-          { label: '11-20 yrs',check: (y) => y >= 11 && y <= 20 },
-          { label: '21+ yrs',  check: (y) => y >= 21 },
-        ];
-        const yearsAgg = [];
-        for (const b of buckets) {
-          const vals = rows
-            .map((r) => Number(r.salary))
-            .filter((v, i) => {
-              const y = Number(rows[i].years);
-              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
-            });
-          if (vals.length) {
-            yearsAgg.push({
-              label: b.label,
-              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
-              n: vals.length,
-            });
-          }
-        }
-
-        setInsights({
-          kpi: { salary: salStats, hourly: hourlyStats },
-          byTitleSalary,
-          byTitleHourly,
-          byCitySalary,
-          byCityHourly,
-          byYearsSalary: yearsAgg,
-          sampleN: rows.length,
+      if (vals.length) {
+        yearsAgg.push({
+          label: b.label,
+          avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
+          n: vals.length,
         });
-        setShowInsights(true);
-      } catch (e) {
-        console.error(e);
-        alert('Failed to load insights.');
       }
     }
+
+    setInsights({
+      kpi: { salary: salStats, hourly: hourlyStats },
+      byTitleSalary,
+      byTitleHourly,
+      byCitySalary,
+      byCityHourly,
+      byYearsSalary: yearsAgg,
+      sampleN: rows.length,
+    });
+
+    // NOTE: intentionally removed setShowInsights(true);
+  } catch (e) {
+    console.error(e);
+    alert('Failed to load insights.');
+  }
+}
+
 
     function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
