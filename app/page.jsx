@@ -1323,26 +1323,28 @@ if (user.role === 'recruiter') {
                           </div>
 
                           <div>
-                            <Label>City</Label>
-                            <Input
-                              value={editForm.city}
-                              onChange={(e) => changeEditField('city', e.target.value)}
-                            />
-                          </div>
-
-                          <div>
-                            <Label>State</Label>
-                            <select
-                              value={editForm.state || ''}
-                              onChange={(e) => changeEditField('state', normState(e.target.value))}
-                              style={selectStyle}
-                            >
-                              <option value="">Select state</option>
-                              {STATES.map((s) => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
-                          </div>
+                           <div>
+  <Label>Metro Area</Label>
+  <select
+    value={
+      editForm.city
+        ? `${editForm.city}${editForm.state ? `, ${editForm.state}` : ''}`
+        : ''
+    }
+    onChange={(e) => {
+      const v = e.target.value;        // e.g., "Chicago, IL"
+      const [c, st] = v.split(',').map((x) => x.trim());
+      changeEditField('city', c || '');
+      changeEditField('state', st ? normState(st) : '');
+    }}
+    style={selectStyle}
+  >
+    <option value="">Select a metro</option>
+    {MAJOR_METROS.map((m) => (
+      <option key={m} value={m}>{m}</option>
+    ))}
+  </select>
+</div>
 
                           <div>
                             <Label>Years</Label>
