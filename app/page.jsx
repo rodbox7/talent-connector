@@ -1029,11 +1029,17 @@ export default function Page() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <input
-                          type="checkbox"
-                          checked={contract}
-                          onChange={(e) => setContract(e.target.checked)}
-                        />
+                     <input
+  type="checkbox"
+  checked={iContractOnly}
+  onChange={(e) => {
+    const v = e.target.checked;
+    setIContractOnly(v);
+    // instant apply
+    setTimeout(() => loadInsights(), 0);
+  }}
+/>
+
                         <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
                       </label>
                       {contract ? (
