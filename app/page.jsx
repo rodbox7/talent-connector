@@ -2102,7 +2102,7 @@ async function fetchClientRows() {
   </div>
 ) : null}
 
-/* Red banner if on assignment (only when not off-market) */
+    {/* Red banner if on assignment (only when not off-market) */}
 {!c.off_market && c.on_assignment ? (
   <div
     style={{
