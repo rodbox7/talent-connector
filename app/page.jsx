@@ -951,23 +951,24 @@ export default function Page() {
     backgroundSize: 'cover',
     backgroundAttachment: 'fixed',
   };
-  const overlay = {
-    minHeight: '100vh',
-    width: '100%',
-    backdropFilter: 'blur(1px)',
-    background:
-      'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    padding: isMobile ? '16px 12px' : '40px 16px',
-  };
+ const overlayCentered = {
+  minHeight: '100vh',
+  width: '100%',
+  backdropFilter: 'blur(1px)',
+  background:
+    'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
+  display: 'flex',
+  alignItems: 'center',   // vertical center
+  justifyContent: 'center', // horizontal center
+  padding: isMobile ? '16px 12px' : '40px 16px',
+};
+
 
   /* ---------- Logged-out ---------- */
   if (!user) {
     return (
       <div style={pageWrap}>
-        <div style={overlay}>
+        <div style={overlayCentered}>
           <Card style={{ width: 520, padding: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
               {/* Branding with spaces around dash */}
