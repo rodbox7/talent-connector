@@ -605,21 +605,27 @@ export default function Page() {
   }
 
   // Fetch the recruiter's recent candidates list
-  async function refreshMyRecent() {
-    if (!user || user.role !== 'recruiter') return;
-    setLoadingList(true);
-    const { data, error } = await supabase
-      .from('candidates')
-      .select(
-  'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
-)
+async function refreshMyRecent() {
+  if (!user || user.role !== 'recruiter') return;
+  setLoadingList(true);
 
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (!error && data) setMyRecent(data);
-    setLoadingList(false);
-  }
+  let query = supabase
+    .from('candidates')
+    .select(
+      'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+    )
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (!isSuperRecruiter) {
+    query = query.eq('created_by', user.id);   // normal recruiters: only their own
+  } // superuser sees all
+
+  const { data, error } = await query;
+  if (!error && data) setMyRecent(data);
+  setLoadingList(false);
+}
+
   React.useEffect(() => {
     if (user?.role === 'recruiter') {
       refreshMyRecent();
@@ -1064,8 +1070,11 @@ async function fetchClientRows() {
     );
   }
 
-  /* ---------- Recruiter UI ---------- */
-  if (user.role === 'recruiter') {
+ /* ---------- Recruiter UI ---------- */
+if (user.role === 'recruiter') {
+  const isSuperRecruiter =
+    (user?.role === 'recruiter') &&
+    ((user?.email || '').toLowerCase() === 'jdavid@bhsg.com'); // ✅ superuser flag
     return (
       <div style={pageWrap}>
         <div style={overlay}>
@@ -1249,7 +1258,10 @@ async function fetchClientRows() {
             </Card>
 
             <Card style={{ marginTop: 14 }}>
-              <div style={{ fontWeight: 800, marginBottom: 12 }}>My recent candidates</div>
+             <div style={{ fontWeight: 800, marginBottom: 12 }}>
+  {isSuperRecruiter ? 'All recent candidates (superuser)' : 'My recent candidates'}
+</div>
+
               {loadingList ? (
                 <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
               ) : myRecent.length === 0 ? (
