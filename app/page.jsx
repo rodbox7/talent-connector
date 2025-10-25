@@ -693,6 +693,9 @@ export default function Page() {
 
         if (fCity && String(r.city || '') !== fCity) return false;
         if (fState && String(r.state || '') !== fState) return false;
+        // NEW: make Title and Type-of-law filters apply
+        if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
+        if (fLaw &&   !matchesCSV(r.law_csv,   fLaw))   return false;
 
         if (salMin != null || salMax != null) {
           const s = Number(r.salary);
@@ -1345,7 +1348,7 @@ export default function Page() {
                             onClick={() => removeCandidate(c.id)}
                             style={{
                               background: '#B91C1C',
-                              border: '1px solid #7F1D1D',
+                              border: '1px solid '#7F1D1D',
                               width: isMobile ? '100%' : undefined,
                             }}
                           >
@@ -1368,7 +1371,7 @@ export default function Page() {
   if (user.role === 'client') {
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
-      const subj = `Talent Connector Candidate — ${c?.name || ''}`;
+      const subj = `Talent Connector Candidate - ${c?.name || ''}`;
       const NL = '\n';
       const body = [
         'Hello,',
@@ -1575,7 +1578,7 @@ export default function Page() {
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
                 onClick={() => setShowInsights(false)}
-                style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+                style={{ background: '#0B1220', border: '1px solid '#1F2937', width: isMobile ? '100%' : undefined }}
               >
                 Back to Candidate Search
               </Button>
@@ -2030,7 +2033,13 @@ export default function Page() {
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
                             <Button
                               onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                              style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+                              style={{
+                                background: '#93C5FD',
+                                border: '1px solid #3B82F6',
+                                color: '#0B1220',
+                                fontWeight: 700,
+                                width: isMobile ? '100%' : undefined
+                              }}
                             >
                               Additional information
                             </Button>
