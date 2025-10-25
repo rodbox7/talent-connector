@@ -1272,8 +1272,279 @@ if (user.role === 'recruiter') {
                 <div style={{ fontSize: 14, color: '#9CA3AF' }}>No candidates yet.</div>
               ) : (
                 <div style={{ display: 'grid', gap: 10 }}>
-                myRecent.map((c)
-  /* ---------- Client UI ---------- */
+  {myRecent.map((c) =>
+    editingId === c.id ? (
+      <div
+        key={c.id}
+        style={{
+          border: '1px solid #1F2937',
+          borderRadius: 12,
+          padding: 12,
+          background: '#0B1220',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: 10,
+          }}
+        >
+          {/* Description */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Label>Description</Label>
+            <Input
+              value={editForm.name || ''}
+              onChange={(e) => changeEditField('name', e.target.value)}
+            />
+          </div>
+
+          {/* Title */}
+          <div>
+            <Label>Title</Label>
+            <select
+              value={editForm.titles_csv || ''}
+              onChange={(e) => changeEditField('titles_csv', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">Select title</option>
+              {TITLE_OPTIONS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Type of Law */}
+          <div>
+            <Label>Type of Law</Label>
+            <select
+              value={editForm.law_csv || ''}
+              onChange={(e) => changeEditField('law_csv', e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">Select type of law</option>
+              {LAW_OPTIONS.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Metro Area (writes city & state) */}
+          <div>
+            <Label>Metro Area</Label>
+            <select
+              value={
+                editForm.city
+                  ? `${editForm.city}${editForm.state ? `, ${editForm.state}` : ''}`
+                  : ''
+              }
+              onChange={(e) => {
+                const v = e.target.value; // "Chicago, IL"
+                const [cName, st] = v.split(',').map((x) => x.trim());
+                changeEditField('city', cName || '');
+                changeEditField('state', st ? st.toUpperCase() : '');
+              }}
+              style={selectStyle}
+            >
+              <option value="">Select a metro</option>
+              {MAJOR_METROS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Years */}
+          <div>
+            <Label>Years of experience</Label>
+            <Input
+              inputMode="numeric"
+              value={editForm.years ?? ''}
+              onChange={(e) => changeEditField('years', e.target.value)}
+            />
+          </div>
+
+          {/* Recent role years */}
+          <div>
+            <Label>Years in most recent job</Label>
+            <Input
+              inputMode="numeric"
+              value={editForm.recent_role_years ?? ''}
+              onChange={(e) => changeEditField('recent_role_years', e.target.value)}
+            />
+          </div>
+
+          {/* Salary */}
+          <div>
+            <Label>Salary</Label>
+            <Input
+              inputMode="numeric"
+              value={editForm.salary ?? ''}
+              onChange={(e) => changeEditField('salary', e.target.value)}
+            />
+          </div>
+
+          {/* Date entered */}
+          <div>
+            <Label>Date entered</Label>
+            <Input
+              type="date"
+              value={editForm.date_entered || ''}
+              onChange={(e) => changeEditField('date_entered', e.target.value)}
+            />
+          </div>
+
+          {/* Contract + Hourly */}
+          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!editForm.contract}
+                onChange={(e) => changeEditField('contract', e.target.checked)}
+              />
+              <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract</span>
+            </label>
+            {editForm.contract ? (
+              <Input
+                placeholder="Hourly"
+                inputMode="numeric"
+                value={editForm.hourly ?? ''}
+                onChange={(e) => changeEditField('hourly', e.target.value)}
+              />
+            ) : null}
+          </div>
+
+          {/* Off Market + On Assignment */}
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              display: 'flex',
+              gap: 16,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!editForm.off_market}
+                onChange={(e) => changeEditField('off_market', e.target.checked)}
+              />
+              <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off The Market</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!editForm.on_assignment}
+                onChange={(e) => changeEditField('on_assignment', e.target.checked)}
+                disabled={!!editForm.off_market}
+                title={editForm.off_market ? 'Disabled while Off The Market' : ''}
+              />
+              <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
+            </label>
+
+            {editForm.on_assignment && !editForm.off_market ? (
+              <div>
+                <Label>Estimated date available</Label>
+                <Input
+                  type="date"
+                  value={editForm.est_available_date || ''}
+                  onChange={(e) =>
+                    changeEditField('est_available_date', e.target.value)
+                  }
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {/* Notes */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Label>Notes</Label>
+            <TextArea
+              value={editForm.notes || ''}
+              onChange={(e) => changeEditField('notes', e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+          <Button onClick={saveEdit}>Save</Button>
+          <Button
+            onClick={cancelEdit}
+            style={{ background: '#111827', border: '1px solid #1F2937' }}
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div
+        key={c.id}
+        style={{
+          border: '1px solid #1F2937',
+          borderRadius: 12,
+          padding: 12,
+          background: '#0B1220',
+          display: 'grid',
+          gridTemplateColumns: isMobile
+            ? '1fr'
+            : '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
+          gap: 10,
+          rowGap: isMobile ? 8 : 10,
+          alignItems: 'center',
+          fontSize: 13,
+        }}
+      >
+        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+          {c.name}
+          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+          </div>
+        </div>
+        <div style={{ color: '#9CA3AF' }}>
+          {c.city || '—'}, {c.state || '—'}
+        </div>
+        <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
+        <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
+        <div style={{ color: '#E5E7EB' }}>{displayCompRecruiter(c)}</div>
+        <div style={{ color: '#9CA3AF' }}>
+          {formatMDY(c.date_entered || c.created_at)}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            justifyContent: isMobile ? 'stretch' : 'flex-end',
+            flexDirection: isMobile ? 'column' : 'row',
+          }}
+        >
+          <Button
+            onClick={() => startEdit(c)}
+            style={{
+              background: '#111827',
+              border: '1px solid #1F2937',
+              width: isMobile ? '100%' : undefined,
+            }}
+          >
+            Edit
+          </Button>
+          <Button
+            onClick={() => removeCandidate(c.id)}
+            style={{
+              background: '#B91C1C',
+              border: '1px solid #7F1D1D',
+              width: isMobile ? '100%' : undefined,
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+    )
+  )}
+</div>
+/* ---------- Client UI ---------- */
+
   if (user.role === 'client') {
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
