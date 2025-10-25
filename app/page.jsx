@@ -1029,16 +1029,12 @@ export default function Page() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                     <input
+<input
   type="checkbox"
   checked={iContractOnly}
-  onChange={(e) => {
-    const v = e.target.checked;
-    setIContractOnly(v);
-    // instant apply
-    setTimeout(() => loadInsights(), 0);
-  }}
+  onChange={(e) => setIContractOnly(e.target.checked)}
 />
+
 
                         <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
                       </label>
@@ -1524,6 +1520,13 @@ function isTrue(v) {
             });
           }
         }
+        // Auto-apply when "Contract only" changes while Insights is open
+React.useEffect(() => {
+  if (showInsights) {
+    loadInsights();
+  }
+}, [iContractOnly, showInsights]);
+
 
         setInsights({
           kpi: { salary: salStats, hourly: hourlyStats },
