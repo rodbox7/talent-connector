@@ -604,7 +604,7 @@ export default function Page() {
     }
   }
 
-  // Fetch the recruiter's recent candidates list
+// Fetch the recruiter's recent candidates list
 async function refreshMyRecent() {
   if (!user || user.role !== 'recruiter') return;
   setLoadingList(true);
@@ -617,14 +617,16 @@ async function refreshMyRecent() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (!isSuperRecruiter) {
-    query = query.eq('created_by', user.id);   // normal recruiters: only their own
-  } // superuser sees all
+  // Only filter by creator for non-superusers
+  if (!( (user.email || '').toLowerCase() === 'jdavid@bhsg.com' )) {
+    query = query.eq('created_by', user.id);
+  }
 
   const { data, error } = await query;
   if (!error && data) setMyRecent(data);
   setLoadingList(false);
 }
+
 
   React.useEffect(() => {
     if (user?.role === 'recruiter') {
@@ -1071,12 +1073,14 @@ async function fetchClientRows() {
   }
 
  /* ---------- Recruiter UI ---------- */
+/* ---------- Recruiter UI ---------- */
 if (user.role === 'recruiter') {
-  const isSuperRecruiter =
-    (user?.role === 'recruiter') &&
-    ((user?.email || '').toLowerCase() === 'jdavid@bhsg.com'); // ✅ superuser flag
-    return (
-      <div style={pageWrap}>
+  // superuser can see/edit all candidates
+  const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
+
+  return (
+    <div style={pageWrap}>
+
         <div style={overlay}>
           <div style={{ width: 'min(1100px, 100%)' }}>
             <div
