@@ -694,6 +694,7 @@ export default function Page() {
   const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
   const [contractOnly, setContractOnly] = React.useState(false);
   const [hourlyBillRange, setHourlyBillRange] = React.useState(''); // "25-50" ... "300-"
+  const [showOffMarket, setShowOffMarket] = React.useState(false); // NEW
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
@@ -819,11 +820,12 @@ async function fetchClientRows() {
 
     // Pull a generous slice and filter client-side for simplicity.
     const { data, error } = await supabase
-      .from('candidates')
-      .select(
-        'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
-      )
-      .limit(2000);
+  .from('candidates')
+  .select(
+    'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+  )
+  .limit(2000);
+
     if (error) throw error;
 
     const { min: salMin, max: salMax } = parseRange(salaryRange);
@@ -832,27 +834,30 @@ async function fetchClientRows() {
 
     const term = (search || '').trim().toLowerCase();
 
-    const rows = (data || []).filter((r) => {
-      // Keyword search across a few fields
-      if (term) {
-        const blob = [
-          r.name,
-          r.titles_csv,
-          r.law_csv,
-          r.city,
-          r.state,
-          r.notes,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!blob.includes(term)) return false;
-      }
+   const rows = (data || []).filter((r) => {
+  // Keyword search across a few fields
+  if (term) {
+    const blob = [
+      r.name,
+      r.titles_csv,
+      r.law_csv,
+      r.city,
+      r.state,
+      r.notes,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    if (!blob.includes(term)) return false;
+  }
 
-      if (fCity && String(r.city || '') !== fCity) return false;
-      if (fState && String(r.state || '') !== fState) return false;
-      if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
-      if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
+  // NEW: hide off-market by default unless the user opts in
+  if (!showOffMarket && r.off_market) return false;
+
+  if (fCity && String(r.city || '') !== fCity) return false;
+  if (fState && String(r.state || '') !== fState) return false;
+  // ...
+
 
       // Salary range (ignore 0/blank)
       if (salMin != null || salMax != null) {
@@ -1977,44 +1982,47 @@ async function fetchClientRows() {
                     </select>
                   </div>
 
-                  {/* Contract-only + Hourly Billable Range */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={contractOnly}
-                        onChange={(e) => {
-                          setContractOnly(e.target.checked);
-                          if (!e.target.checked) setHourlyBillRange('');
-                        }}
-                      />
-                      <span style={{ color: '#E5E7EB', fontSize: 13 }}>Only show available for contract</span>
-                    </label>
-                    {contractOnly ? (
-                      <div style={{ flex: 1 }}>
-                        <Label style={{ marginBottom: 4 }}>Hourly (billable)</Label>
-                        <select
-                          value={hourlyBillRange}
-                          onChange={(e) => setHourlyBillRange(e.target.value)}
-                          style={selectStyle}
-                        >
-                          {(() => {
-                            const ranges = [{ label: 'Any', value: '' }, { label: '$25–$50/hr', value: '25-50' }];
-                            for (let start = 50; start < 300; start += 25) {
-                              const end = start + 25;
-                              if (end <= 300) ranges.push({ label: `$${start}–$${end}/hr`, value: `${start}-${end}` });
-                            }
-                            ranges.push({ label: '$300+/hr', value: '300-' });
-                            return ranges.map((o) => (
-                              <option key={o.value || 'any-hr'} value={o.value}>
-                                {o.label}
-                              </option>
-                            ));
-                          })()}
-                        </select>
-                      </div>
-                    ) : null}
-                  </div>
+               {/* Contract-only + Hourly Billable Range */}
+<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <input
+      type="checkbox"
+      checked={contractOnly}
+      onChange={(e) => {
+        setContractOnly(e.target.checked);
+        if (!e.target.checked) setHourlyBillRange('');
+      }}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Only show available for contract</span>
+  </label>
+  {contractOnly ? (
+    <div style={{ flex: 1 }}>
+      <Label style={{ marginBottom: 4 }}>Hourly (billable)</Label>
+      <select
+        value={hourlyBillRange}
+        onChange={(e) => setHourlyBillRange(e.target.value)}
+        style={selectStyle}
+      >
+        {/* options */}
+      </select>
+    </div>
+  ) : null}
+</div>
+
+{/* NEW: Show off-market toggle */}
+<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <input
+      type="checkbox"
+      checked={showOffMarket}
+      onChange={(e) => setShowOffMarket(e.target.checked)}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 13 }}>
+      Show candidates no longer on the market
+    </span>
+  </label>
+</div>
+
 
                   <div>
                     <Label>Sort by</Label>
