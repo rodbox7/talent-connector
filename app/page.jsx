@@ -1073,7 +1073,6 @@ async function fetchClientRows() {
   }
 
  /* ---------- Recruiter UI ---------- */
-/* ---------- Recruiter UI ---------- */
 if (user.role === 'recruiter') {
   // superuser can see/edit all candidates
   const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
@@ -1544,73 +1543,7 @@ if (user.role === 'recruiter') {
     </div>
   )}
 </Card>
- => (
-                    <div
-                      key={c.id}
-                      style={{
-                        border: '1px solid #1F2937',
-                        borderRadius: 12,
-                        padding: 12,
-                        background: '#0B1220',
-                        display: 'grid',
-                        gridTemplateColumns: isMobile
-                          ? '1fr'
-                          : '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
-                        gap: 10,
-                        rowGap: isMobile ? 8 : 10,
-                        alignItems: 'center',
-                        fontSize: 13,
-                      }}
-                    >
-                      <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
-                        {c.name}
-                        <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
-                          {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
-                        </div>
-                      </div>
-                      <div style={{ color: '#9CA3AF' }}>
-                        {c.city || '—'}, {c.state || '—'}
-                      </div>
-                      <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
-                      <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
-                      <div style={{ color: '#E5E7EB' }}>
-                        {displayCompRecruiter(c)}
-                      </div>
-                      <div style={{ color: '#9CA3AF' }}>
-                        {formatMDY(c.date_entered || c.created_at)}
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: 8,
-                          justifyContent: isMobile ? 'stretch' : 'flex-end',
-                          flexDirection: isMobile ? 'column' : 'row',
-                        }}
-                      >
-                        <Button
-                          onClick={() => startEdit(c)}
-                          style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          onClick={() => removeCandidate(c.id)}
-                          style={{ background: '#B91C1C', border: '1px solid #7F1D1D', width: isMobile ? '100%' : undefined }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-                   </div>
-        </div>
-      </div>
-    );
-  } // end recruiter branch
-
+ 
 /* ---------- Client UI ---------- */
 
   if (user.role === 'client') {
