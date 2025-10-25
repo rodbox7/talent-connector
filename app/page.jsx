@@ -963,6 +963,17 @@ export default function Page() {
   padding: isMobile ? '16px 12px' : '40px 16px',
 };
 
+    const overlay = {
+    minHeight: '100vh',
+    width: '100%',
+    backdropFilter: 'blur(1px)',
+    background:
+      'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
+    display: 'flex',
+    alignItems: 'flex-start',   // top-ish alignment for logged-in pages
+    justifyContent: 'center',
+    padding: isMobile ? '16px 12px' : '40px 16px',
+  };
 
   /* ---------- Logged-out ---------- */
   if (!user) {
