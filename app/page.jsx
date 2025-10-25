@@ -586,6 +586,14 @@ export default function Page() {
     setIStartDate(start);
     setIEndDate(end);
   }, [iPreset]);
+    // Auto-apply when Insights filters (incl. checkbox) change while Insights is open
+  React.useEffect(() => {
+    if (user?.role === 'client' && showInsights) {
+      loadInsights();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iTitle, iLaw, iCity, iState, iYearsRange, iContractOnly, iStartDate, iEndDate, showInsights]);
+
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
@@ -780,6 +788,14 @@ export default function Page() {
   React.useEffect(() => {
     if (user?.role === 'client') fetchClientRows();
   }, [user]);
+    // Auto-apply when client checkboxes change (no Apply click needed)
+  React.useEffect(() => {
+    if (user?.role === 'client' && !showInsights) {
+      fetchClientRows();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractOnly, showOffMarket]);
+
 
   /* ---------- Layout (mobile-aware) ---------- */
   const pageWrap = {
