@@ -1752,12 +1752,16 @@ export default function Page() {
                   <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
-                  <Button
-                    onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-                  >
-                    Compensation Insights
-                  </Button>
+                 <Button
+  onClick={async () => {
+    if (!showInsights) setShowInsights(true); // show the Insights screen
+    await loadInsights();                     // then (re)load data
+  }}
+  style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+>
+  Compensation Insights
+</Button>
+
                   <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
                     Log out
                   </Button>
