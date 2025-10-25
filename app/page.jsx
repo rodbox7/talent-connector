@@ -1,4 +1,4 @@
-f'use client';
+'use client';
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
