@@ -13,164 +13,41 @@ const STATES = [
   'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
 ];
+
 // Major US metros (alpha)
 const MAJOR_METROS = [
-  'Atlanta, GA',
-  'Austin, TX',
-  'Baltimore, MD',
-  'Birmingham, AL',
-  'Boston, MA',
-  'Buffalo, NY',
-  'Charlotte, NC',
-  'Chicago, IL',
-  'Cincinnati, OH',
-  'Cleveland, OH',
-  'Columbus, OH',
-  'Dallas–Fort Worth, TX',
-  'Denver, CO',
-  'Detroit, MI',
-  'Hartford, CT',
-  'Honolulu, HI',
-  'Houston, TX',
-  'Indianapolis, IN',
-  'Jacksonville, FL',
-  'Kansas City, MO',
-  'Las Vegas, NV',
-  'Los Angeles, CA',
-  'Louisville, KY',
-  'Memphis, TN',
-  'Miami, FL',
-  'Milwaukee, WI',
-  'Minneapolis–St. Paul, MN',
-  'Nashville, TN',
-  'New Orleans, LA',
-  'New York City, NY',
-  'Oklahoma City, OK',
-  'Orlando, FL',
-  'Philadelphia, PA',
-  'Phoenix, AZ',
-  'Pittsburgh, PA',
-  'Portland, OR',
-  'Providence, RI',
-  'Raleigh–Durham, NC',
-  'Richmond, VA',
-  'Sacramento, CA',
-  'Salt Lake City, UT',
-  'San Antonio, TX',
-  'San Diego, CA',
-  'San Francisco–Oakland, CA',
-  'San Jose, CA',
-  'Seattle, WA',
-  'St. Louis, MO',
-  'Tampa–St. Petersburg, FL',
-  'Tucson, AZ',
-  'Washington, DC',
+  'Atlanta, GA','Austin, TX','Baltimore, MD','Birmingham, AL','Boston, MA',
+  'Buffalo, NY','Charlotte, NC','Chicago, IL','Cincinnati, OH','Cleveland, OH',
+  'Columbus, OH','Dallas–Fort Worth, TX','Denver, CO','Detroit, MI','Hartford, CT',
+  'Honolulu, HI','Houston, TX','Indianapolis, IN','Jacksonville, FL','Kansas City, MO',
+  'Las Vegas, NV','Los Angeles, CA','Louisville, KY','Memphis, TN','Miami, FL',
+  'Milwaukee, WI','Minneapolis–St. Paul, MN','Nashville, TN','New Orleans, LA','New York City, NY',
+  'Oklahoma City, OK','Orlando, FL','Philadelphia, PA','Phoenix, AZ','Pittsburgh, PA',
+  'Portland, OR','Providence, RI','Raleigh–Durham, NC','Richmond, VA','Sacramento, CA',
+  'Salt Lake City, UT','San Antonio, TX','San Diego, CA','San Francisco–Oakland, CA','San Jose, CA',
+  'Seattle, WA','St. Louis, MO','Tampa–St. Petersburg, FL','Tucson, AZ','Washington, DC',
 ];
-
 
 /* ---------- NEW: Title/Practice options ---------- */
 // Role titles
-const TITLE_OPTIONS = [
-  'Administrative',
-  'Legal Support',
-  'Paralegal',
-  'Attorney',
-];
+const TITLE_OPTIONS = ['Administrative','Legal Support','Paralegal','Attorney'];
 
 // Type of Law / Practice Areas
 const LAW_OPTIONS = [
-  "40's Act",
-  'Administrative',
-  'Administrative Manager',
-  'Antitrust',
-  'Appellate',
-  'Asbestos',
-  'Associate',
-  'Attorney',
-  'Banking',
-  'Bankruptcy',
-  'Commercial Litigation',
-  'Commercial Real Estate',
-  'Compliance',
-  'Conflicts',
-  'Conflicts Analyst',
-  'Construction',
-  'Contracts',
-  'Corporate',
-  'Criminal',
-  'Data Privacy/Cybersecurity',
-  'Docketing',
-  'Document Review',
-  'Employee Benefits/Executive Comp/ERISA',
-  'Energy',
-  'Entertainment',
-  'Environmental',
-  'Family',
-  'FCPA',
-  'FDA',
-  'Finance',
-  'Financial Services',
-  'FinTech',
-  'Foreclosure',
-  'Foreign Filing',
-  'Foreign Language Review',
-  'Franchise',
-  'General Counsel',
-  'Government Contracts',
-  'Government Contracts Attorney',
-  'Healthcare',
-  'HSR',
-  'Immigration',
-  'In House Associate',
-  'Insurance Coverage',
-  'Insurance Defense',
-  'Insurance Litigation',
-  'Insurance Regulatory',
-  'International Arbitration',
-  'International Trade',
-  'Labor & Employment',
-  'Law Clerk',
-  'Law Student',
-  'Leasing',
-  'Legal JD',
-  'Legal Malpractice',
-  'Legal Marketing',
-  'Legal Support',
-  'Life Sciences',
-  'Litigation',
-  'Litigation Technology',
-  'Medical Malpractice',
-  'Mergers and Acquisitions',
-  'MRS Project Manager',
-  'Mutual Fund',
-  'Nurse',
-  'Oil & Gas',
-  'Paralegal',
-  'Partner',
-  'Patent Agent',
-  'Patent Counsel',
-  'Patent Litigation',
-  'Patent Prosecution',
-  'Personal Injury',
-  'Project Finance',
-  'Project Manager',
-  'Public Finance',
-  'Real Estate Finance',
-  'Regulatory',
-  'Residential Real Estate',
-  'Restructuring',
-  'Securities',
-  'Securities Litigation',
-  'Syndication',
-  'Tax',
-  'Technology',
-  'Technology Transactions',
-  'Toxic Tort',
-  'Trade Attorney',
-  'Trademark',
-  'Trust & Estate',
-  "Worker's Compensation",
-  'White Collar Litigation',
+  "40's Act",'Administrative','Administrative Manager','Antitrust','Appellate','Asbestos','Associate','Attorney',
+  'Banking','Bankruptcy','Commercial Litigation','Commercial Real Estate','Compliance','Conflicts','Conflicts Analyst',
+  'Construction','Contracts','Corporate','Criminal','Data Privacy/Cybersecurity','Docketing','Document Review',
+  'Employee Benefits/Executive Comp/ERISA','Energy','Entertainment','Environmental','Family','FCPA','FDA','Finance',
+  'Financial Services','FinTech','Foreclosure','Foreign Filing','Foreign Language Review','Franchise','General Counsel',
+  'Government Contracts','Government Contracts Attorney','Healthcare','HSR','Immigration','In House Associate',
+  'Insurance Coverage','Insurance Defense','Insurance Litigation','Insurance Regulatory','International Arbitration',
+  'International Trade','Labor & Employment','Law Clerk','Law Student','Leasing','Legal JD','Legal Malpractice',
+  'Legal Marketing','Legal Support','Life Sciences','Litigation','Litigation Technology','Medical Malpractice',
+  'Mergers and Acquisitions','MRS Project Manager','Mutual Fund','Nurse','Oil & Gas','Paralegal','Partner',
+  'Patent Agent','Patent Counsel','Patent Litigation','Patent Prosecution','Personal Injury','Project Finance',
+  'Project Manager','Public Finance','Real Estate Finance','Regulatory','Residential Real Estate','Restructuring',
+  'Securities','Securities Litigation','Syndication','Tax','Technology','Technology Transactions','Toxic Tort',
+  'Trade Attorney','Trademark','Trust & Estate',"Worker's Compensation",'White Collar Litigation',
 ];
 
 /* ---------- Small UI helpers ---------- */
@@ -233,7 +110,7 @@ const Button = ({ children, ...rest }) => (
     style={{
       padding: '10px 14px',
       borderRadius: 10,
-      border: '1px solid #243041', // ✅ fixed the quotes
+      border: '1px solid #243041',
       background: '#3B82F6',
       color: 'white',
       fontWeight: 600,
@@ -244,7 +121,6 @@ const Button = ({ children, ...rest }) => (
     {children}
   </button>
 );
-
 
 const Tag = ({ children, style }) => (
   <span
@@ -283,7 +159,7 @@ function formatMDY(val) {
   if (!val) return '';
   if (typeof val === 'string') {
     const m = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return m[2] + '/' + m[3] + '/' + m[1]; // MM/DD/YYYY
+    if (m) return m[2] + '/' + m[3] + '/' + m[1];
   }
   try {
     const d = new Date(val);
@@ -349,7 +225,6 @@ function displayCompRecruiter(c) {
 }
 
 function displayCompClient(c) {
-  // Client-facing shows billable hourly (1.66x)
   const bill = (c.contract && Number.isFinite(Number(c.hourly)))
     ? Math.round(Number(c.hourly) * 1.66)
     : null;
@@ -398,7 +273,7 @@ function presetRange(preset) {
   const end = toYMD(today);
 
   const startOfYear = new Date(today.getFullYear(), 0, 1);
-  const q = Math.floor(today.getMonth() / 3); // 0..3
+  const q = Math.floor(today.getMonth() / 3);
   const startOfQuarter = new Date(today.getFullYear(), q * 3, 1);
 
   const backDays = (n) => {
@@ -435,7 +310,7 @@ function useIsMobile(breakpoint = 768) {
 
 /* ---------- Page ---------- */
 export default function Page() {
-  const isMobile = useIsMobile(768); // breakpoint for responsive tweaks
+  const isMobile = useIsMobile(768);
 
   const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = React.useState('');
@@ -524,24 +399,23 @@ export default function Page() {
 
   function startEdit(row) {
     setEditingId(row.id);
-  setEditForm({
-  name: row.name || '',
-  titles_csv: row.titles_csv || '',
-  law_csv: row.law_csv || '',
-  city: row.city || '',
-  state: row.state || '',
-  years: row.years ?? '',
-  recent_role_years: row.recent_role_years ?? '',
-  salary: row.salary ?? '',
-  contract: !!row.contract,
-  hourly: row.hourly ?? '',
-  date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
-  notes: row.notes || '',
-  on_assignment: !!row.on_assignment,
-  est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
-  off_market: !!row.off_market,
-});
-
+    setEditForm({
+      name: row.name || '',
+      titles_csv: row.titles_csv || '',
+      law_csv: row.law_csv || '',
+      city: row.city || '',
+      state: row.state || '',
+      years: row.years ?? '',
+      recent_role_years: row.recent_role_years ?? '',
+      salary: row.salary ?? '',
+      contract: !!row.contract,
+      hourly: row.hourly ?? '',
+      date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
+      notes: row.notes || '',
+      on_assignment: !!row.on_assignment,
+      est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
+      off_market: !!row.off_market,
+    });
   }
   function cancelEdit() {
     setEditingId(null);
@@ -554,33 +428,32 @@ export default function Page() {
   async function saveEdit() {
     if (!editingId) return;
     try {
-      // Guard: if city present but no state, block save
       if (String(editForm.city || '').trim() && !String(editForm.state || '').trim()) {
         alert('Please select a state for this city.');
         return;
       }
- const payload = {
-  name: String(editForm.name || '').trim(),
-  titles_csv: String(editForm.titles_csv || '').trim(),
-  law_csv: String(editForm.law_csv || '').trim(),
-  city: toTitleCaseCity(String(editForm.city || '').trim()),
-  state: normState(String(editForm.state || '').trim()),
-  years: editForm.years === '' ? null : Number(editForm.years),
-  recent_role_years:
-    editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
-  salary: editForm.salary === '' ? null : Number(editForm.salary),
-  contract: !!editForm.contract,
-  hourly: !editForm.contract
-    ? null
-    : editForm.hourly === ''
-    ? null
-    : Number(editForm.hourly),
-  date_entered: editForm.date_entered || null,
-  notes: String(editForm.notes || '').trim() || null,
-  on_assignment: !!editForm.on_assignment,
-  est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
-  off_market: !!editForm.off_market,
-};
+      const payload = {
+        name: String(editForm.name || '').trim(),
+        titles_csv: String(editForm.titles_csv || '').trim(),
+        law_csv: String(editForm.law_csv || '').trim(),
+        city: toTitleCaseCity(String(editForm.city || '').trim()),
+        state: normState(String(editForm.state || '').trim()),
+        years: editForm.years === '' ? null : Number(editForm.years),
+        recent_role_years:
+          editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
+        salary: editForm.salary === '' ? null : Number(editForm.salary),
+        contract: !!editForm.contract,
+        hourly: !editForm.contract
+          ? null
+          : editForm.hourly === ''
+          ? null
+          : Number(editForm.hourly),
+        date_entered: editForm.date_entered || null,
+        notes: String(editForm.notes || '').trim() || null,
+        on_assignment: !!editForm.on_assignment,
+        est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
+        off_market: !!editForm.off_market,
+      };
 
       const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
       if (error) throw error;
@@ -604,29 +477,27 @@ export default function Page() {
     }
   }
 
-// Fetch the recruiter's recent candidates list
-async function refreshMyRecent() {
-  if (!user || user.role !== 'recruiter') return;
-  setLoadingList(true);
+  // Fetch the recruiter's recent candidates list
+  async function refreshMyRecent() {
+    if (!user || user.role !== 'recruiter') return;
+    setLoadingList(true);
 
-  let query = supabase
-    .from('candidates')
-    .select(
-      'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
-    )
-    .order('created_at', { ascending: false })
-    .limit(50);
+    let query = supabase
+      .from('candidates')
+      .select(
+        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+      )
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-  // Only filter by creator for non-superusers
-  if (!( (user.email || '').toLowerCase() === 'jdavid@bhsg.com' )) {
-    query = query.eq('created_by', user.id);
+    if (!((user.email || '').toLowerCase() === 'jdavid@bhsg.com')) {
+      query = query.eq('created_by', user.id);
+    }
+
+    const { data, error } = await query;
+    if (!error && data) setMyRecent(data);
+    setLoadingList(false);
   }
-
-  const { data, error } = await query;
-  if (!error && data) setMyRecent(data);
-  setLoadingList(false);
-}
-
 
   React.useEffect(() => {
     if (user?.role === 'recruiter') {
@@ -641,7 +512,6 @@ async function refreshMyRecent() {
         setAddMsg('You must be logged in as recruiter.');
         return;
       }
-      // Guard: if city typed, require state
       if (city.trim() && !state.trim()) {
         setAddMsg('Please select a state for this city.');
         return;
@@ -678,7 +548,6 @@ async function refreshMyRecent() {
       setContract(false);
       setHourly('');
       setNotes('');
-      // reset date picker back to "today"
       {
         const d = new Date();
         const yyyy = d.getFullYear();
@@ -698,16 +567,15 @@ async function refreshMyRecent() {
   const [search, setSearch] = React.useState('');
 
   // dropdown ranges
-  const [salaryRange, setSalaryRange] = React.useState(''); // "min-max" or "min-"
-  const [yearsRange, setYearsRange] = React.useState('');   // "min-max" or "min-"
+  const [salaryRange, setSalaryRange] = React.useState('');
+  const [yearsRange, setYearsRange] = React.useState('');
   const [contractOnly, setContractOnly] = React.useState(false);
-  const [hourlyBillRange, setHourlyBillRange] = React.useState(''); // "25-50" ... "300-"
-  const [showOffMarket, setShowOffMarket] = React.useState(false); // NEW
+  const [hourlyBillRange, setHourlyBillRange] = React.useState('');
+  const [showOffMarket, setShowOffMarket] = React.useState(false);
 
   const [sortBy, setSortBy] = React.useState('date_desc');
 
   const [cities, setCities] = React.useState([]);
-  // keep states from DB if you want, but render fixed STATES below
   const [states, setStates] = React.useState([]);
   const [titleOptions, setTitleOptions] = React.useState([]);
   const [lawOptions, setLawOptions] = React.useState([]);
@@ -731,19 +599,17 @@ async function refreshMyRecent() {
   const [iLaw, setILaw] = React.useState('');
   const [iCity, setICity] = React.useState('');
   const [iState, setIState] = React.useState('');
-  const [iYearsRange, setIYearsRange] = React.useState(''); // "min-max"
+  const [iYearsRange, setIYearsRange] = React.useState('');
   const [iContractOnly, setIContractOnly] = React.useState(false);
-  // Insights date preset (drives iStartDate/iEndDate)
   const [iPreset, setIPreset] = React.useState('LAST_180');
-  const [iStartDate, setIStartDate] = React.useState('');   // YYYY-MM-DD inclusive
-  const [iEndDate, setIEndDate] = React.useState('');       // YYYY-MM-DD inclusive
+  const [iStartDate, setIStartDate] = React.useState('');
+  const [iEndDate, setIEndDate] = React.useState('');
   React.useEffect(() => {
     const { start, end } = presetRange(iPreset);
     setIStartDate(start);
     setIEndDate(end);
   }, [iPreset]);
 
-  // TODAY as plain local YYYY-MM-DD
   const todayStr = React.useMemo(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -800,7 +666,6 @@ async function refreshMyRecent() {
     })();
   }, [user]);
 
-  // Helpers
   function parseRange(val) {
     if (!val) return { min: null, max: null };
     const [minStr, maxStr] = val.split('-');
@@ -809,139 +674,127 @@ async function refreshMyRecent() {
     return { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null };
   }
 
-  // Convert a client billable range back to recruiter hourly
   function billToRecruiterRange(val) {
     const r = parseRange(val);
-    const k = 1.66; // bill = 1.66 * pay
+    const k = 1.66;
     let min = null, max = null;
     if (r.min != null) min = Math.ceil(r.min / k);
     if (r.max != null) max = Math.floor(r.max / k);
     return { min, max };
   }
 
- // ---------- FETCH CLIENT ROWS ----------
-async function fetchClientRows() {
-  try {
-    setClientErr('');
-    setClientLoading(true);
-    setExpandedId(null);
+  // ---------- FETCH CLIENT ROWS ----------
+  async function fetchClientRows() {
+    try {
+      setClientErr('');
+      setClientLoading(true);
+      setExpandedId(null);
 
-    // Pull a generous slice and filter client-side for simplicity.
-    const { data, error } = await supabase
-  .from('candidates')
-  .select(
-    'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
-  )
-  .limit(2000);
+      const { data, error } = await supabase
+        .from('candidates')
+        .select(
+          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+        )
+        .limit(2000);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const { min: salMin, max: salMax } = parseRange(salaryRange);
-    const { min: yrsMin, max: yrsMax } = parseRange(yearsRange);
-    const hrRecRange = billToRecruiterRange(hourlyBillRange);
+      const { min: salMin, max: salMax } = parseRange(salaryRange);
+      const { min: yrsMin, max: yrsMax } = parseRange(yearsRange);
+      const hrRecRange = billToRecruiterRange(hourlyBillRange);
 
-    const term = (search || '').trim().toLowerCase();
+      const term = (search || '').trim().toLowerCase();
 
-   const rows = (data || []).filter((r) => {
-  // Keyword search across a few fields
-  if (term) {
-    const blob = [
-      r.name,
-      r.titles_csv,
-      r.law_csv,
-      r.city,
-      r.state,
-      r.notes,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    if (!blob.includes(term)) return false;
+      const rows = (data || []).filter((r) => {
+        if (term) {
+          const blob = [
+            r.name,
+            r.titles_csv,
+            r.law_csv,
+            r.city,
+            r.state,
+            r.notes,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          if (!blob.includes(term)) return false;
+        }
+
+        if (!showOffMarket && r.off_market) return false;
+
+        if (fCity && String(r.city || '') !== fCity) return false;
+        if (fState && String(r.state || '') !== fState) return false;
+
+        if (salMin != null || salMax != null) {
+          const s = Number(r.salary);
+          const has = Number.isFinite(s) && s > 0;
+          if (!has) return false;
+          if (salMin != null && s < salMin) return false;
+          if (salMax != null && s > salMax) return false;
+        }
+
+        if (yrsMin != null || yrsMax != null) {
+          const y = Number(r.years);
+          if (!Number.isFinite(y)) return false;
+          if (yrsMin != null && y < yrsMin) return false;
+          if (yrsMax != null && y > yrsMax) return false;
+        }
+
+        if (contractOnly && !r.contract) return false;
+        if (contractOnly && hourlyBillRange) {
+          const h = Number(r.hourly);
+          if (!(Number.isFinite(h) && h > 0)) return false;
+          if (hrRecRange.min != null && h < hrRecRange.min) return false;
+          if (hrRecRange.max != null && h > hrRecRange.max) return false;
+        }
+
+        return true;
+      });
+
+      const sorted = rows.sort((a, b) => {
+        switch (sortBy) {
+          case 'date_asc':
+            return (ymd(a.date_entered || a.created_at) || '').localeCompare(
+              ymd(b.date_entered || b.created_at) || ''
+            );
+          case 'salary_desc':
+          case 'salary_asc': {
+            const sa = Number(a.salary) || -Infinity;
+            const sb = Number(b.salary) || -Infinity;
+            return sortBy === 'salary_desc' ? sb - sa : sa - sb;
+          }
+          case 'hourly_desc':
+          case 'hourly_asc': {
+            const ha = a.contract && Number.isFinite(Number(a.hourly)) ? Math.round(Number(a.hourly) * 1.66) : -Infinity;
+            const hb = b.contract && Number.isFinite(Number(b.hourly)) ? Math.round(Number(b.hourly) * 1.66) : -Infinity;
+            return sortBy === 'hourly_desc' ? hb - ha : ha - hb;
+          }
+          case 'years_desc':
+          case 'years_asc': {
+            const ya = Number(a.years);
+            const yb = Number(b.years);
+            const A = Number.isFinite(ya) ? ya : -Infinity;
+            const B = Number.isFinite(yb) ? yb : -Infinity;
+            return sortBy === 'years_desc' ? B - A : A - B;
+          }
+          case 'date_desc':
+          default:
+            return (ymd(b.date_entered || b.created_at) || '').localeCompare(
+              ymd(a.date_entered || a.created_at) || ''
+            );
+        }
+      });
+
+      setClientRows(sorted);
+    } catch (e) {
+      console.error(e);
+      setClientErr('Failed to load candidates.');
+    } finally {
+      setClientLoading(false);
+    }
   }
 
-  // NEW: hide off-market by default unless the user opts in
-  if (!showOffMarket && r.off_market) return false;
-
-  if (fCity && String(r.city || '') !== fCity) return false;
-  if (fState && String(r.state || '') !== fState) return false;
-  // ...
-
-
-      // Salary range (ignore 0/blank)
-      if (salMin != null || salMax != null) {
-        const s = Number(r.salary);
-        const has = Number.isFinite(s) && s > 0;
-        if (!has) return false;
-        if (salMin != null && s < salMin) return false;
-        if (salMax != null && s > salMax) return false;
-      }
-
-      // Years of experience
-      if (yrsMin != null || yrsMax != null) {
-        const y = Number(r.years);
-        if (!Number.isFinite(y)) return false;
-        if (yrsMin != null && y < yrsMin) return false;
-        if (yrsMax != null && y > yrsMax) return false;
-      }
-
-      // Contract-only + hourly billable range (converted back to recruiter hourly)
-      if (contractOnly && !r.contract) return false;
-      if (contractOnly && hourlyBillRange) {
-        const h = Number(r.hourly);
-        if (!(Number.isFinite(h) && h > 0)) return false;
-        if (hrRecRange.min != null && h < hrRecRange.min) return false;
-        if (hrRecRange.max != null && h > hrRecRange.max) return false;
-      }
-
-      return true;
-    });
-
-    // Sorting
-    const sorted = rows.sort((a, b) => {
-      switch (sortBy) {
-        case 'date_asc':
-          return (ymd(a.date_entered || a.created_at) || '').localeCompare(
-            ymd(b.date_entered || b.created_at) || ''
-          );
-        case 'salary_desc':
-        case 'salary_asc': {
-          const sa = Number(a.salary) || -Infinity;
-          const sb = Number(b.salary) || -Infinity;
-          return sortBy === 'salary_desc' ? sb - sa : sa - sb;
-        }
-        case 'hourly_desc':
-        case 'hourly_asc': {
-          const ha = a.contract && Number.isFinite(Number(a.hourly)) ? Math.round(Number(a.hourly) * 1.66) : -Infinity;
-          const hb = b.contract && Number.isFinite(Number(b.hourly)) ? Math.round(Number(b.hourly) * 1.66) : -Infinity;
-          return sortBy === 'hourly_desc' ? hb - ha : ha - hb;
-        }
-        case 'years_desc':
-        case 'years_asc': {
-          const ya = Number(a.years);
-          const yb = Number(b.years);
-          const A = Number.isFinite(ya) ? ya : -Infinity;
-          const B = Number.isFinite(yb) ? yb : -Infinity;
-          return sortBy === 'years_desc' ? B - A : A - B;
-        }
-        case 'date_desc':
-        default:
-          return (ymd(b.date_entered || b.created_at) || '').localeCompare(
-            ymd(a.date_entered || a.created_at) || ''
-          );
-      }
-    });
-
-    setClientRows(sorted);
-  } catch (e) {
-    console.error(e);
-    setClientErr('Failed to load candidates.');
-  } finally {
-    setClientLoading(false);
-  }
-}
-
-
-  // ---------- CLEAR FILTERS (instant reload) ----------
   function clearClientFilters() {
     setSearch('');
     setFCity('');
@@ -953,7 +806,6 @@ async function fetchClientRows() {
     setContractOnly(false);
     setHourlyBillRange('');
     setSortBy('date_desc');
-    // immediately reload rows
     fetchClientRows();
   }
 
@@ -970,26 +822,26 @@ async function fetchClientRows() {
     backgroundSize: 'cover',
     backgroundAttachment: 'fixed',
   };
- const overlayCentered = {
-  minHeight: '100vh',
-  width: '100%',
-  backdropFilter: 'blur(1px)',
-  background:
-    'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
-  display: 'flex',
-  alignItems: 'center',   // vertical center
-  justifyContent: 'center', // horizontal center
-  padding: isMobile ? '16px 12px' : '40px 16px',
-};
-
-    const overlay = {
+  const overlayCentered = {
     minHeight: '100vh',
     width: '100%',
     backdropFilter: 'blur(1px)',
     background:
       'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
     display: 'flex',
-    alignItems: 'flex-start',   // top-ish alignment for logged-in pages
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: isMobile ? '16px 12px' : '40px 16px',
+  };
+
+  const overlay = {
+    minHeight: '100vh',
+    width: '100%',
+    backdropFilter: 'blur(1px)',
+    background:
+      'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
+    display: 'flex',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     padding: isMobile ? '16px 12px' : '40px 16px',
   };
@@ -1001,7 +853,6 @@ async function fetchClientRows() {
         <div style={overlayCentered}>
           <Card style={{ width: 520, padding: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
-              {/* Branding with spaces around dash */}
               Talent Connector – Powered by Beacon Hill Legal
             </div>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
@@ -1036,7 +887,6 @@ async function fetchClientRows() {
               ))}
             </div>
 
-            {/* Center the inputs + button */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ width: '100%', maxWidth: 400 }}>
                 <Label>Email</Label>
@@ -1072,14 +922,12 @@ async function fetchClientRows() {
     );
   }
 
- /* ---------- Recruiter UI ---------- */
-if (user.role === 'recruiter') {
-  // superuser can see/edit all candidates
-  const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
+  /* ---------- Recruiter UI ---------- */
+  if (user.role === 'recruiter') {
+    const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
 
-  return (
-    <div style={pageWrap}>
-
+    return (
+      <div style={pageWrap}>
         <div style={overlay}>
           <div style={{ width: 'min(1100px, 100%)' }}>
             <div
@@ -1102,7 +950,6 @@ if (user.role === 'recruiter') {
             <Card style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
 
-              {/* Center the form grid within the card */}
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: '100%', maxWidth: 980 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
@@ -1115,7 +962,7 @@ if (user.role === 'recruiter') {
                       />
                     </div>
 
-                    {/* REPLACED: Title dropdown */}
+                    {/* Title */}
                     <div>
                       <Label>Title</Label>
                       <select
@@ -1130,7 +977,7 @@ if (user.role === 'recruiter') {
                       </select>
                     </div>
 
-                    {/* REPLACED: Type of Law dropdown */}
+                    {/* Type of Law */}
                     <div>
                       <Label>Type of Law</Label>
                       <select
@@ -1145,7 +992,7 @@ if (user.role === 'recruiter') {
                       </select>
                     </div>
 
-                    {/* State dropdown (fixed 50-state list) */}
+                    {/* State */}
                     <div>
                       <Label>State</Label>
                       <select
@@ -1160,26 +1007,25 @@ if (user.role === 'recruiter') {
                       </select>
                     </div>
 
-                    {/* City free-form input */}
-                   <div>
-  <Label>Metro Area</Label>
-  <select
-    value={city ? `${city}${state ? `, ${state}` : ''}` : ''}
-    onChange={(e) => {
-      const v = e.target.value; // e.g., "Chicago, IL"
-      const [c, st] = v.split(',').map(s => s.trim());
-      setCity(c || '');
-      setState(st || '');
-    }}
-    style={selectStyle}
-  >
-    <option value="">Select a metro</option>
-    {MAJOR_METROS.map((m) => (
-      <option key={m} value={m}>{m}</option>
-    ))}
-  </select>
-</div>
-
+                    {/* Metro (writes both city & state) */}
+                    <div>
+                      <Label>Metro Area</Label>
+                      <select
+                        value={city ? `${city}${state ? `, ${state}` : ''}` : ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const [c, st] = v.split(',').map(s => s.trim());
+                          setCity(c || '');
+                          setState(st || '');
+                        }}
+                        style={selectStyle}
+                      >
+                        <option value="">Select a metro</option>
+                        {MAJOR_METROS.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
 
                     <div>
                       <Label>Years of experience</Label>
@@ -1260,294 +1106,287 @@ if (user.role === 'recruiter') {
               </div>
             </Card>
 
-                       <Card style={{ marginTop: 14 }}>
-  <div style={{ fontWeight: 800, marginBottom: 12 }}>
-    {isSuperRecruiter ? 'All recent candidates (superuser)' : 'My recent candidates'}
-  </div>
-
-  {loadingList ? (
-    <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
-  ) : myRecent.length === 0 ? (
-    <div style={{ fontSize: 14, color: '#9CA3AF' }}>No candidates yet.</div>
-  ) : (
-    <div style={{ display: 'grid', gap: 10 }}>
-      {myRecent.map((c) =>
-        editingId === c.id ? (
-          // ---------- EDIT MODE ----------
-          <div
-            key={c.id}
-            style={{
-              border: '1px solid #1F2937',
-              borderRadius: 12,
-              padding: 12,
-              background: '#0B1220',
-            }}
-          >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-                gap: 10,
-              }}
-            >
-              {/* Description */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <Label>Description</Label>
-                <Input
-                  value={editForm.name || ''}
-                  onChange={(e) => changeEditField('name', e.target.value)}
-                />
+            <Card style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>
+                {isSuperRecruiter ? 'All recent candidates (superuser)' : 'My recent candidates'}
               </div>
 
-              {/* Title */}
-              <div>
-                <Label>Title</Label>
-                <select
-                  value={editForm.titles_csv || ''}
-                  onChange={(e) => changeEditField('titles_csv', e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="">Select title</option>
-                  {TITLE_OPTIONS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
+              {loadingList ? (
+                <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
+              ) : myRecent.length === 0 ? (
+                <div style={{ fontSize: 14, color: '#9CA3AF' }}>No candidates yet.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {myRecent.map((c) =>
+                    editingId === c.id ? (
+                      // ---------- EDIT MODE ----------
+                      <div
+                        key={c.id}
+                        style={{
+                          border: '1px solid #1F2937',
+                          borderRadius: 12,
+                          padding: 12,
+                          background: '#0B1220',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                            gap: 10,
+                          }}
+                        >
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <Label>Description</Label>
+                            <Input
+                              value={editForm.name || ''}
+                              onChange={(e) => changeEditField('name', e.target.value)}
+                            />
+                          </div>
 
-              {/* Type of Law */}
-              <div>
-                <Label>Type of Law</Label>
-                <select
-                  value={editForm.law_csv || ''}
-                  onChange={(e) => changeEditField('law_csv', e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="">Select type of law</option>
-                  {LAW_OPTIONS.map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-              </div>
+                          <div>
+                            <Label>Title</Label>
+                            <select
+                              value={editForm.titles_csv || ''}
+                              onChange={(e) => changeEditField('titles_csv', e.target.value)}
+                              style={selectStyle}
+                            >
+                              <option value="">Select title</option>
+                              {TITLE_OPTIONS.map((t) => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
+                          </div>
 
-              {/* Metro (writes city & state) */}
-              <div>
-                <Label>Metro Area</Label>
-                <select
-                  value={
-                    editForm.city
-                      ? `${editForm.city}${editForm.state ? `, ${editForm.state}` : ''}`
-                      : ''
-                  }
-                  onChange={(e) => {
-                    const [cName, st] = e.target.value.split(',').map((x) => x.trim());
-                    changeEditField('city', cName || '');
-                    changeEditField('state', st ? normState(st) : '');
-                  }}
-                  style={selectStyle}
-                >
-                  <option value="">Select a metro</option>
-                  {MAJOR_METROS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
+                          <div>
+                            <Label>Type of Law</Label>
+                            <select
+                              value={editForm.law_csv || ''}
+                              onChange={(e) => changeEditField('law_csv', e.target.value)}
+                              style={selectStyle}
+                            >
+                              <option value="">Select type of law</option>
+                              {LAW_OPTIONS.map((l) => (
+                                <option key={l} value={l}>{l}</option>
+                              ))}
+                            </select>
+                          </div>
 
-              {/* Years */}
-              <div>
-                <Label>Years</Label>
-                <Input
-                  inputMode="numeric"
-                  value={editForm.years ?? ''}
-                  onChange={(e) => changeEditField('years', e.target.value)}
-                />
-              </div>
+                          <div>
+                            <Label>Metro Area</Label>
+                            <select
+                              value={
+                                editForm.city
+                                  ? `${editForm.city}${editForm.state ? `, ${editForm.state}` : ''}`
+                                  : ''
+                              }
+                              onChange={(e) => {
+                                const [cName, st] = e.target.value.split(',').map((x) => x.trim());
+                                changeEditField('city', cName || '');
+                                changeEditField('state', st ? normState(st) : '');
+                              }}
+                              style={selectStyle}
+                            >
+                              <option value="">Select a metro</option>
+                              {MAJOR_METROS.map((m) => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </select>
+                          </div>
 
-              {/* Recent role years */}
-              <div>
-                <Label>Years in most recent job</Label>
-                <Input
-                  inputMode="numeric"
-                  value={editForm.recent_role_years ?? ''}
-                  onChange={(e) => changeEditField('recent_role_years', e.target.value)}
-                />
-              </div>
+                          <div>
+                            <Label>Years</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={editForm.years ?? ''}
+                              onChange={(e) => changeEditField('years', e.target.value)}
+                            />
+                          </div>
 
-              {/* Salary */}
-              <div>
-                <Label>Salary</Label>
-                <Input
-                  inputMode="numeric"
-                  value={editForm.salary ?? ''}
-                  onChange={(e) => changeEditField('salary', e.target.value)}
-                />
-              </div>
+                          <div>
+                            <Label>Years in most recent job</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={editForm.recent_role_years ?? ''}
+                              onChange={(e) => changeEditField('recent_role_years', e.target.value)}
+                            />
+                          </div>
 
-              {/* Date entered */}
-              <div>
-                <Label>Date entered</Label>
-                <Input
-                  type="date"
-                  value={editForm.date_entered || ''}
-                  onChange={(e) => changeEditField('date_entered', e.target.value)}
-                />
-              </div>
+                          <div>
+                            <Label>Salary</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={editForm.salary ?? ''}
+                              onChange={(e) => changeEditField('salary', e.target.value)}
+                            />
+                          </div>
 
-              {/* Contract + Hourly */}
-              <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!editForm.contract}
-                    onChange={(e) => changeEditField('contract', e.target.checked)}
-                  />
-                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract</span>
-                </label>
-                {editForm.contract ? (
-                  <Input
-                    placeholder="Hourly"
-                    inputMode="numeric"
-                    value={editForm.hourly ?? ''}
-                    onChange={(e) => changeEditField('hourly', e.target.value)}
-                  />
-                ) : null}
-              </div>
+                          <div>
+                            <Label>Date entered</Label>
+                            <Input
+                              type="date"
+                              value={editForm.date_entered || ''}
+                              onChange={(e) => changeEditField('date_entered', e.target.value)}
+                            />
+                          </div>
 
-              {/* Off Market + On Assignment */}
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  display: 'flex',
-                  gap: 16,
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!editForm.off_market}
-                    onChange={(e) => changeEditField('off_market', e.target.checked)}
-                  />
-                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off The Market</span>
-                </label>
+                          <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.contract}
+                                onChange={(e) => changeEditField('contract', e.target.checked)}
+                              />
+                              <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract</span>
+                            </label>
+                            {editForm.contract ? (
+                              <Input
+                                placeholder="Hourly"
+                                inputMode="numeric"
+                                value={editForm.hourly ?? ''}
+                                onChange={(e) => changeEditField('hourly', e.target.value)}
+                              />
+                            ) : null}
+                          </div>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!editForm.on_assignment}
-                    onChange={(e) => changeEditField('on_assignment', e.target.checked)}
-                    disabled={!!editForm.off_market}
-                    title={editForm.off_market ? 'Disabled while Off The Market' : ''}
-                  />
-                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
-                </label>
+                          <div
+                            style={{
+                              gridColumn: '1 / -1',
+                              display: 'flex',
+                              gap: 16,
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.off_market}
+                                onChange={(e) => changeEditField('off_market', e.target.checked)}
+                              />
+                              <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off The Market</span>
+                            </label>
 
-                {editForm.on_assignment && !editForm.off_market ? (
-                  <div>
-                    <Label>Estimated date available</Label>
-                    <Input
-                      type="date"
-                      value={editForm.est_available_date || ''}
-                      onChange={(e) => changeEditField('est_available_date', e.target.value)}
-                    />
-                  </div>
-                ) : null}
-              </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.on_assignment}
+                                onChange={(e) => changeEditField('on_assignment', e.target.checked)}
+                                disabled={!!editForm.off_market}
+                                title={editForm.off_market ? 'Disabled while Off The Market' : ''}
+                              />
+                              <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
+                            </label>
 
-              {/* Notes */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <Label>Notes</Label>
-                <TextArea
-                  value={editForm.notes || ''}
-                  onChange={(e) => changeEditField('notes', e.target.value)}
-                />
-              </div>
-            </div>
+                            {editForm.on_assignment && !editForm.off_market ? (
+                              <div>
+                                <Label>Estimated date available</Label>
+                                <Input
+                                  type="date"
+                                  value={editForm.est_available_date || ''}
+                                  onChange={(e) => changeEditField('est_available_date', e.target.value)}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
 
-            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-              <Button onClick={saveEdit}>Save</Button>
-              <Button
-                onClick={cancelEdit}
-                style={{ background: '#111827', border: '1px solid #1F2937' }}
-              >
-                Cancel
-              </Button>
-            </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <Label>Notes</Label>
+                            <TextArea
+                              value={editForm.notes || ''}
+                              onChange={(e) => changeEditField('notes', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                          <Button onClick={saveEdit}>Save</Button>
+                          <Button
+                            onClick={cancelEdit}
+                            style={{ background: '#111827', border: '1px solid #1F2937' }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // ---------- READ-ONLY ROW ----------
+                      <div
+                        key={c.id}
+                        style={{
+                          border: '1px solid #1F2937',
+                          borderRadius: 12,
+                          padding: 12,
+                          background: '#0B1220',
+                          display: 'grid',
+                          gridTemplateColumns: isMobile
+                            ? '1fr'
+                            : '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
+                          gap: 10,
+                          rowGap: isMobile ? 8 : 10,
+                          alignItems: 'center',
+                          fontSize: 13,
+                        }}
+                      >
+                        <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                          {c.name}
+                          <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+                            {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+                          </div>
+                        </div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {c.city || '—'}, {c.state || '—'}
+                        </div>
+                        <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
+                        <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
+                        <div style={{ color: '#E5E7EB' }}>{displayCompRecruiter(c)}</div>
+                        <div style={{ color: '#9CA3AF' }}>
+                          {formatMDY(c.date_entered || c.created_at)}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 8,
+                            justifyContent: isMobile ? 'stretch' : 'flex-end',
+                            flexDirection: isMobile ? 'column' : 'row',
+                          }}
+                        >
+                          <Button
+                            onClick={() => startEdit(c)}
+                            style={{
+                              background: '#111827',
+                              border: '1px solid #1F2937',
+                              width: isMobile ? '100%' : undefined,
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={() => removeCandidate(c.id)}
+                            style={{
+                              background: '#B91C1C',
+                              border: '1px solid #7F1D1D',
+                              width: isMobile ? '100%' : undefined,
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </Card>
           </div>
-        ) : (
-          // ---------- READ-ONLY ROW ----------
-          <div
-            key={c.id}
-            style={{
-              border: '1px solid #1F2937',
-              borderRadius: 12,
-              padding: 12,
-              background: '#0B1220',
-              display: 'grid',
-              gridTemplateColumns: isMobile
-                ? '1fr'
-                : '1.2fr 0.8fr 0.5fr 0.6fr 0.6fr 0.8fr auto',
-              gap: 10,
-              rowGap: isMobile ? 8 : 10,
-              alignItems: 'center',
-              fontSize: 13,
-            }}
-          >
-            <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
-              {c.name}
-              <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
-                {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
-              </div>
-            </div>
-            <div style={{ color: '#9CA3AF' }}>
-              {c.city || '—'}, {c.state || '—'}
-            </div>
-            <div style={{ color: '#E5E7EB' }}>{c.years ?? '—'}</div>
-            <div style={{ color: '#E5E7EB' }}>{c.recent_role_years ?? '—'}</div>
-            <div style={{ color: '#E5E7EB' }}>{displayCompRecruiter(c)}</div>
-            <div style={{ color: '#9CA3AF' }}>
-              {formatMDY(c.date_entered || c.created_at)}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                justifyContent: isMobile ? 'stretch' : 'flex-end',
-                flexDirection: isMobile ? 'column' : 'row',
-              }}
-            >
-              <Button
-                onClick={() => startEdit(c)}
-                style={{
-                  background: '#111827',
-                  border: '1px solid #1F2937',
-                  width: isMobile ? '100%' : undefined,
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                onClick={() => removeCandidate(c.id)}
-                style={{
-                  background: '#B91C1C',
-                  border: '1px solid #7F1D1D',
-                  width: isMobile ? '100%' : undefined,
-                }}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        )
-      )}
-    </div>
-  )}
-</Card>
- 
-/* ---------- Client UI ---------- */
+        </div>
+      </div>
+    );
+  } // end recruiter branch
 
+  /* ---------- Client UI ---------- */
   if (user.role === 'client') {
-    function buildMailto(c) {
+    const buildMailto = (c) => {
       const to = user.amEmail || 'info@youragency.com';
       const subj = `Talent Connector Candidate — ${c?.name || ''}`;
       const NL = '\n';
@@ -1569,23 +1408,21 @@ if (user.role === 'recruiter') {
       ].filter(Boolean).join(NL);
 
       return `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-    }
+    };
 
     // KPI tile
-    function Kpi({ label, value, sub }) {
-      return (
-        <Card style={{ padding: 16 }}>
-          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            {value ?? '—'}
-          </div>
-          {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
-        </Card>
-      );
-    }
+    const Kpi = ({ label, value, sub }) => (
+      <Card style={{ padding: 16 }}>
+        <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 800 }}>
+          {value ?? '—'}
+        </div>
+        {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
+      </Card>
+    );
 
     // Insights helpers
-    function groupAvg(items, key, valueKey) {
+    const groupAvg = (items, key, valueKey) => {
       const acc = new Map();
       for (const it of items) {
         const k = (it[key] || '').trim();
@@ -1600,19 +1437,19 @@ if (user.role === 'recruiter') {
       for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
       rows.sort((a, b) => b.avg - a.avg);
       return rows.slice(0, 12);
-    }
+    };
     const _csvKey = (k) => k + '_one';
-    function explodeCSVToRows(items, csvKey) {
+    const explodeCSVToRows = (items, csvKey) => {
       const rows = [];
       for (const it of items) {
         const raw = String(it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
         for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
       }
       return rows;
-    }
+    };
 
     // Load Insights with filters + KPIs + DATE RANGE
-    async function loadInsights() {
+    const loadInsights = async () => {
       try {
         const { data, error } = await supabase
           .from('candidates')
@@ -1628,7 +1465,6 @@ if (user.role === 'recruiter') {
           if (iState && String(r.state || '').trim() !== iState.trim()) return false;
           if (iContractOnly && !r.contract) return false;
 
-          // Date range on "market recency": prefer date_entered; fallback created_at
           const recency = ymd(r.date_entered) || ymd(r.created_at);
           if (iStartDate && (!recency || recency < iStartDate)) return false;
           if (iEndDate   && (!recency || recency > iEndDate))   return false;
@@ -1644,14 +1480,12 @@ if (user.role === 'recruiter') {
           return true;
         };
 
-        // Add client-facing billable hourly (1.66x)
         const rows = (data || []).filter(pass).map((r) => {
           const h = Number(r.hourly);
           const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
           return { ...r, hourly_billable: billable };
         });
 
-        // KPIs (ignore zeros/missing)
         const salVals = rows
           .map(r => Number(r.salary))
           .filter(v => Number.isFinite(v) && v > 0);
@@ -1663,7 +1497,6 @@ if (user.role === 'recruiter') {
           .filter(v => Number.isFinite(v) && v > 0);
         const hourlyStats = statsFrom(hourlyVals);
 
-        // Aggregations (within filtered rows)
         const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
           ...r,
           title_one: r[_csvKey('titles_csv')],
@@ -1679,7 +1512,6 @@ if (user.role === 'recruiter') {
         const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
         const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
 
-        // Salary by years buckets
         const buckets = [
           { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
           { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
@@ -1707,9 +1539,9 @@ if (user.role === 'recruiter') {
         setInsights({
           kpi: { salary: salStats, hourly: hourlyStats },
           byTitleSalary,
-          byTitleHourly,   // billable
+          byTitleHourly,
           byCitySalary,
-          byCityHourly,    // billable
+          byCityHourly,
           byYearsSalary: yearsAgg,
           sampleN: rows.length,
         });
@@ -1718,9 +1550,9 @@ if (user.role === 'recruiter') {
         console.error(e);
         alert('Failed to load insights.');
       }
-    }
+    };
 
-    function BarChart({ title, rows, money = true }) {
+    const BarChart = ({ title, rows, money = true }) => {
       const max = Math.max(...rows.map((r) => r.avg), 1);
       return (
         <Card style={{ marginTop: 12 }}>
@@ -1749,9 +1581,9 @@ if (user.role === 'recruiter') {
           </div>
         </Card>
       );
-    }
+    };
 
-    function InsightsView() {
+    const InsightsView = () => {
       if (!insights) return null;
 
       return (
@@ -1895,7 +1727,7 @@ if (user.role === 'recruiter') {
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
         </div>
       );
-    }
+    };
 
     return (
       <div style={pageWrap}>
@@ -2040,47 +1872,51 @@ if (user.role === 'recruiter') {
                     </select>
                   </div>
 
-               {/* Contract-only + Hourly Billable Range */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <input
-      type="checkbox"
-      checked={contractOnly}
-      onChange={(e) => {
-        setContractOnly(e.target.checked);
-        if (!e.target.checked) setHourlyBillRange('');
-      }}
-    />
-    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Only show available for contract</span>
-  </label>
-  {contractOnly ? (
-    <div style={{ flex: 1 }}>
-      <Label style={{ marginBottom: 4 }}>Hourly (billable)</Label>
-      <select
-        value={hourlyBillRange}
-        onChange={(e) => setHourlyBillRange(e.target.value)}
-        style={selectStyle}
-      >
-        {/* options */}
-      </select>
-    </div>
-  ) : null}
-</div>
+                  {/* Contract-only + Hourly Billable Range */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={contractOnly}
+                        onChange={(e) => {
+                          setContractOnly(e.target.checked);
+                          if (!e.target.checked) setHourlyBillRange('');
+                        }}
+                      />
+                      <span style={{ color: '#E5E7EB', fontSize: 13 }}>Only show available for contract</span>
+                    </label>
+                    {contractOnly ? (
+                      <div style={{ flex: 1 }}>
+                        <Label style={{ marginBottom: 4 }}>Hourly (billable)</Label>
+                        <select
+                          value={hourlyBillRange}
+                          onChange={(e) => setHourlyBillRange(e.target.value)}
+                          style={selectStyle}
+                        >
+                          {/* add any specific ranges you want */}
+                          <option value="">Any</option>
+                          <option value="50-100">$50–$100/hr</option>
+                          <option value="100-150">$100–$150/hr</option>
+                          <option value="150-200">$150–$200/hr</option>
+                          <option value="200-">$200+/hr</option>
+                        </select>
+                      </div>
+                    ) : null}
+                  </div>
 
-{/* NEW: Show off-market toggle */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <input
-      type="checkbox"
-      checked={showOffMarket}
-      onChange={(e) => setShowOffMarket(e.target.checked)}
-    />
-    <span style={{ color: '#E5E7EB', fontSize: 13 }}>
-      Show candidates no longer on the market
-    </span>
-  </label>
-</div>
-
+                  {/* Show off-market toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={showOffMarket}
+                        onChange={(e) => setShowOffMarket(e.target.checked)}
+                      />
+                      <span style={{ color: '#E5E7EB', fontSize: 13 }}>
+                        Show candidates no longer on the market
+                      </span>
+                    </label>
+                  </div>
 
                   <div>
                     <Label>Sort by</Label>
@@ -2111,31 +1947,31 @@ if (user.role === 'recruiter') {
               </Card>
 
               <Card style={{ marginTop: 12 }}>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-    <div style={{ fontWeight: 800 }}>Need a hand?</div>
-    <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
-      If you aren’t finding what you’re looking for, we can help.
-    </div>
-    <a
-      href="https://bhsg.com/partner-with-us"
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        display: 'inline-block',
-        padding: '10px 14px',
-        borderRadius: 10,
-        border: '1px solid #243041',
-        background: '#2563EB',
-        color: 'white',
-        fontWeight: 600,
-        textDecoration: 'none',
-        width: 'fit-content',
-      }}
-    >
-      Request our help with your search
-    </a>
-  </div>
-</Card>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontWeight: 800 }}>Need a hand?</div>
+                  <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
+                    If you aren’t finding what you’re looking for, we can help.
+                  </div>
+                  <a
+                    href="https://bhsg.com/partner-with-us"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block',
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: '1px solid #243041',
+                      background: '#2563EB',
+                      color: 'white',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      width: 'fit-content',
+                    }}
+                  >
+                    Request our help with your search
+                  </a>
+                </div>
+              </Card>
 
               <Card style={{ marginTop: 14 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
@@ -2150,42 +1986,41 @@ if (user.role === 'recruiter') {
                         key={c.id}
                         style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
                       >
-{/* Red banner for Off The Market */}
-{c.off_market ? (
-  <div
-    style={{
-      marginBottom: 8,
-      padding: '8px 10px',
-      borderRadius: 8,
-      background: '#7F1D1D',
-      border: '1px solid #B91C1C',
-      color: 'white',
-      fontWeight: 700,
-      fontSize: 13,
-    }}
-  >
-    Off The Market
-  </div>
-) : null}
+                        {/* Off-market banner */}
+                        {c.off_market ? (
+                          <div
+                            style={{
+                              marginBottom: 8,
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              background: '#7F1D1D',
+                              border: '1px solid #B91C1C',
+                              color: 'white',
+                              fontWeight: 700,
+                              fontSize: 13,
+                            }}
+                          >
+                            Off The Market
+                          </div>
+                        ) : null}
 
-    {/* Red banner if on assignment (only when not off-market) */}
-{!c.off_market && c.on_assignment ? (
-  <div
-    style={{
-      marginBottom: 8,
-      padding: '8px 10px',
-      borderRadius: 8,
-      background: '#7F1D1D',
-      border: '1px solid #B91C1C',
-      color: 'white',
-      fontWeight: 700,
-      fontSize: 13,
-    }}
-  >
-    Currently on assignment — est. available {formatMDY(c.est_available_date) || 'TBD'}
-  </div>
-) : null}
-
+                        {/* On assignment banner */}
+                        {!c.off_market && c.on_assignment ? (
+                          <div
+                            style={{
+                              marginBottom: 8,
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              background: '#7F1D1D',
+                              border: '1px solid #B91C1C',
+                              color: 'white',
+                              fontWeight: 700,
+                              fontSize: 13,
+                            }}
+                          >
+                            Currently on assignment — est. available {formatMDY(c.est_available_date) || 'TBD'}
+                          </div>
+                        ) : null}
 
                         <div
                           style={{
@@ -2426,7 +2261,7 @@ function AdminPanel() {
           role: row.role,
           org: row.org || null,
           amEmail: row.account_manager_email || null,
-          password: null, // let server decide
+          password: null,
           resend: true,
         }),
       });
@@ -2484,7 +2319,6 @@ function AdminPanel() {
     }
   }
 
-  // Filtered list
   const filtered = React.useMemo(() => {
     const s = (q || '').trim().toLowerCase();
     if (!s) return list;
