@@ -586,8 +586,6 @@ export default function Page() {
     setIStartDate(start);
     setIEndDate(end);
   }, [iPreset]);
-   
-
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
@@ -782,14 +780,6 @@ export default function Page() {
   React.useEffect(() => {
     if (user?.role === 'client') fetchClientRows();
   }, [user]);
-    // Auto-apply when client checkboxes change (no Apply click needed)
-  React.useEffect(() => {
-    if (user?.role === 'client' && !showInsights) {
-      fetchClientRows();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contractOnly, showOffMarket]);
-
 
   /* ---------- Layout (mobile-aware) ---------- */
   const pageWrap = {
@@ -1439,108 +1429,106 @@ export default function Page() {
     }
 
     async function loadInsights() {
-  try {
-    const { data, error } = await supabase
-      .from('candidates')
-      .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
-      .limit(5000);
-    if (error) throw error;
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
+          .limit(5000);
+        if (error) throw error;
 
-    const pass = (r) => {
-      if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
-      if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
-      if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
-      if (iState && String(r.state || '').trim() !== iState.trim()) return false;
-      if (iContractOnly && !r.contract) return false;
+        const pass = (r) => {
+          if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
+          if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
+          if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
+          if (iState && String(r.state || '').trim() !== iState.trim()) return false;
+          if (iContractOnly && !r.contract) return false;
 
-      const recency = ymd(r.date_entered) || ymd(r.created_at);
-      if (iStartDate && (!recency || recency < iStartDate)) return false;
-      if (iEndDate   && (!recency || recency > iEndDate))   return false;
+          const recency = ymd(r.date_entered) || ymd(r.created_at);
+          if (iStartDate && (!recency || recency < iStartDate)) return false;
+          if (iEndDate   && (!recency || recency > iEndDate))   return false;
 
-      if (iYearsRange) {
-        const [minStr, maxStr] = iYearsRange.split('-');
-        const min = minStr ? Number(minStr) : null;
-        const max = maxStr ? Number(maxStr) : null;
-        const y = Number(r.years);
-        if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
-        if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
-      }
-      return true;
-    };
+          if (iYearsRange) {
+            const [minStr, maxStr] = iYearsRange.split('-');
+            const min = minStr ? Number(minStr) : null;
+            const max = maxStr ? Number(maxStr) : null;
+            const y = Number(r.years);
+            if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
+            if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
+          }
+          return true;
+        };
 
-    const rows = (data || []).filter(pass).map((r) => {
-      const h = Number(r.hourly);
-      const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
-      return { ...r, hourly_billable: billable };
-    });
-
-    const salVals = rows
-      .map(r => Number(r.salary))
-      .filter(v => Number.isFinite(v) && v > 0);
-    const salStats = statsFrom(salVals);
-
-    const hourlyVals = rows
-      .filter(r => r.contract)
-      .map(r => Number(r.hourly_billable))
-      .filter(v => Number.isFinite(v) && v > 0);
-    const hourlyStats = statsFrom(hourlyVals);
-
-    const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
-      ...r,
-      title_one: r[_csvKey('titles_csv')],
-    }));
-
-    const withCityState = rows.map((r) => ({
-      ...r,
-      city_full: [r.city, r.state].filter(Boolean).join(', '),
-    }));
-
-    const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
-    const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
-    const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
-    const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
-
-    const buckets = [
-      { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
-      { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
-      { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
-      { label: '11-20 yrs',check: (y) => y >= 11 && y <= 20 },
-      { label: '21+ yrs',  check: (y) => y >= 21 },
-    ];
-    const yearsAgg = [];
-    for (const b of buckets) {
-      const vals = rows
-        .map((r) => Number(r.salary))
-        .filter((v, i) => {
-          const y = Number(rows[i].years);
-          return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+        const rows = (data || []).filter(pass).map((r) => {
+          const h = Number(r.hourly);
+          const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
+          return { ...r, hourly_billable: billable };
         });
-      if (vals.length) {
-        yearsAgg.push({
-          label: b.label,
-          avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
-          n: vals.length,
+
+        const salVals = rows
+          .map(r => Number(r.salary))
+          .filter(v => Number.isFinite(v) && v > 0);
+        const salStats = statsFrom(salVals);
+
+        const hourlyVals = rows
+          .filter(r => r.contract)
+          .map(r => Number(r.hourly_billable))
+          .filter(v => Number.isFinite(v) && v > 0);
+        const hourlyStats = statsFrom(hourlyVals);
+
+        const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
+          ...r,
+          title_one: r[_csvKey('titles_csv')],
+        }));
+
+        const withCityState = rows.map((r) => ({
+          ...r,
+          city_full: [r.city, r.state].filter(Boolean).join(', '),
+        }));
+
+        const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
+        const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
+        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
+        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
+
+        const buckets = [
+          { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
+          { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
+          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
+          { label: '11-20 yrs',check: (y) => y >= 11 && y <= 20 },
+          { label: '21+ yrs',  check: (y) => y >= 21 },
+        ];
+        const yearsAgg = [];
+        for (const b of buckets) {
+          const vals = rows
+            .map((r) => Number(r.salary))
+            .filter((v, i) => {
+              const y = Number(rows[i].years);
+              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+            });
+          if (vals.length) {
+            yearsAgg.push({
+              label: b.label,
+              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
+              n: vals.length,
+            });
+          }
+        }
+
+        setInsights({
+          kpi: { salary: salStats, hourly: hourlyStats },
+          byTitleSalary,
+          byTitleHourly,
+          byCitySalary,
+          byCityHourly,
+          byYearsSalary: yearsAgg,
+          sampleN: rows.length,
         });
+        setShowInsights(true);
+      } catch (e) {
+        console.error(e);
+        alert('Failed to load insights.');
       }
     }
-
-    setInsights({
-      kpi: { salary: salStats, hourly: hourlyStats },
-      byTitleSalary,
-      byTitleHourly,
-      byCitySalary,
-      byCityHourly,
-      byYearsSalary: yearsAgg,
-      sampleN: rows.length,
-    });
-
-    // NOTE: intentionally removed setShowInsights(true);
-  } catch (e) {
-    console.error(e);
-    alert('Failed to load insights.');
-  }
-}
-
 
     function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
@@ -1573,160 +1561,151 @@ export default function Page() {
       );
     }
 
-   function InsightsView() {
-  // 🔁 Instant-apply whenever any Insights filter changes
-  // (runs only while the Insights screen is visible)
-  React.useEffect(() => {
-    if (showInsights) {
-      loadInsights();
+    function InsightsView() {
+      if (!insights) return null;
+
+      return (
+        <div style={{ width: 'min(1150px, 100%)' }}>
+          {/* Header with Back + Refresh */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+              Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
+              <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                onClick={() => setShowInsights(false)}
+                style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+              >
+                Back to Candidate Search
+              </Button>
+              <Button
+                onClick={loadInsights}
+                style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+              >
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Insights Filters */}
+          <Card style={{ marginTop: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
+              <div>
+                <Label>Title</Label>
+                <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {titleOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Type of Law</Label>
+                <select value={iLaw} onChange={(e)=>setILaw(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {lawOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>State</Label>
+                <select value={iState} onChange={(e)=>setIState(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>City</Label>
+                <select value={iCity} onChange={(e)=>setICity(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Years of experience</Label>
+                <select value={iYearsRange} onChange={(e)=>setIYearsRange(e.target.value)} style={selectStyle}>
+                  <option value="">Any</option>
+                  <option value="0-2">0–2 years</option>
+                  <option value="3-5">3–5 years</option>
+                  <option value="6-10">6–10 years</option>
+                  <option value="11-20">11–20 years</option>
+                  <option value="21-">21+ years</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Date range</Label>
+                <select value={iPreset} onChange={(e) => setIPreset(e.target.value)} style={selectStyle}>
+                  <option value="LAST_30">Last 30 days</option>
+                  <option value="LAST_60">Last 60 days</option>
+                  <option value="LAST_90">Last 90 days</option>
+                  <option value="LAST_180">Last 180 days</option>
+                  <option value="YTD">Year to date</option>
+                  <option value="THIS_Q">This quarter</option>
+                  <option value="ALL">All time</option>
+                </select>
+              </div>
+
+              <div style={{ display:'flex', alignItems:'end', gap:10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={iContractOnly} onChange={(e)=>setIContractOnly(e.target.checked)} />
+                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract only</span>
+                </label>
+              </div>
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
+              <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}>Apply</Button>
+              <Button
+                onClick={() => {
+                  setITitle('');
+                  setILaw('');
+                  setIState('');
+                  setICity('');
+                  setIYearsRange('');
+                  setIContractOnly(false);
+                  setIPreset('LAST_180');
+                }}
+                style={{ background:'#111827', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+              >
+                Clear
+              </Button>
+            </div>
+          </Card>
+
+          {/* KPI row */}
+          {insights?.kpi ? (
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
+              <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
+              <Kpi
+                label="Typical Salary Range"
+                value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'}
+              />
+              <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
+              <Kpi label="Sample Size" value={insights.sampleN} />
+              <Kpi
+                label="Filter"
+                value={
+                  [
+                    iTitle,
+                    iLaw,
+                    [iCity, iState].filter(Boolean).join(', '),
+                    (iStartDate || iEndDate)
+                      ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
+                      : null,
+                    iContractOnly ? 'Contract only' : null,
+                  ].filter(Boolean).join(' • ') || 'All'
+                }
+              />
+            </div>
+          ) : null}
+
+          {/* Charts */}
+          <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
+          <BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
+          <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
+          <BarChart title="Avg Hourly (Billable) by City" rows={insights.byCityHourly} money />
+          <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+        </div>
+      );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iTitle, iLaw, iCity, iState, iYearsRange, iContractOnly, iStartDate, iEndDate]);
-
-  if (!insights) return null;
-
-  return (
-    <div style={{ width: 'min(1150px, 100%)' }}>
-      {/* Header with Back + Refresh */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-          Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
-          <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Button
-            onClick={() => setShowInsights(false)}
-            style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-          >
-            Back to Candidate Search
-          </Button>
-          <Button
-            onClick={loadInsights}
-            style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-          >
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Insights Filters */}
-      <Card style={{ marginTop: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
-          <div>
-            <Label>Title</Label>
-            <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
-              <option value="">Any</option>
-              {titleOptions.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Type of Law</Label>
-            <select value={iLaw} onChange={(e)=>setILaw(e.target.value)} style={selectStyle}>
-              <option value="">Any</option>
-              {lawOptions.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>State</Label>
-            <select value={iState} onChange={(e)=>setIState(e.target.value)} style={selectStyle}>
-              <option value="">Any</option>
-              {STATES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>City</Label>
-            <select value={iCity} onChange={(e)=>setICity(e.target.value)} style={selectStyle}>
-              <option value="">Any</option>
-              {cities.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Years of experience</Label>
-            <select value={iYearsRange} onChange={(e)=>setIYearsRange(e.target.value)} style={selectStyle}>
-              <option value="">Any</option>
-              <option value="0-2">0–2 years</option>
-              <option value="3-5">3–5 years</option>
-              <option value="6-10">6–10 years</option>
-              <option value="11-20">11–20 years</option>
-              <option value="21-">21+ years</option>
-            </select>
-          </div>
-
-          <div>
-            <Label>Date range</Label>
-            <select value={iPreset} onChange={(e) => setIPreset(e.target.value)} style={selectStyle}>
-              <option value="LAST_30">Last 30 days</option>
-              <option value="LAST_60">Last 60 days</option>
-              <option value="LAST_90">Last 90 days</option>
-              <option value="LAST_180">Last 180 days</option>
-              <option value="YTD">Year to date</option>
-              <option value="THIS_Q">This quarter</option>
-              <option value="ALL">All time</option>
-            </select>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'end', gap:10 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={iContractOnly} onChange={(e)=>setIContractOnly(e.target.checked)} />
-              <span style={{ color: '#E5E7EB', fontSize: 13 }}>Contract only</span>
-            </label>
-          </div>
-        </div>
-        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
-          <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}>Apply</Button>
-          <Button
-            onClick={() => {
-              setITitle('');
-              setILaw('');
-              setIState('');
-              setICity('');
-              setIYearsRange('');
-              setIContractOnly(false);
-              setIPreset('LAST_180');
-            }}
-            style={{ background:'#111827', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-          >
-            Clear
-          </Button>
-        </div>
-      </Card>
-
-      {/* KPI row */}
-      {insights?.kpi ? (
-        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
-          <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
-          <Kpi
-            label="Typical Salary Range"
-            value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'}
-          />
-          <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
-          <Kpi label="Sample Size" value={insights.sampleN} />
-          <Kpi
-            label="Filter"
-            value={
-              [
-                iTitle,
-                iLaw,
-                [iCity, iState].filter(Boolean).join(', '),
-                (iStartDate || iEndDate)
-                  ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
-                  : null,
-                iContractOnly ? 'Contract only' : null,
-              ].filter(Boolean).join(' • ') || 'All'
-            }
-          />
-        </div>
-      ) : null}
-
-      {/* Charts */}
-      <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
-      <BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
-      <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
-      <BarChart title="Avg Hourly (Billable) by City" rows={insights.byCityHourly} money />
-      <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
-    </div>
-  );
-}
 
     return (
       <div style={pageWrap}>
@@ -1752,16 +1731,12 @@ export default function Page() {
                   <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
-                 <Button
-  onClick={async () => {
-    if (!showInsights) setShowInsights(true); // show the Insights screen
-    await loadInsights();                     // then (re)load data
-  }}
-  style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
->
-  Compensation Insights
-</Button>
-
+                  <Button
+                    onClick={loadInsights}
+                    style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+                  >
+                    Compensation Insights
+                  </Button>
                   <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
                     Log out
                   </Button>
