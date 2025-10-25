@@ -29,25 +29,12 @@ const MAJOR_METROS = [
 ];
 
 /* ---------- NEW: Title/Practice options ---------- */
-// Role titles
-const TITLE_OPTIONS = ['Administrative','Legal Support','Paralegal','Attorney'];
+const TITLE_OPTIONS = [
+  'Administrative','Legal Support','Paralegal','Attorney',
+];
 
-// Type of Law / Practice Areas
 const LAW_OPTIONS = [
-  "40's Act",'Administrative','Administrative Manager','Antitrust','Appellate','Asbestos','Associate','Attorney',
-  'Banking','Bankruptcy','Commercial Litigation','Commercial Real Estate','Compliance','Conflicts','Conflicts Analyst',
-  'Construction','Contracts','Corporate','Criminal','Data Privacy/Cybersecurity','Docketing','Document Review',
-  'Employee Benefits/Executive Comp/ERISA','Energy','Entertainment','Environmental','Family','FCPA','FDA','Finance',
-  'Financial Services','FinTech','Foreclosure','Foreign Filing','Foreign Language Review','Franchise','General Counsel',
-  'Government Contracts','Government Contracts Attorney','Healthcare','HSR','Immigration','In House Associate',
-  'Insurance Coverage','Insurance Defense','Insurance Litigation','Insurance Regulatory','International Arbitration',
-  'International Trade','Labor & Employment','Law Clerk','Law Student','Leasing','Legal JD','Legal Malpractice',
-  'Legal Marketing','Legal Support','Life Sciences','Litigation','Litigation Technology','Medical Malpractice',
-  'Mergers and Acquisitions','MRS Project Manager','Mutual Fund','Nurse','Oil & Gas','Paralegal','Partner',
-  'Patent Agent','Patent Counsel','Patent Litigation','Patent Prosecution','Personal Injury','Project Finance',
-  'Project Manager','Public Finance','Real Estate Finance','Regulatory','Residential Real Estate','Restructuring',
-  'Securities','Securities Litigation','Syndication','Tax','Technology','Technology Transactions','Toxic Tort',
-  'Trade Attorney','Trademark','Trust & Estate',"Worker's Compensation",'White Collar Litigation',
+  "40's Act",'Administrative','Administrative Manager','Antitrust','Appellate','Asbestos','Associate','Attorney','Banking','Bankruptcy','Commercial Litigation','Commercial Real Estate','Compliance','Conflicts','Conflicts Analyst','Construction','Contracts','Corporate','Criminal','Data Privacy/Cybersecurity','Docketing','Document Review','Employee Benefits/Executive Comp/ERISA','Energy','Entertainment','Environmental','Family','FCPA','FDA','Finance','Financial Services','FinTech','Foreclosure','Foreign Filing','Foreign Language Review','Franchise','General Counsel','Government Contracts','Government Contracts Attorney','Healthcare','HSR','Immigration','In House Associate','Insurance Coverage','Insurance Defense','Insurance Litigation','Insurance Regulatory','International Arbitration','International Trade','Labor & Employment','Law Clerk','Law Student','Leasing','Legal JD','Legal Malpractice','Legal Marketing','Legal Support','Life Sciences','Litigation','Litigation Technology','Medical Malpractice','Mergers and Acquisitions','MRS Project Manager','Mutual Fund','Nurse','Oil & Gas','Paralegal','Partner','Patent Agent','Patent Counsel','Patent Litigation','Patent Prosecution','Personal Injury','Project Finance','Project Manager','Public Finance','Real Estate Finance','Regulatory','Residential Real Estate','Restructuring','Securities','Securities Litigation','Syndication','Tax','Technology','Technology Transactions','Toxic Tort','Trade Attorney','Trademark','Trust & Estate',"Worker's Compensation",'White Collar Litigation',
 ];
 
 /* ---------- Small UI helpers ---------- */
@@ -76,12 +63,14 @@ const Input = (props) => (
     {...props}
     style={{
       width: '100%',
-      padding: '10px 12px',
+      padding: '12px 14px',           // mobile-friendly touch target
       borderRadius: 10,
       border: '1px solid #1F2937',
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
+      fontSize: 16,                   // prevent iOS zoom
+      lineHeight: '22px',
       ...props.style,
     }}
   />
@@ -93,12 +82,14 @@ const TextArea = (props) => (
     style={{
       width: '100%',
       minHeight: 120,
-      padding: '10px 12px',
+      padding: '12px 14px',
       borderRadius: 10,
       border: '1px solid #1F2937',
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
+      fontSize: 16,                    // prevent iOS zoom
+      lineHeight: '22px',
       ...props.style,
     }}
   />
@@ -140,7 +131,6 @@ const Tag = ({ children, style }) => (
 );
 
 /* ---------- helpers ---------- */
-// Show date safely with *no timezone drift*.
 function renderDate(val) {
   if (!val) return '—';
   if (typeof val === 'string') {
@@ -154,7 +144,6 @@ function renderDate(val) {
   }
 }
 
-// Format YYYY-MM-DD or date-ish to MM/DD/YYYY without timezone drift
 function formatMDY(val) {
   if (!val) return '';
   if (typeof val === 'string') {
@@ -172,7 +161,6 @@ function formatMDY(val) {
   }
 }
 
-// YYYY-MM-DD from date/ISO string (no tz drift)
 function ymd(val) {
   if (!val) return null;
   if (typeof val === 'string') {
@@ -190,13 +178,11 @@ function ymd(val) {
   }
 }
 
-// Numeric guard so NaN never hits the DB
 const numOrNull = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
 
-// Normalize "new york" -> "New York"
 function toTitleCaseCity(s) {
   if (!s) return '';
   return s
@@ -207,7 +193,6 @@ function toTitleCaseCity(s) {
     .replace(/\b(Of|And|The|De|La|Da|Van|Von)\b/g, (m) => m.toLowerCase());
 }
 
-// Normalize state to 2-letter uppercase
 function normState(s) {
   if (!s) return '';
   return s.trim().toUpperCase();
@@ -235,7 +220,6 @@ function displayCompClient(c) {
   return '—';
 }
 
-// Stats (avg/median/p25/p75) for a numeric array
 function statsFrom(values) {
   const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
   const n = v.length;
@@ -251,7 +235,6 @@ function statsFrom(values) {
   return { n, avg, median: q(50), p25: q(25), p75: q(75) };
 }
 
-// Substring match against CSV field (case-insensitive)
 function matchesCSV(csv, needle) {
   if (!needle) return true;
   return String(csv || '')
@@ -260,7 +243,6 @@ function matchesCSV(csv, needle) {
     .some((s) => s.includes(String(needle).trim().toLowerCase()));
 }
 
-// Compute YYYY-MM-DD date ranges for presets
 function presetRange(preset) {
   const toYMD = (d) => {
     const yyyy = d.getFullYear();
@@ -294,7 +276,6 @@ function presetRange(preset) {
   }
 }
 
-// Hook: true when viewport <= breakpoint px
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = React.useState(false);
   React.useEffect(() => {
@@ -417,6 +398,7 @@ export default function Page() {
       off_market: !!row.off_market,
     });
   }
+
   function cancelEdit() {
     setEditingId(null);
     setEditForm({});
@@ -477,7 +459,6 @@ export default function Page() {
     }
   }
 
-  // Fetch the recruiter's recent candidates list
   async function refreshMyRecent() {
     if (!user || user.role !== 'recruiter') return;
     setLoadingList(true);
@@ -536,7 +517,6 @@ export default function Page() {
 
       setAddMsg('Candidate added');
 
-      // Clear fields
       setName('');
       setTitles('');
       setLaw('');
@@ -566,7 +546,6 @@ export default function Page() {
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
-  // dropdown ranges
   const [salaryRange, setSalaryRange] = React.useState('');
   const [yearsRange, setYearsRange] = React.useState('');
   const [contractOnly, setContractOnly] = React.useState(false);
@@ -590,11 +569,9 @@ export default function Page() {
   const [clientErr, setClientErr] = React.useState('');
   const [expandedId, setExpandedId] = React.useState(null);
 
-  // Insights view
   const [showInsights, setShowInsights] = React.useState(false);
   const [insights, setInsights] = React.useState(null);
 
-  // Insights filters (for KPI + charts)
   const [iTitle, setITitle] = React.useState('');
   const [iLaw, setILaw] = React.useState('');
   const [iCity, setICity] = React.useState('');
@@ -638,10 +615,7 @@ export default function Page() {
           .select('city,state,titles_csv,law_csv')
           .limit(1000);
         if (error) throw error;
-        const cset = new Set(),
-          sset = new Set(),
-          tset = new Set(),
-          lset = new Set();
+        const cset = new Set(), sset = new Set(), tset = new Set(), lset = new Set();
         for (const r of data || []) {
           if (r.city) cset.add(r.city.trim());
           if (r.state) sset.add(r.state.trim());
@@ -683,7 +657,6 @@ export default function Page() {
     return { min, max };
   }
 
-  // ---------- FETCH CLIENT ROWS ----------
   async function fetchClientRows() {
     try {
       setClientErr('');
@@ -708,12 +681,7 @@ export default function Page() {
       const rows = (data || []).filter((r) => {
         if (term) {
           const blob = [
-            r.name,
-            r.titles_csv,
-            r.law_csv,
-            r.city,
-            r.state,
-            r.notes,
+            r.name, r.titles_csv, r.law_csv, r.city, r.state, r.notes,
           ]
             .filter(Boolean)
             .join(' ')
@@ -813,14 +781,14 @@ export default function Page() {
     if (user?.role === 'client') fetchClientRows();
   }, [user]);
 
-  /* ---------- Layout ---------- */
+  /* ---------- Layout (mobile-aware) ---------- */
   const pageWrap = {
     minHeight: '100vh',
     width: '100%',
     backgroundImage: `url(${NYC})`,
-    backgroundPosition: 'center',
+    backgroundPosition: isMobile ? 'center top' : 'center',
     backgroundSize: 'cover',
-    backgroundAttachment: 'fixed',
+    backgroundAttachment: isMobile ? 'scroll' : 'fixed', // mobile fix
   };
   const overlayCentered = {
     minHeight: '100vh',
@@ -831,9 +799,8 @@ export default function Page() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: isMobile ? '16px 12px' : '40px 16px',
+    padding: isMobile ? '20px 16px' : '40px 16px',
   };
-
   const overlay = {
     minHeight: '100vh',
     width: '100%',
@@ -843,7 +810,7 @@ export default function Page() {
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    padding: isMobile ? '16px 12px' : '40px 16px',
+    padding: isMobile ? '20px 16px' : '40px 16px',
   };
 
   /* ---------- Logged-out ---------- */
@@ -887,6 +854,7 @@ export default function Page() {
               ))}
             </div>
 
+            {/* Center the inputs + button */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ width: '100%', maxWidth: 400 }}>
                 <Label>Email</Label>
@@ -950,6 +918,7 @@ export default function Page() {
             <Card style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
 
+              {/* Center the form grid within the card */}
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: '100%', maxWidth: 980 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
@@ -962,7 +931,7 @@ export default function Page() {
                       />
                     </div>
 
-                    {/* Title */}
+                    {/* Title dropdown */}
                     <div>
                       <Label>Title</Label>
                       <select
@@ -977,7 +946,7 @@ export default function Page() {
                       </select>
                     </div>
 
-                    {/* Type of Law */}
+                    {/* Type of Law dropdown */}
                     <div>
                       <Label>Type of Law</Label>
                       <select
@@ -992,7 +961,7 @@ export default function Page() {
                       </select>
                     </div>
 
-                    {/* State */}
+                    {/* State dropdown */}
                     <div>
                       <Label>State</Label>
                       <select
@@ -1007,15 +976,15 @@ export default function Page() {
                       </select>
                     </div>
 
-                    {/* Metro (writes both city & state) */}
+                    {/* Metro select writes city/state */}
                     <div>
                       <Label>Metro Area</Label>
                       <select
                         value={city ? `${city}${state ? `, ${state}` : ''}` : ''}
                         onChange={(e) => {
                           const v = e.target.value;
-                          const [c, st] = v.split(',').map(s => s.trim());
-                          setCity(c || '');
+                          const [cName, st] = v.split(',').map(s => s.trim());
+                          setCity(cName || '');
                           setState(st || '');
                         }}
                         style={selectStyle}
@@ -1090,8 +1059,8 @@ export default function Page() {
                 </div>
               </div>
 
-              <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
-                <Button onClick={addCandidate}>Add candidate</Button>
+              <div style={{ marginTop: 14, display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row' }}>
+                <Button onClick={addCandidate} style={{ width: isMobile ? '100%' : undefined }}>Add candidate</Button>
                 {addMsg ? (
                   <div
                     style={{
@@ -1136,6 +1105,7 @@ export default function Page() {
                             gap: 10,
                           }}
                         >
+                          {/* Description */}
                           <div style={{ gridColumn: '1 / -1' }}>
                             <Label>Description</Label>
                             <Input
@@ -1144,6 +1114,7 @@ export default function Page() {
                             />
                           </div>
 
+                          {/* Title */}
                           <div>
                             <Label>Title</Label>
                             <select
@@ -1158,6 +1129,7 @@ export default function Page() {
                             </select>
                           </div>
 
+                          {/* Type of Law */}
                           <div>
                             <Label>Type of Law</Label>
                             <select
@@ -1172,6 +1144,7 @@ export default function Page() {
                             </select>
                           </div>
 
+                          {/* Metro (writes city & state) */}
                           <div>
                             <Label>Metro Area</Label>
                             <select
@@ -1194,6 +1167,7 @@ export default function Page() {
                             </select>
                           </div>
 
+                          {/* Years */}
                           <div>
                             <Label>Years</Label>
                             <Input
@@ -1203,6 +1177,7 @@ export default function Page() {
                             />
                           </div>
 
+                          {/* Recent role years */}
                           <div>
                             <Label>Years in most recent job</Label>
                             <Input
@@ -1212,6 +1187,7 @@ export default function Page() {
                             />
                           </div>
 
+                          {/* Salary */}
                           <div>
                             <Label>Salary</Label>
                             <Input
@@ -1221,6 +1197,7 @@ export default function Page() {
                             />
                           </div>
 
+                          {/* Date entered */}
                           <div>
                             <Label>Date entered</Label>
                             <Input
@@ -1230,6 +1207,7 @@ export default function Page() {
                             />
                           </div>
 
+                          {/* Contract + Hourly */}
                           <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <input
@@ -1249,6 +1227,7 @@ export default function Page() {
                             ) : null}
                           </div>
 
+                          {/* Off Market + On Assignment */}
                           <div
                             style={{
                               gridColumn: '1 / -1',
@@ -1290,6 +1269,7 @@ export default function Page() {
                             ) : null}
                           </div>
 
+                          {/* Notes */}
                           <div style={{ gridColumn: '1 / -1' }}>
                             <Label>Notes</Label>
                             <TextArea
@@ -1386,7 +1366,7 @@ export default function Page() {
 
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
-    const buildMailto = (c) => {
+    function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
       const subj = `Talent Connector Candidate — ${c?.name || ''}`;
       const NL = '\n';
@@ -1408,21 +1388,21 @@ export default function Page() {
       ].filter(Boolean).join(NL);
 
       return `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-    };
+    }
 
-    // KPI tile
-    const Kpi = ({ label, value, sub }) => (
-      <Card style={{ padding: 16 }}>
-        <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 800 }}>
-          {value ?? '—'}
-        </div>
-        {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
-      </Card>
-    );
+    function Kpi({ label, value, sub }) {
+      return (
+        <Card style={{ padding: 16 }}>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>
+            {value ?? '—'}
+          </div>
+          {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
+        </Card>
+      );
+    }
 
-    // Insights helpers
-    const groupAvg = (items, key, valueKey) => {
+    function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
         const k = (it[key] || '').trim();
@@ -1437,19 +1417,18 @@ export default function Page() {
       for (const [k, { sum, n }] of acc.entries()) rows.push({ label: k, avg: Math.round(sum / n), n });
       rows.sort((a, b) => b.avg - a.avg);
       return rows.slice(0, 12);
-    };
+    }
     const _csvKey = (k) => k + '_one';
-    const explodeCSVToRows = (items, csvKey) => {
+    function explodeCSVToRows(items, csvKey) {
       const rows = [];
       for (const it of items) {
         const raw = String(it[csvKey] || '').split(',').map(s => s.trim()).filter(Boolean);
         for (const r of raw) rows.push({ ...it, [_csvKey(csvKey)]: r });
       }
       return rows;
-    };
+    }
 
-    // Load Insights with filters + KPIs + DATE RANGE
-    const loadInsights = async () => {
+    async function loadInsights() {
       try {
         const { data, error } = await supabase
           .from('candidates')
@@ -1457,7 +1436,6 @@ export default function Page() {
           .limit(5000);
         if (error) throw error;
 
-        const yrs = (r) => Number(r.years);
         const pass = (r) => {
           if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
           if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
@@ -1473,7 +1451,7 @@ export default function Page() {
             const [minStr, maxStr] = iYearsRange.split('-');
             const min = minStr ? Number(minStr) : null;
             const max = maxStr ? Number(maxStr) : null;
-            const y = yrs(r);
+            const y = Number(r.years);
             if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
             if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
           }
@@ -1550,9 +1528,9 @@ export default function Page() {
         console.error(e);
         alert('Failed to load insights.');
       }
-    };
+    }
 
-    const BarChart = ({ title, rows, money = true }) => {
+    function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
       return (
         <Card style={{ marginTop: 12 }}>
@@ -1581,9 +1559,9 @@ export default function Page() {
           </div>
         </Card>
       );
-    };
+    }
 
-    const InsightsView = () => {
+    function InsightsView() {
       if (!insights) return null;
 
       return (
@@ -1727,7 +1705,7 @@ export default function Page() {
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
         </div>
       );
-    };
+    }
 
     return (
       <div style={pageWrap}>
@@ -1893,12 +1871,14 @@ export default function Page() {
                           onChange={(e) => setHourlyBillRange(e.target.value)}
                           style={selectStyle}
                         >
-                          {/* add any specific ranges you want */}
                           <option value="">Any</option>
-                          <option value="50-100">$50–$100/hr</option>
-                          <option value="100-150">$100–$150/hr</option>
-                          <option value="150-200">$150–$200/hr</option>
-                          <option value="200-">$200+/hr</option>
+                          <option value="25-50">$25–$50</option>
+                          <option value="50-75">$50–$75</option>
+                          <option value="75-100">$75–$100</option>
+                          <option value="100-150">$100–$150</option>
+                          <option value="150-200">$150–$200</option>
+                          <option value="200-300">$200–$300</option>
+                          <option value="300-">$300+</option>
                         </select>
                       </div>
                     ) : null}
@@ -1965,7 +1945,8 @@ export default function Page() {
                       color: 'white',
                       fontWeight: 600,
                       textDecoration: 'none',
-                      width: 'fit-content',
+                      width: isMobile ? '100%' : 'fit-content',
+                      textAlign: 'center',
                     }}
                   >
                     Request our help with your search
@@ -1986,7 +1967,7 @@ export default function Page() {
                         key={c.id}
                         style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
                       >
-                        {/* Off-market banner */}
+                        {/* Red banner for Off The Market */}
                         {c.off_market ? (
                           <div
                             style={{
@@ -2004,7 +1985,7 @@ export default function Page() {
                           </div>
                         ) : null}
 
-                        {/* On assignment banner */}
+                        {/* Red banner if on assignment (only when not off-market) */}
                         {!c.off_market && c.on_assignment ? (
                           <div
                             style={{
@@ -2122,7 +2103,7 @@ export default function Page() {
               Log out
             </Button>
           </div>
-          <AdminPanel />
+          <AdminPanel isMobile={isMobile} />
         </div>
       </div>
     </div>
@@ -2130,7 +2111,7 @@ export default function Page() {
 }
 
 /* ---------- Admin Panel ---------- */
-function AdminPanel() {
+function AdminPanel({ isMobile }) {
   const [list, setList] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -2142,11 +2123,10 @@ function AdminPanel() {
   const [amEmail, setAmEmail] = React.useState('');
   const [tempPw, setTempPw] = React.useState('');
 
-  // Directory controls
   const [q, setQ] = React.useState('');
   const [editingId, setEditingId] = React.useState(null);
   const [editDraft, setEditDraft] = React.useState({ role: 'client', org: '', account_manager_email: '' });
-  const [rowBusy, setRowBusy] = React.useState({}); // id -> boolean
+  const [rowBusy, setRowBusy] = React.useState({});
 
   React.useEffect(() => {
     loadProfiles();
@@ -2373,8 +2353,8 @@ function AdminPanel() {
             />
           </div>
         </div>
-        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-          <Button onClick={invite}>Add user</Button>
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
+          <Button onClick={invite} style={{ width: isMobile ? '100%' : undefined }}>Add user</Button>
           {err ? (
             <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{err}</div>
           ) : (
@@ -2387,14 +2367,14 @@ function AdminPanel() {
       <Card style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontWeight: 800 }}>Directory</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
             <Input
               placeholder="Search email / org / sales contact"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              style={{ width: 300 }}
+              style={{ width: isMobile ? '100%' : 300 }}
             />
-            <Button onClick={loadProfiles} style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}>
+            <Button onClick={loadProfiles} style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
               Refresh
             </Button>
           </div>
@@ -2404,9 +2384,9 @@ function AdminPanel() {
           <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? 14 : 13 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: '#9CA3AF' }}>
+                <tr style={{ textAlign: 'left', color: '#9CA3AF', fontSize: isMobile ? 13 : 12 }}>
                   <th style={thStyle}>Email</th>
                   <th style={thStyle}>Role</th>
                   <th style={thStyle}>Org</th>
@@ -2457,7 +2437,7 @@ function AdminPanel() {
                       <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         {!isEditing ? (
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                             <Button
                               onClick={() => startEdit(r)}
                               style={{ background: '#111827', border: '1px solid #1F2937' }}
@@ -2488,7 +2468,7 @@ function AdminPanel() {
                             </Button>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                             <Button onClick={() => saveEdit(r.id)} disabled={busy}>Save</Button>
                             <Button
                               onClick={cancelEdit}
@@ -2522,12 +2502,17 @@ function AdminPanel() {
 /* ---------- shared styles ---------- */
 const selectStyle = {
   width: '100%',
-  padding: '10px 12px',
+  padding: '12px 14px',
   borderRadius: 10,
   border: '1px solid #1F2937',
   background: '#0F172A',
   color: '#E5E7EB',
   outline: 'none',
+  fontSize: 16,           // iOS zoom prevention
+  lineHeight: '22px',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
 };
+
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
