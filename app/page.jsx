@@ -1419,47 +1419,59 @@ if (user.role === 'recruiter') {
           ) : null}
         </div>
 
-        {/* Off the Market + On Assignment */}
-        <div
-          style={{
-            gridColumn: '1 / -1',
-            display: 'flex',
-            gap: 16,
-            alignItems: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!editForm.off_market}
-              onChange={(e) => changeEditField('off_market', e.target.checked)}
-            />
-            <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off The Market</span>
-          </label>
+       {/* Off the Market + On Assignment */}
+<div
+  style={{
+    gridColumn: '1 / -1',
+    display: 'flex',
+    gap: 16,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  }}
+>
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <input
+      type="checkbox"
+      checked={!!editForm.off_market}
+      onChange={(e) => changeEditField('off_market', e.target.checked)}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off The Market</span>
+  </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!editForm.on_assignment}
-              onChange={(e) => changeEditField('on_assignment', e.target.checked)}
-              disabled={!!editForm.off_market}
-              title={editForm.off_market ? 'Disabled while Off The Market' : ''}
-            />
-            <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
-          </label>
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <input
+      type="checkbox"
+      checked={!!editForm.on_assignment}
+      onChange={(e) => changeEditField('on_assignment', e.target.checked)}
+      disabled={!!editForm.off_market}
+      title={editForm.off_market ? 'Disabled while Off The Market' : ''}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
+  </label>
 
-          {editForm.on_assignment && !editForm.off_market ? (
-            <div>
-              <Label>Estimated date available</Label>
-              <Input
-                type="date"
-                value={editForm.est_available_date || ''}
-                onChange={(e) =>
-                  changeEditField('est_available_date', e.target.value)
-                }
-              />
-            </div>
+  {editForm.on_assignment && !editForm.off_market ? (
+    <div>
+      <Label>Estimated date available</Label>
+      <Input
+        type="date"
+        value={editForm.est_available_date || ''}
+        onChange={(e) =>
+          changeEditField('est_available_date', e.target.value)
+        }
+      />
+    </div>
+  ) : null}
+</div>
+
+{/* Notes */}
+<div style={{ gridColumn: '1 / -1' }}>
+  <Label>Notes</Label>
+  <TextArea
+    value={editForm.notes || ''}
+    onChange={(e) => changeEditField('notes', e.target.value)}
+  />
+</div>
+
           ) : null}
         </div>
 
