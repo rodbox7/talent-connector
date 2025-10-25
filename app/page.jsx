@@ -1401,6 +1401,11 @@ export default function Page() {
         </Card>
       );
     }
+    // normalize truthy contract field
+function isTrue(v) {
+  return v === true || v === 1 || v === '1' || v === 'true';
+}
+
 
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
