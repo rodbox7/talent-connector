@@ -2032,12 +2032,18 @@ export default function Page() {
                             {formatMDY(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
-                            <Button
-                              onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                              style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-                            >
-                              Additional information
-                            </Button>
+                           <Button
+  onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+  style={{
+    background: isMobile ? '#111827' : '#93C5FD',     // light blue on desktop
+    border: isMobile ? '1px solid #1F2937' : '1px solid #60A5FA',
+    color: isMobile ? 'white' : '#0B1220',            // better contrast on light blue
+    width: isMobile ? '100%' : undefined,
+  }}
+>
+  Additional information
+</Button>
+
                             <a
   href={buildMailto(c)}
   style={{
