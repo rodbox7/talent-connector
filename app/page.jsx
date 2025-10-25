@@ -810,124 +810,123 @@ export default function Page() {
     return { min, max };
   }
 
-  // ---------- FETCH CLIENT ROWS ----------
-  async function fetchClientRows() {
-    try {
-      setClientErr('');
-      setClientLoading(true);
-      setExpandedId(null);
+ // ---------- FETCH CLIENT ROWS ----------
+async function fetchClientRows() {
+  try {
+    setClientErr('');
+    setClientLoading(true);
+    setExpandedId(null);
 
-      // Pull a generous slice and filter client-side for simplicity.
-      const { data, error } = await supabase
-        .from('candidates')
-        .select(
-  'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
-)
+    // Pull a generous slice and filter client-side for simplicity.
+    const { data, error } = await supabase
+      .from('candidates')
+      .select(
+        'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+      )
+      .limit(2000);
+    if (error) throw error;
 
-        )
-        .limit(2000);
-      if (error) throw error;
+    const { min: salMin, max: salMax } = parseRange(salaryRange);
+    const { min: yrsMin, max: yrsMax } = parseRange(yearsRange);
+    const hrRecRange = billToRecruiterRange(hourlyBillRange);
 
-      const { min: salMin, max: salMax } = parseRange(salaryRange);
-      const { min: yrsMin, max: yrsMax } = parseRange(yearsRange);
-      const hrRecRange = billToRecruiterRange(hourlyBillRange);
+    const term = (search || '').trim().toLowerCase();
 
-      const term = (search || '').trim().toLowerCase();
+    const rows = (data || []).filter((r) => {
+      // Keyword search across a few fields
+      if (term) {
+        const blob = [
+          r.name,
+          r.titles_csv,
+          r.law_csv,
+          r.city,
+          r.state,
+          r.notes,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!blob.includes(term)) return false;
+      }
 
-      const rows = (data || []).filter((r) => {
-        // Keyword search across a few fields
-        if (term) {
-          const blob = [
-            r.name,
-            r.titles_csv,
-            r.law_csv,
-            r.city,
-            r.state,
-            r.notes,
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          if (!blob.includes(term)) return false;
+      if (fCity && String(r.city || '') !== fCity) return false;
+      if (fState && String(r.state || '') !== fState) return false;
+      if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
+      if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
+
+      // Salary range (ignore 0/blank)
+      if (salMin != null || salMax != null) {
+        const s = Number(r.salary);
+        const has = Number.isFinite(s) && s > 0;
+        if (!has) return false;
+        if (salMin != null && s < salMin) return false;
+        if (salMax != null && s > salMax) return false;
+      }
+
+      // Years of experience
+      if (yrsMin != null || yrsMax != null) {
+        const y = Number(r.years);
+        if (!Number.isFinite(y)) return false;
+        if (yrsMin != null && y < yrsMin) return false;
+        if (yrsMax != null && y > yrsMax) return false;
+      }
+
+      // Contract-only + hourly billable range (converted back to recruiter hourly)
+      if (contractOnly && !r.contract) return false;
+      if (contractOnly && hourlyBillRange) {
+        const h = Number(r.hourly);
+        if (!(Number.isFinite(h) && h > 0)) return false;
+        if (hrRecRange.min != null && h < hrRecRange.min) return false;
+        if (hrRecRange.max != null && h > hrRecRange.max) return false;
+      }
+
+      return true;
+    });
+
+    // Sorting
+    const sorted = rows.sort((a, b) => {
+      switch (sortBy) {
+        case 'date_asc':
+          return (ymd(a.date_entered || a.created_at) || '').localeCompare(
+            ymd(b.date_entered || b.created_at) || ''
+          );
+        case 'salary_desc':
+        case 'salary_asc': {
+          const sa = Number(a.salary) || -Infinity;
+          const sb = Number(b.salary) || -Infinity;
+          return sortBy === 'salary_desc' ? sb - sa : sa - sb;
         }
-
-        if (fCity && String(r.city || '') !== fCity) return false;
-        if (fState && String(r.state || '') !== fState) return false;
-        if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
-        if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
-
-        // Salary range (ignore 0/blank)
-        if (salMin != null || salMax != null) {
-          const s = Number(r.salary);
-          const has = Number.isFinite(s) && s > 0;
-          if (!has) return false;
-          if (salMin != null && s < salMin) return false;
-          if (salMax != null && s > salMax) return false;
+        case 'hourly_desc':
+        case 'hourly_asc': {
+          const ha = a.contract && Number.isFinite(Number(a.hourly)) ? Math.round(Number(a.hourly) * 1.66) : -Infinity;
+          const hb = b.contract && Number.isFinite(Number(b.hourly)) ? Math.round(Number(b.hourly) * 1.66) : -Infinity;
+          return sortBy === 'hourly_desc' ? hb - ha : ha - hb;
         }
-
-        // Years of experience
-        if (yrsMin != null || yrsMax != null) {
-          const y = Number(r.years);
-          if (!Number.isFinite(y)) return false;
-          if (yrsMin != null && y < yrsMin) return false;
-          if (yrsMax != null && y > yrsMax) return false;
+        case 'years_desc':
+        case 'years_asc': {
+          const ya = Number(a.years);
+          const yb = Number(b.years);
+          const A = Number.isFinite(ya) ? ya : -Infinity;
+          const B = Number.isFinite(yb) ? yb : -Infinity;
+          return sortBy === 'years_desc' ? B - A : A - B;
         }
+        case 'date_desc':
+        default:
+          return (ymd(b.date_entered || b.created_at) || '').localeCompare(
+            ymd(a.date_entered || a.created_at) || ''
+          );
+      }
+    });
 
-        // Contract-only + hourly billable range (converted back to recruiter hourly)
-        if (contractOnly && !r.contract) return false;
-        if (contractOnly && hourlyBillRange) {
-          const h = Number(r.hourly);
-          if (!(Number.isFinite(h) && h > 0)) return false;
-          if (hrRecRange.min != null && h < hrRecRange.min) return false;
-          if (hrRecRange.max != null && h > hrRecRange.max) return false;
-        }
-
-        return true;
-      });
-
-      // Sorting
-      const sorted = rows.sort((a, b) => {
-        switch (sortBy) {
-          case 'date_asc':
-            return (ymd(a.date_entered || a.created_at) || '').localeCompare(
-              ymd(b.date_entered || b.created_at) || ''
-            );
-          case 'salary_desc':
-          case 'salary_asc': {
-            const sa = Number(a.salary) || -Infinity;
-            const sb = Number(b.salary) || -Infinity;
-            return sortBy === 'salary_desc' ? sb - sa : sa - sb;
-          }
-          case 'hourly_desc':
-          case 'hourly_asc': {
-            const ha = a.contract && Number.isFinite(Number(a.hourly)) ? Math.round(Number(a.hourly) * 1.66) : -Infinity;
-            const hb = b.contract && Number.isFinite(Number(b.hourly)) ? Math.round(Number(b.hourly) * 1.66) : -Infinity;
-            return sortBy === 'hourly_desc' ? hb - ha : ha - hb;
-          }
-          case 'years_desc':
-          case 'years_asc': {
-            const ya = Number(a.years);
-            const yb = Number(b.years);
-            const A = Number.isFinite(ya) ? ya : -Infinity;
-            const B = Number.isFinite(yb) ? yb : -Infinity;
-            return sortBy === 'years_desc' ? B - A : A - B;
-          }
-          case 'date_desc':
-          default:
-            return (ymd(b.date_entered || b.created_at) || '').localeCompare(
-              ymd(a.date_entered || a.created_at) || ''
-            );
-        }
-      });
-
-      setClientRows(sorted);
-    } catch (e) {
-      console.error(e);
-      setClientErr('Failed to load candidates.');
-    } finally {
-      setClientLoading(false);
-    }
+    setClientRows(sorted);
+  } catch (e) {
+    console.error(e);
+    setClientErr('Failed to load candidates.');
+  } finally {
+    setClientLoading(false);
   }
+}
+
 
   // ---------- CLEAR FILTERS (instant reload) ----------
   function clearClientFilters() {
