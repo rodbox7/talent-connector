@@ -524,22 +524,24 @@ export default function Page() {
 
   function startEdit(row) {
     setEditingId(row.id);
-    setEditForm({
-      name: row.name || '',
-      titles_csv: row.titles_csv || '',
-      law_csv: row.law_csv || '',
-      city: row.city || '',
-      state: row.state || '',
-      years: row.years ?? '',
-      recent_role_years: row.recent_role_years ?? '',
-      salary: row.salary ?? '',
-      contract: !!row.contract,
-      hourly: row.hourly ?? '',
-      date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
-      notes: row.notes || '',
-      on_assignment: !!row.on_assignment,
-      est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
-    });
+  setEditForm({
+  name: row.name || '',
+  titles_csv: row.titles_csv || '',
+  law_csv: row.law_csv || '',
+  city: row.city || '',
+  state: row.state || '',
+  years: row.years ?? '',
+  recent_role_years: row.recent_role_years ?? '',
+  salary: row.salary ?? '',
+  contract: !!row.contract,
+  hourly: row.hourly ?? '',
+  date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
+  notes: row.notes || '',
+  on_assignment: !!row.on_assignment,
+  est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
+  off_market: !!row.off_market,
+});
+
   }
   function cancelEdit() {
     setEditingId(null);
@@ -557,27 +559,29 @@ export default function Page() {
         alert('Please select a state for this city.');
         return;
       }
-      const payload = {
-        name: String(editForm.name || '').trim(),
-        titles_csv: String(editForm.titles_csv || '').trim(),
-        law_csv: String(editForm.law_csv || '').trim(),
-        city: toTitleCaseCity(String(editForm.city || '').trim()),
-        state: normState(String(editForm.state || '').trim()),
-        years: editForm.years === '' ? null : Number(editForm.years),
-        recent_role_years:
-          editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
-        salary: editForm.salary === '' ? null : Number(editForm.salary),
-        contract: !!editForm.contract,
-        hourly: !editForm.contract
-          ? null
-          : editForm.hourly === ''
-          ? null
-          : Number(editForm.hourly),
-        date_entered: editForm.date_entered || null,
-        notes: String(editForm.notes || '').trim() || null,
-        on_assignment: !!editForm.on_assignment,
-        est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
-      };
+ const payload = {
+  name: String(editForm.name || '').trim(),
+  titles_csv: String(editForm.titles_csv || '').trim(),
+  law_csv: String(editForm.law_csv || '').trim(),
+  city: toTitleCaseCity(String(editForm.city || '').trim()),
+  state: normState(String(editForm.state || '').trim()),
+  years: editForm.years === '' ? null : Number(editForm.years),
+  recent_role_years:
+    editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
+  salary: editForm.salary === '' ? null : Number(editForm.salary),
+  contract: !!editForm.contract,
+  hourly: !editForm.contract
+    ? null
+    : editForm.hourly === ''
+    ? null
+    : Number(editForm.hourly),
+  date_entered: editForm.date_entered || null,
+  notes: String(editForm.notes || '').trim() || null,
+  on_assignment: !!editForm.on_assignment,
+  est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
+  off_market: !!editForm.off_market,
+};
+
       const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
       if (error) throw error;
       await refreshMyRecent();
@@ -607,8 +611,9 @@ export default function Page() {
     const { data, error } = await supabase
       .from('candidates')
       .select(
-        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date'
-      )
+  'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+)
+
       .eq('created_by', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -816,7 +821,9 @@ export default function Page() {
       const { data, error } = await supabase
         .from('candidates')
         .select(
-          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date'
+  'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+)
+
         )
         .limit(2000);
       if (error) throw error;
@@ -1368,27 +1375,36 @@ export default function Page() {
                             ) : null}
                           </div>
 
-                          {/* On Assignment controls */}
-                          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, alignItems: 'center' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <input
-                                type="checkbox"
-                                checked={!!editForm.on_assignment}
-                                onChange={(e) => changeEditField('on_assignment', e.target.checked)}
-                              />
-                              <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
-                            </label>
-                            {editForm.on_assignment ? (
-                              <div>
-                                <Label>Estimated date available</Label>
-                                <Input
-                                  type="date"
-                                  value={editForm.est_available_date || ''}
-                                  onChange={(e) => changeEditField('est_available_date', e.target.value)}
-                                />
-                              </div>
-                            ) : null}
-                          </div>
+                         {/* Status controls */}
+<div style={{ gridColumn: '1 / -1', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <input
+      type="checkbox"
+      checked={!!editForm.on_assignment}
+      onChange={(e) => changeEditField('on_assignment', e.target.checked)}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 13 }}>On Assignment</span>
+  </label>
+  {editForm.on_assignment ? (
+    <div>
+      <Label>Estimated date available</Label>
+      <Input
+        type="date"
+        value={editForm.est_available_date || ''}
+        onChange={(e) => changeEditField('est_available_date', e.target.value)}
+      />
+    </div>
+  ) : null}
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <input
+      type="checkbox"
+      checked={!!editForm.off_market}
+      onChange={(e) => changeEditField('off_market', e.target.checked)}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off The Market</span>
+  </label>
+</div>
 
                           <div style={{ gridColumn: '1 / -1' }}>
                             <Label>Notes</Label>
@@ -2069,23 +2085,42 @@ export default function Page() {
                         key={c.id}
                         style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
                       >
-                        {/* Red banner if on assignment */}
-                        {c.on_assignment ? (
-                          <div
-                            style={{
-                              marginBottom: 8,
-                              padding: '8px 10px',
-                              borderRadius: 8,
-                              background: '#7F1D1D',
-                              border: '1px solid #B91C1C',
-                              color: 'white',
-                              fontWeight: 700,
-                              fontSize: 13,
-                            }}
-                          >
-                            Currently on assignment — est. available {formatMDY(c.est_available_date) || 'TBD'}
-                          </div>
-                        ) : null}
+{/* Red banner for Off The Market */}
+{c.off_market ? (
+  <div
+    style={{
+      marginBottom: 8,
+      padding: '8px 10px',
+      borderRadius: 8,
+      background: '#7F1D1D',
+      border: '1px solid #B91C1C',
+      color: 'white',
+      fontWeight: 700,
+      fontSize: 13,
+    }}
+  >
+    Off The Market
+  </div>
+) : null}
+
+/* Red banner if on assignment (only when not off-market) */
+{!c.off_market && c.on_assignment ? (
+  <div
+    style={{
+      marginBottom: 8,
+      padding: '8px 10px',
+      borderRadius: 8,
+      background: '#7F1D1D',
+      border: '1px solid #B91C1C',
+      color: 'white',
+      fontWeight: 700,
+      fontSize: 13,
+    }}
+  >
+    Currently on assignment — est. available {formatMDY(c.est_available_date) || 'TBD'}
+  </div>
+) : null}
+
 
                         <div
                           style={{
