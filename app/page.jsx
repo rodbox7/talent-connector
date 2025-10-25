@@ -1029,13 +1029,11 @@ export default function Page() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-<input
-  type="checkbox"
-  checked={iContractOnly}
-  onChange={(e) => setIContractOnly(e.target.checked)}
-/>
-
-
+                        <input
+                          type="checkbox"
+                          checked={contract}
+                          onChange={(e) => setContract(e.target.checked)}
+                        />
                         <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
                       </label>
                       {contract ? (
@@ -1403,11 +1401,6 @@ export default function Page() {
         </Card>
       );
     }
-    // normalize truthy contract field
-function isTrue(v) {
-  return v === true || v === 1 || v === '1' || v === 'true';
-}
-
 
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
@@ -1435,128 +1428,91 @@ function isTrue(v) {
       return rows;
     }
 
-    // helper must exist above this: 
-// function isTrue(v) { return v === true || v === 1 || v === '1' || v === 'true'; }
+    async function loadInsights() {
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
+          .limit(5000);
+        if (error) throw error;
 
-async function loadInsights() {
-  try {
-    const { data, error } = await supabase
-      .from('candidates')
-      .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
-      .limit(5000);
-    if (error) throw error;
+        const pass = (r) => {
+          if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
+          if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
+          if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
+          if (iState && String(r.state || '').trim() !== iState.trim()) return false;
+          if (iContractOnly && !r.contract) return false;
 
-    const yrs = (r) => Number(r.years);
+          const recency = ymd(r.date_entered) || ymd(r.created_at);
+          if (iStartDate && (!recency || recency < iStartDate)) return false;
+          if (iEndDate   && (!recency || recency > iEndDate))   return false;
 
-    const pass = (r) => {
-      if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
-      if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
-      if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
-      if (iState && String(r.state || '').trim() !== iState.trim()) return false;
+          if (iYearsRange) {
+            const [minStr, maxStr] = iYearsRange.split('-');
+            const min = minStr ? Number(minStr) : null;
+            const max = maxStr ? Number(maxStr) : null;
+            const y = Number(r.years);
+            if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
+            if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
+          }
+          return true;
+        };
 
-      // normalize contract when filtering
-      if (iContractOnly && !isTrue(r.contract)) return false;
-
-      // Date range on "market recency": prefer date_entered; fallback created_at
-      const recency = ymd(r.date_entered) || ymd(r.created_at);
-      if (iStartDate && (!recency || recency < iStartDate)) return false;
-      if (iEndDate   && (!recency || recency > iEndDate))   return false;
-
-      if (iYearsRange) {
-        const [minStr, maxStr] = iYearsRange.split('-');
-        const min = minStr ? Number(minStr) : null;
-        const max = maxStr ? Number(maxStr) : null;
-        const y = yrs(r);
-        if (Number.isFinite(min) && !(Number.isFinite(y) && y >= min)) return false;
-        if (Number.isFinite(max) && !(Number.isFinite(y) && y <= max)) return false;
-      }
-      return true;
-    };
-
-    // Add client-facing billable hourly (1.66x)
-    const rows = (data || []).filter(pass).map((r) => {
-      const h = Number(r.hourly);
-      const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
-      return { ...r, hourly_billable: billable };
-    });
-
-    // KPIs (ignore zeros/missing)
-    const salVals = rows
-      .map(r => Number(r.salary))
-      .filter(v => Number.isFinite(v) && v > 0);
-    const salStats = statsFrom(salVals);
-
-    const hourlyVals = rows
-      .filter(r => isTrue(r.contract)) // normalize here too
-      .map(r => Number(r.hourly_billable))
-      .filter(v => Number.isFinite(v) && v > 0);
-    const hourlyStats = statsFrom(hourlyVals);
-
-    // Aggregations (within filtered rows)
-    const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
-      ...r,
-      title_one: r[_csvKey('titles_csv')],
-    }));
-
-    const withCityState = rows.map((r) => ({
-      ...r,
-      city_full: [r.city, r.state].filter(Boolean).join(', '),
-    }));
-
-    const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
-    const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
-    const byCitySalary  = groupAvg(withCityState, 'city_full', 'salary');
-    const byCityHourly  = groupAvg(withCityState, 'city_full', 'hourly_billable');
-
-    // Salary by years buckets
-    const buckets = [
-      { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
-      { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
-      { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
-      { label: '11-20 yrs',check: (y) => y >= 11 && y <= 20 },
-      { label: '21+ yrs',  check: (y) => y >= 21 },
-    ];
-    const yearsAgg = [];
-    for (const b of buckets) {
-      const vals = rows
-        .map((r) => Number(r.salary))
-        .filter((v, i) => {
-          const y = yrs(rows[i]);
-          return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+        const rows = (data || []).filter(pass).map((r) => {
+          const h = Number(r.hourly);
+          const billable = Number.isFinite(h) && h > 0 ? Math.round(h * 1.66) : null;
+          return { ...r, hourly_billable: billable };
         });
-      if (vals.length) {
-        yearsAgg.push({
-          label: b.label,
-          avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
-          n: vals.length,
-        });
-      }
-    }
 
-    setInsights({
-      kpi: { salary: salStats, hourly: hourlyStats },
-      byTitleSalary,
-      byTitleHourly,     // billable
-      byCitySalary,
-      byCityHourly,      // billable
-      byYearsSalary: yearsAgg,
-      sampleN: rows.length,
-    });
+        const salVals = rows
+          .map(r => Number(r.salary))
+          .filter(v => Number.isFinite(v) && v > 0);
+        const salStats = statsFrom(salVals);
 
-    // (keep or remove) setShowInsights(true); // only if you want auto-open
-  } catch (e) {
-    console.error(e);
-    alert('Failed to load insights.');
-  }
-}
+        const hourlyVals = rows
+          .filter(r => r.contract)
+          .map(r => Number(r.hourly_billable))
+          .filter(v => Number.isFinite(v) && v > 0);
+        const hourlyStats = statsFrom(hourlyVals);
 
-        // Auto-apply when "Contract only" changes while Insights is open
-React.useEffect(() => {
-  if (showInsights) {
-    loadInsights();
-  }
-}, [iContractOnly, showInsights]);
+        const titleRows = explodeCSVToRows(rows, 'titles_csv').map((r) => ({
+          ...r,
+          title_one: r[_csvKey('titles_csv')],
+        }));
 
+        const withCityState = rows.map((r) => ({
+          ...r,
+          city_full: [r.city, r.state].filter(Boolean).join(', '),
+        }));
+
+        const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
+        const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
+        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
+        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
+
+        const buckets = [
+          { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
+          { label: '3-5 yrs',  check: (y) => y >= 3 && y <= 5 },
+          { label: '6-10 yrs', check: (y) => y >= 6 && y <= 10 },
+          { label: '11-20 yrs',check: (y) => y >= 11 && y <= 20 },
+          { label: '21+ yrs',  check: (y) => y >= 21 },
+        ];
+        const yearsAgg = [];
+        for (const b of buckets) {
+          const vals = rows
+            .map((r) => Number(r.salary))
+            .filter((v, i) => {
+              const y = Number(rows[i].years);
+              return Number.isFinite(v) && v > 0 && Number.isFinite(y) && b.check(y);
+            });
+          if (vals.length) {
+            yearsAgg.push({
+              label: b.label,
+              avg: Math.round(vals.reduce((a, c) => a + c, 0) / vals.length),
+              n: vals.length,
+            });
+          }
+        }
 
         setInsights({
           kpi: { salary: salStats, hourly: hourlyStats },
@@ -1976,29 +1932,25 @@ React.useEffect(() => {
                   <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
                     If you aren’t finding what you’re looking for, we can help.
                   </div>
-                 <a
-  href="https://bhsg.com/partner-with-us"
-  target="_blank"
-  rel="noopener noreferrer"
-  style={{
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '10px 14px',              // match Button
-    borderRadius: 10,                  // match Button
-    border: '1px solid #243041',
-    background: '#2563EB',
-    color: 'white',
-    fontWeight: 600,
-    fontSize: 14,                      // prevent taller line height on mobile
-    lineHeight: '22px',                // match Button/Input
-    textDecoration: 'none',
-    // remove width: '100%' on mobile so it doesn't look huge
-  }}
->
-  Request our help with your search
-</a>
-
+                  <a
+                    href="https://bhsg.com/partner-with-us"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block',
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: '1px solid #243041',
+                      background: '#2563EB',
+                      color: 'white',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      width: isMobile ? '100%' : 'fit-content',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Request our help with your search
+                  </a>
                 </div>
               </Card>
 
@@ -2076,40 +2028,29 @@ React.useEffect(() => {
                             {formatMDY(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
-                           <Button
-  onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-  style={{
-    background: isMobile ? '#111827' : '#93C5FD',     // light blue on desktop
-    border: isMobile ? '1px solid #1F2937' : '1px solid #60A5FA',
-    color: isMobile ? 'white' : '#0B1220',            // better contrast on light blue
-    width: isMobile ? '100%' : undefined,
-  }}
->
-  Additional information
-</Button>
-
+                            <Button
+                              onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
+                              style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+                            >
+                              Additional information
+                            </Button>
                             <a
-  href={buildMailto(c)}
-  style={{
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '10px 14px',      // match Button
-    borderRadius: 10,          // match Button
-    border: '1px solid #243041',
-    background: '#2563EB',
-    color: 'white',
-    fontWeight: 600,
-    fontSize: 14,
-    lineHeight: '22px',        // match Button/Input height
-    textDecoration: 'none',
-    // NOTE: removed width: isMobile ? '100%' : undefined
-    textAlign: 'center',
-  }}
->
-  Email for more information
-</a>
-
+                              href={buildMailto(c)}
+                              style={{
+                                display: 'inline-block',
+                                padding: '10px 14px',
+                                borderRadius: 10,
+                                border: '1px solid #243041',
+                                background: '#2563EB',
+                                color: 'white',
+                                fontWeight: 600,
+                                textDecoration: 'none',
+                                width: isMobile ? '100%' : undefined,
+                                textAlign: 'center',
+                              }}
+                            >
+                              Email for more information
+                            </a>
                           </div>
                         </div>
                         {expandedId === c.id && (
