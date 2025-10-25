@@ -1333,11 +1333,11 @@ if (user.role === 'recruiter') {
                 </div>
               )}
             </Card>
-          </div> {/* width wrapper */}
-        </div> {/* overlay */}
-      </div> {/* pageWrap */}
-    );        {/* return from recruiter UI */}
-  }           {/* end recruiter branch */}
+                   </div>
+        </div>
+      </div>
+    );
+  } // end recruiter branch
 
 /* ---------- Client UI ---------- */
 
