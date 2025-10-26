@@ -1746,40 +1746,55 @@ export default function Page() {
     }}
   >
     {/* New today */}
-    <Tag
-      style={{
-        padding: isMobile ? '8px 12px' : '6px 12px',
-        fontSize: isMobile ? 13 : 16,
-      }}
-    >
-      New today: <strong>{cCountToday}</strong>
-    </Tag>
+   {/* New today — same visual height as other buttons */}
+<Tag
+  style={{
+    padding: isMobile ? '6px 10px' : '6px 12px',
+    fontSize: isMobile ? 12.5 : 16,
+    lineHeight: isMobile ? '20px' : '22px',
+    height: isMobile ? 36 : 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }}
+>
+  New today: <strong>{cCountToday}</strong>
+</Tag>
 
-    {/* Compensation Insights */}
-    <Button
-      onClick={loadInsights}
-      style={{
-        background: '#0EA5E9',
-        border: '1px solid #1F2937',
-        width: isMobile ? '100%' : undefined,
-        ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
-      }}
-    >
-      Compensation Insights
-    </Button>
+{/* Compensation Insights — compact */}
+<Button
+  onClick={loadInsights}
+  style={{
+    background: '#0EA5E9',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : undefined,
+    padding: isMobile ? '6px 10px' : '10px 14px',
+    fontSize: isMobile ? 13 : 14,
+    lineHeight: isMobile ? '20px' : '22px',
+    height: isMobile ? 36 : 'auto',
+    boxSizing: 'border-box',
+  }}
+>
+  Compensation Insights
+</Button>
 
-    {/* Log out */}
-    <Button
-      onClick={logout}
-      style={{
-        background: '#0B1220',
-        border: '1px solid #1F2937',
-        width: isMobile ? '100%' : undefined,
-        ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
-      }}
-    >
-      Log out
-    </Button>
+{/* Log out — compact */}
+<Button
+  onClick={logout}
+  style={{
+    background: '#0B1220',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : undefined,
+    padding: isMobile ? '6px 10px' : '10px 14px',
+    fontSize: isMobile ? 13 : 14,
+    lineHeight: isMobile ? '20px' : '22px',
+    height: isMobile ? 36 : 'auto',
+    boxSizing: 'border-box',
+  }}
+>
+  Log out
+</Button>
+
   </div>
 </div>
 
