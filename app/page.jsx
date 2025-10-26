@@ -1718,7 +1718,7 @@ export default function Page() {
         <div style={overlay}>
           {!showInsights ? (
             <div style={{ width: 'min(1150px, 100%)' }}>
-             <div
+            <div
   style={{
     display: 'flex',
     alignItems: isMobile ? 'stretch' : 'center',
@@ -1735,7 +1735,7 @@ export default function Page() {
     <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
   </div>
 
-  {/* Right actions — COMPACT on mobile */}
+  {/* Right actions */}
   <div
     style={{
       display: 'flex',
@@ -1745,11 +1745,11 @@ export default function Page() {
       width: isMobile ? '100%' : 'auto',
     }}
   >
-    {/* New today (Tag) */}
+    {/* New today */}
     <Tag
       style={{
-        padding: isMobile ? '4px 10px' : '6px 12px',
-        fontSize: isMobile ? 12 : 16,
+        padding: isMobile ? '8px 12px' : '6px 12px',
+        fontSize: isMobile ? 13 : 16,
       }}
     >
       New today: <strong>{cCountToday}</strong>
@@ -1783,10 +1783,6 @@ export default function Page() {
   </div>
 </div>
 
-
-
-                </div>
-              </div>
 
               <Card style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
