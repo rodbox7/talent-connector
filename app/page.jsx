@@ -1734,18 +1734,43 @@ export default function Page() {
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
-                  <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
-                    New today: <strong>{cCountToday}</strong>
-                  </Tag>
-                  <Button
-                    onClick={loadInsights}
-                    style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-                  >
-                    Compensation Insights
-                  </Button>
-                  <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
-                    Log out
-                  </Button>
+                 <Tag
+  style={{
+    padding: isMobile ? '10px 14px' : '6px 12px',
+    fontSize: isMobile ? 14 : 16,
+  }}
+>
+  New today: <strong>{cCountToday}</strong>
+</Tag>
+
+                 <Button
+  onClick={loadInsights}
+  style={{
+    background: '#0EA5E9',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : undefined,
+    padding: '10px 14px',
+    fontSize: isMobile ? 14 : undefined,
+    lineHeight: isMobile ? '20px' : undefined,
+  }}
+>
+  Compensation Insights
+</Button>
+
+                 <Button
+  onClick={logout}
+  style={{
+    background: '#0B1220',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : undefined,
+    padding: '10px 14px',
+    fontSize: isMobile ? 14 : undefined,
+    lineHeight: isMobile ? '20px' : undefined,
+  }}
+>
+  Log out
+</Button>
+
                 </div>
               </div>
 
@@ -1754,12 +1779,16 @@ export default function Page() {
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
                   <div style={{ minWidth: 0 }}>
                     <Label>Keyword</Label>
-                    <Input
-                      placeholder="description, law, title, city/state, notes"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      style={{ width: '100%' }}
-                    />
+                   <Input
+  placeholder="description, law, title, metro, notes"
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+  style={{
+    width: '100%',
+    ...(isMobile ? { padding: '10px 14px', fontSize: 14, lineHeight: '20px' } : {}),
+  }}
+/>
+
                   </div>
 
                  <div style={{ minWidth: 0 }}>
