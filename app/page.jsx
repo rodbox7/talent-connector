@@ -562,8 +562,8 @@ export default function Page() {
   const [titleOptions, setTitleOptions] = React.useState([]);
   const [lawOptions, setLawOptions] = React.useState([]);
 
-  const [fCity, setFCity] = React.useState('');
-  const [fState, setFState] = React.useState('');
+  const [fMetro, setFMetro] = React.useState('');
+
   const [fTitle, setFTitle] = React.useState('');
   const [fLaw, setFLaw] = React.useState('');
 
@@ -694,8 +694,11 @@ export default function Page() {
 
         if (!showOffMarket && r.off_market) return false;
 
-        if (fCity && String(r.city || '') !== fCity) return false;
-        if (fState && String(r.state || '') !== fState) return false;
+       if (fMetro) {
+  const metro = [r.city, r.state].filter(Boolean).join(', ');
+  if (metro !== fMetro) return false;
+}
+
 
         if (salMin != null || salMax != null) {
           const s = Number(r.salary);
@@ -766,19 +769,19 @@ export default function Page() {
     }
   }
 
-  function clearClientFilters() {
-    setSearch('');
-    setFCity('');
-    setFState('');
-    setFTitle('');
-    setFLaw('');
-    setSalaryRange('');
-    setYearsRange('');
-    setContractOnly(false);
-    setHourlyBillRange('');
-    setSortBy('date_desc');
-    fetchClientRows();
-  }
+ function clearClientFilters() {
+  setSearch('');
+  setFMetro('');
+  setFTitle('');
+  setFLaw('');
+  setSalaryRange('');
+  setYearsRange('');
+  setContractOnly(false);
+  setHourlyBillRange('');
+  setSortBy('date_desc');
+  fetchClientRows();
+}
+
 
   React.useEffect(() => {
     if (user?.role === 'client') fetchClientRows();
@@ -1759,29 +1762,15 @@ export default function Page() {
                     />
                   </div>
 
-                  <div style={{ minWidth: 0 }}>
-                    <Label>City</Label>
-                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {cities.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ minWidth: 0 }}>
-                    <Label>State</Label>
-                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                      {STATES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                 <div style={{ minWidth: 0 }}>
+  <Label>Metro Area</Label>
+  <select value={fMetro} onChange={(e) => setFMetro(e.target.value)} style={selectStyle}>
+    <option value="">Any</option>
+    {MAJOR_METROS.map((m) => (
+      <option key={m} value={m}>{m}</option>
+    ))}
+  </select>
+</div>
 
                   <div>
                     <Label>Title</Label>
