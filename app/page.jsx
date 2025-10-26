@@ -1932,25 +1932,22 @@ export default function Page() {
                   <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
                     If you aren’t finding what you’re looking for, we can help.
                   </div>
-                  <a
-                    href="https://bhsg.com/partner-with-us"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block',
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      border: '1px solid #243041',
-                      background: '#2563EB',
-                      color: 'white',
-                      fontWeight: 600,
-                      textDecoration: 'none',
-                      width: isMobile ? '100%' : 'fit-content',
-                      textAlign: 'center',
-                    }}
-                  >
-                    Request our help with your search
-                  </a>
+                 <a
+  href="https://bhsg.com/partner-with-us"
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    ...buttonBaseStyle,
+    background: '#2563EB',
+    color: 'white',
+    width: isMobile ? '100%' : 'fit-content',
+    textAlign: 'center',
+    border: '1px solid #1F2937', // match other buttons
+  }}
+>
+  Request our help with your search
+</a>
+
                 </div>
               </Card>
 
@@ -2035,22 +2032,19 @@ export default function Page() {
                               Additional information
                             </Button>
                             <a
-                              href={buildMailto(c)}
-                              style={{
-                                display: 'inline-block',
-                                padding: '10px 14px',
-                                borderRadius: 10,
-                                border: '1px solid #243041',
-                                background: '#2563EB',
-                                color: 'white',
-                                fontWeight: 600,
-                                textDecoration: 'none',
-                                width: isMobile ? '100%' : undefined,
-                                textAlign: 'center',
-                              }}
-                            >
-                              Email for more information
-                            </a>
+  href={buildMailto(c)}
+  style={{
+    ...buttonBaseStyle,
+    background: '#2563EB',
+    color: 'white',
+    width: isMobile ? '100%' : undefined,
+    textAlign: 'center',
+    border: '1px solid #1F2937', // match other buttons
+  }}
+>
+  Email for more information
+</a>
+
                           </div>
                         </div>
                         {expandedId === c.id && (
@@ -2516,3 +2510,15 @@ const selectStyle = {
 
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
+
+// Consistent button base style (matches <Button/> sizing)
+const buttonBaseStyle = {
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid #1F2937',
+  fontWeight: 600,
+  cursor: 'pointer',
+  display: 'inline-block',
+  textDecoration: 'none',
+};
+
