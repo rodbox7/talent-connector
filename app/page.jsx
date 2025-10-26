@@ -1733,43 +1733,53 @@ export default function Page() {
                   Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
-                 <Tag
+ <div
   style={{
-    padding: isMobile ? '10px 14px' : '6px 12px',
-    fontSize: isMobile ? 14 : 16,
+    display: 'flex',
+    alignItems: isMobile ? 'stretch' : 'center',
+    gap: 12,
+    flexDirection: isMobile ? 'column' : 'row',
+    width: isMobile ? '100%' : 'auto',
   }}
 >
-  New today: <strong>{cCountToday}</strong>
-</Tag>
+  {/* New today — compact on mobile */}
+  <Tag
+    style={{
+      padding: isMobile ? '4px 10px' : '6px 12px',
+      fontSize: isMobile ? 12 : 16,
+    }}
+  >
+    New today: <strong>{cCountToday}</strong>
+  </Tag>
 
-                 <Button
-  onClick={loadInsights}
-  style={{
-    background: '#0EA5E9',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : undefined,
-    padding: '10px 14px',
-    fontSize: isMobile ? 14 : undefined,
-    lineHeight: isMobile ? '20px' : undefined,
-  }}
->
-  Compensation Insights
-</Button>
+  {/* Compensation Insights — compact on mobile */}
+  <Button
+    onClick={loadInsights}
+    style={{
+      background: '#0EA5E9',
+      border: '1px solid #1F2937',
+      width: isMobile ? '100%' : undefined,
+      // shrink on mobile to match "Additional information" / "Email…" buttons
+      ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
+    }}
+  >
+    Compensation Insights
+  </Button>
 
-                 <Button
-  onClick={logout}
-  style={{
-    background: '#0B1220',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : undefined,
-    padding: '10px 14px',
-    fontSize: isMobile ? 14 : undefined,
-    lineHeight: isMobile ? '20px' : undefined,
-  }}
->
-  Log out
-</Button>
+  {/* Log out — compact on mobile */}
+  <Button
+    onClick={logout}
+    style={{
+      background: '#0B1220',
+      border: '1px solid #1F2937',
+      width: isMobile ? '100%' : undefined,
+      ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
+    }}
+  >
+    Log out
+  </Button>
+</div>
+
 
                 </div>
               </div>
@@ -1779,15 +1789,16 @@ export default function Page() {
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
                   <div style={{ minWidth: 0 }}>
                     <Label>Keyword</Label>
-                   <Input
+   <Input
   placeholder="description, law, title, metro, notes"
   value={search}
   onChange={(e) => setSearch(e.target.value)}
   style={{
     width: '100%',
-    ...(isMobile ? { padding: '10px 14px', fontSize: 14, lineHeight: '20px' } : {}),
+    ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
   }}
 />
+
 
                   </div>
 
