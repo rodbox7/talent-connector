@@ -101,12 +101,13 @@ const Button = ({ children, ...rest }) => (
     style={{
       padding: '10px 14px',
       borderRadius: 10,
-      border: '1px solid #1F2937',      // normalized to match links
+      border: '1px solid #243041',
       background: '#3B82F6',
       color: 'white',
       fontWeight: 600,
-      fontSize: 14,                      // NEW: normalize size
-      lineHeight: '22px',                // NEW: comfy tap target
+      fontSize: 14,
+      lineHeight: '22px',
+      boxSizing: 'border-box',
       cursor: 'pointer',
       ...(rest.style || {}),
     }}
@@ -114,7 +115,6 @@ const Button = ({ children, ...rest }) => (
     {children}
   </button>
 );
-
 
 const Tag = ({ children, style }) => (
   <span
@@ -2518,21 +2518,22 @@ const selectStyle = {
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 
-// Consistent button base style (matches <Button/> sizing)
+// Consistent button base style (now exactly matches <Button/> dimensions)
 const buttonBaseStyle = {
-  padding: '8px 12px',           // tighter
+  display: 'inline-block',
+  padding: '10px 14px',
   borderRadius: 10,
   border: '1px solid #1F2937',
+  background: '#3B82F6',
+  color: 'white',
   fontWeight: 600,
   fontSize: 14,
-  lineHeight: '20px',            // tighter height
-  cursor: 'pointer',
-  display: 'inline-flex',        // center content nicely
-  alignItems: 'center',
-  justifyContent: 'center',
+  lineHeight: '22px',
+  textAlign: 'center',
   textDecoration: 'none',
-  whiteSpace: 'normal',          // allow wrapping
-  wordBreak: 'break-word',
+  boxSizing: 'border-box',
+  cursor: 'pointer',
+  verticalAlign: 'middle',
 };
 
 
