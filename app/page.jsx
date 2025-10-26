@@ -1741,44 +1741,51 @@ export default function Page() {
                 </div>
 
                 {/* HEADER CONTROLS – compact on mobile */}
-                <div
-                 <Tag
+<div
   style={{
-    ...compactCtrl,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Tag already has its dark pill styles from Tag component
+    display: 'flex',
+    alignItems: isMobile ? 'stretch' : 'center',
+    gap: 12,
+    flexDirection: isMobile ? 'column' : 'row',
+    width: isMobile ? '100%' : 'auto',
   }}
 >
-  New today: <strong>{cCountToday}</strong>
-</Tag>
+  <Tag
+    style={{
+      ...compactCtrl,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}
+  >
+    New today: <strong>{cCountToday}</strong>
+  </Tag>
 
-<Button
-  onClick={loadInsights}
-  style={{
-    ...compactCtrl,
-    background: '#0EA5E9',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : undefined,
-  }}
->
-  Compensation Insights
-</Button>
+  <Button
+    onClick={loadInsights}
+    style={{
+      ...compactCtrl,
+      background: '#0EA5E9',
+      border: '1px solid #1F2937',
+      width: isMobile ? '100%' : undefined,
+    }}
+  >
+    Compensation Insights
+  </Button>
 
-<Button
-  onClick={logout}
-  style={{
-    ...compactCtrl,
-    background: '#0B1220',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : undefined,
-  }}
->
-  Log out
-</Button>
-                </div>
-              </div>
+  <Button
+    onClick={logout}
+    style={{
+      ...compactCtrl,
+      background: '#0B1220',
+      border: '1px solid #1F2937',
+      width: isMobile ? '100%' : undefined,
+    }}
+  >
+    Log out
+  </Button>
+</div>
+
 
               <Card style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
