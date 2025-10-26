@@ -101,10 +101,12 @@ const Button = ({ children, ...rest }) => (
     style={{
       padding: '10px 14px',
       borderRadius: 10,
-      border: '1px solid #243041',
+      border: '1px solid #1F2937',      // normalized to match links
       background: '#3B82F6',
       color: 'white',
       fontWeight: 600,
+      fontSize: 14,                      // NEW: normalize size
+      lineHeight: '22px',                // NEW: comfy tap target
       cursor: 'pointer',
       ...(rest.style || {}),
     }}
@@ -112,6 +114,7 @@ const Button = ({ children, ...rest }) => (
     {children}
   </button>
 );
+
 
 const Tag = ({ children, style }) => (
   <span
@@ -2517,8 +2520,11 @@ const buttonBaseStyle = {
   borderRadius: 10,
   border: '1px solid #1F2937',
   fontWeight: 600,
+  fontSize: 14,            // NEW: match <Button/>
+  lineHeight: '22px',      // NEW: match <Button/>
   cursor: 'pointer',
   display: 'inline-block',
   textDecoration: 'none',
 };
+
 
