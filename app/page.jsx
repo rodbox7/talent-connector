@@ -1718,67 +1718,71 @@ export default function Page() {
         <div style={overlay}>
           {!showInsights ? (
             <div style={{ width: 'min(1150px, 100%)' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: isMobile ? 'stretch' : 'center',
-                  gap: 12,
-                  flexDirection: isMobile ? 'column' : 'row',
-                  justifyContent: 'space-between',
-                  marginBottom: 10,
-                  width: '100%',
-                }}
-              >
-                <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                  Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-                  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
-                </div>
- <div
+             <div
   style={{
     display: 'flex',
     alignItems: isMobile ? 'stretch' : 'center',
     gap: 12,
     flexDirection: isMobile ? 'column' : 'row',
-    width: isMobile ? '100%' : 'auto',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    width: '100%',
   }}
 >
-  {/* New today — compact on mobile */}
-  <Tag
-    style={{
-      padding: isMobile ? '4px 10px' : '6px 12px',
-      fontSize: isMobile ? 12 : 16,
-    }}
-  >
-    New today: <strong>{cCountToday}</strong>
-  </Tag>
+  {/* Left title */}
+  <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+    Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+    <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+  </div>
 
-  {/* Compensation Insights — compact on mobile */}
-  <Button
-    onClick={loadInsights}
+  {/* Right actions — COMPACT on mobile */}
+  <div
     style={{
-      background: '#0EA5E9',
-      border: '1px solid #1F2937',
-      width: isMobile ? '100%' : undefined,
-      // shrink on mobile to match "Additional information" / "Email…" buttons
-      ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
+      display: 'flex',
+      alignItems: isMobile ? 'stretch' : 'center',
+      gap: 12,
+      flexDirection: isMobile ? 'column' : 'row',
+      width: isMobile ? '100%' : 'auto',
     }}
   >
-    Compensation Insights
-  </Button>
+    {/* New today (Tag) */}
+    <Tag
+      style={{
+        padding: isMobile ? '4px 10px' : '6px 12px',
+        fontSize: isMobile ? 12 : 16,
+      }}
+    >
+      New today: <strong>{cCountToday}</strong>
+    </Tag>
 
-  {/* Log out — compact on mobile */}
-  <Button
-    onClick={logout}
-    style={{
-      background: '#0B1220',
-      border: '1px solid #1F2937',
-      width: isMobile ? '100%' : undefined,
-      ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
-    }}
-  >
-    Log out
-  </Button>
+    {/* Compensation Insights */}
+    <Button
+      onClick={loadInsights}
+      style={{
+        background: '#0EA5E9',
+        border: '1px solid #1F2937',
+        width: isMobile ? '100%' : undefined,
+        ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
+      }}
+    >
+      Compensation Insights
+    </Button>
+
+    {/* Log out */}
+    <Button
+      onClick={logout}
+      style={{
+        background: '#0B1220',
+        border: '1px solid #1F2937',
+        width: isMobile ? '100%' : undefined,
+        ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
+      }}
+    >
+      Log out
+    </Button>
+  </div>
 </div>
+
 
 
                 </div>
