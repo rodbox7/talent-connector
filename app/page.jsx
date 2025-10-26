@@ -1935,7 +1935,7 @@ export default function Page() {
                   <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
                     If you aren’t finding what you’re looking for, we can help.
                   </div>
-                 <a
+                <a
   href="https://bhsg.com/partner-with-us"
   target="_blank"
   rel="noopener noreferrer"
@@ -1943,13 +1943,15 @@ export default function Page() {
     ...buttonBaseStyle,
     background: '#2563EB',
     color: 'white',
-    width: isMobile ? '100%' : 'fit-content',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : 'auto',
+    maxWidth: isMobile ? '100%' : 260,  // cap width on desktop
     textAlign: 'center',
-    border: '1px solid #1F2937', // match other buttons
   }}
 >
   Request our help with your search
 </a>
+
 
                 </div>
               </Card>
@@ -2034,19 +2036,21 @@ export default function Page() {
                             >
                               Additional information
                             </Button>
-                            <a
+                           <a
   href={buildMailto(c)}
   style={{
     ...buttonBaseStyle,
     background: '#2563EB',
     color: 'white',
-    width: isMobile ? '100%' : undefined,
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : 'auto',
+    maxWidth: isMobile ? '100%' : 260,  // cap width on desktop
     textAlign: 'center',
-    border: '1px solid #1F2937', // match other buttons
   }}
 >
   Email for more information
 </a>
+
 
                           </div>
                         </div>
@@ -2516,15 +2520,19 @@ const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 
 // Consistent button base style (matches <Button/> sizing)
 const buttonBaseStyle = {
-  padding: '10px 14px',
+  padding: '8px 12px',           // tighter
   borderRadius: 10,
   border: '1px solid #1F2937',
   fontWeight: 600,
-  fontSize: 14,            // NEW: match <Button/>
-  lineHeight: '22px',      // NEW: match <Button/>
+  fontSize: 14,
+  lineHeight: '20px',            // tighter height
   cursor: 'pointer',
-  display: 'inline-block',
+  display: 'inline-flex',        // center content nicely
+  alignItems: 'center',
+  justifyContent: 'center',
   textDecoration: 'none',
+  whiteSpace: 'normal',          // allow wrapping
+  wordBreak: 'break-word',
 };
 
 
