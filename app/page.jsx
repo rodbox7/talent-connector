@@ -1366,6 +1366,18 @@ export default function Page() {
 
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
+      // force small, consistent control size on mobile
+  const compactCtrl = isMobile
+    ? {
+        height: 36,
+        padding: '0 12px',
+        fontSize: 13,
+        lineHeight: '20px',
+        boxSizing: 'border-box',
+        borderRadius: 10,
+      }
+    : {};
+
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
       const subj = `Talent Connector Candidate — ${c?.name || ''}`;
@@ -1730,77 +1742,41 @@ export default function Page() {
 
                 {/* HEADER CONTROLS – compact on mobile */}
                 <div
-                  style={{
-                    display: 'flex',
-                    alignItems: isMobile ? 'stretch' : 'center',
-                    gap: 12,
-                    flexDirection: isMobile ? 'column' : 'row',
-                    width: isMobile ? '100%' : 'auto',
-                  }}
-                >
-                  <Tag
-                    style={{
-                      ...(isMobile
-                        ? {
-                            height: 36,
-                            padding: '0 12px',
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }
-                        : { padding: '6px 12px' }),
-                    }}
-                  >
-                    New today: <strong>{cCountToday}</strong>
-                  </Tag>
+                 <Tag
+  style={{
+    ...compactCtrl,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Tag already has its dark pill styles from Tag component
+  }}
+>
+  New today: <strong>{cCountToday}</strong>
+</Tag>
 
-                  <Button
-                    onClick={loadInsights}
-                    style={{
-                      background: '#0EA5E9',
-                      border: '1px solid #1F2937',
-                      width: isMobile ? '100%' : undefined,
-                      ...(isMobile
-                        ? {
-                            height: 36,
-                            padding: '0 12px',
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxSizing: 'border-box',
-                          }
-                        : {}),
-                    }}
-                  >
-                    Compensation Insights
-                  </Button>
+<Button
+  onClick={loadInsights}
+  style={{
+    ...compactCtrl,
+    background: '#0EA5E9',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : undefined,
+  }}
+>
+  Compensation Insights
+</Button>
 
-                  <Button
-                    onClick={logout}
-                    style={{
-                      background: '#0B1220',
-                      border: '1px solid #1F2937',
-                      width: isMobile ? '100%' : undefined,
-                      ...(isMobile
-                        ? {
-                            height: 36,
-                            padding: '0 12px',
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxSizing: 'border-box',
-                          }
-                        : {}),
-                    }}
-                  >
-                    Log out
-                  </Button>
+<Button
+  onClick={logout}
+  style={{
+    ...compactCtrl,
+    background: '#0B1220',
+    border: '1px solid #1F2937',
+    width: isMobile ? '100%' : undefined,
+  }}
+>
+  Log out
+</Button>
                 </div>
               </div>
 
