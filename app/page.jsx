@@ -105,9 +105,6 @@ const Button = ({ children, ...rest }) => (
       background: '#3B82F6',
       color: 'white',
       fontWeight: 600,
-      fontSize: 14,
-      lineHeight: '22px',
-      boxSizing: 'border-box',
       cursor: 'pointer',
       ...(rest.style || {}),
     }}
@@ -562,8 +559,8 @@ export default function Page() {
   const [titleOptions, setTitleOptions] = React.useState([]);
   const [lawOptions, setLawOptions] = React.useState([]);
 
-  const [fMetro, setFMetro] = React.useState('');
-
+  const [fCity, setFCity] = React.useState('');
+  const [fState, setFState] = React.useState('');
   const [fTitle, setFTitle] = React.useState('');
   const [fLaw, setFLaw] = React.useState('');
 
@@ -694,11 +691,8 @@ export default function Page() {
 
         if (!showOffMarket && r.off_market) return false;
 
-       if (fMetro) {
-  const metro = [r.city, r.state].filter(Boolean).join(', ');
-  if (metro !== fMetro) return false;
-}
-
+        if (fCity && String(r.city || '') !== fCity) return false;
+        if (fState && String(r.state || '') !== fState) return false;
 
         if (salMin != null || salMax != null) {
           const s = Number(r.salary);
@@ -769,19 +763,19 @@ export default function Page() {
     }
   }
 
- function clearClientFilters() {
-  setSearch('');
-  setFMetro('');
-  setFTitle('');
-  setFLaw('');
-  setSalaryRange('');
-  setYearsRange('');
-  setContractOnly(false);
-  setHourlyBillRange('');
-  setSortBy('date_desc');
-  fetchClientRows();
-}
-
+  function clearClientFilters() {
+    setSearch('');
+    setFCity('');
+    setFState('');
+    setFTitle('');
+    setFLaw('');
+    setSalaryRange('');
+    setYearsRange('');
+    setContractOnly(false);
+    setHourlyBillRange('');
+    setSortBy('date_desc');
+    fetchClientRows();
+  }
 
   React.useEffect(() => {
     if (user?.role === 'client') fetchClientRows();
@@ -1718,114 +1712,145 @@ export default function Page() {
         <div style={overlay}>
           {!showInsights ? (
             <div style={{ width: 'min(1150px, 100%)' }}>
-            <div
-  style={{
-    display: 'flex',
-    alignItems: isMobile ? 'stretch' : 'center',
-    gap: 12,
-    flexDirection: isMobile ? 'column' : 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    width: '100%',
-  }}
->
-  {/* Left title */}
-  <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-    Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-    <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
-  </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  gap: 12,
+                  flexDirection: isMobile ? 'column' : 'row',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                  width: '100%',
+                }}
+              >
+                <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                  Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+                  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+                </div>
 
-  {/* Right actions */}
-  <div
-    style={{
-      display: 'flex',
-      alignItems: isMobile ? 'stretch' : 'center',
-      gap: 12,
-      flexDirection: isMobile ? 'column' : 'row',
-      width: isMobile ? '100%' : 'auto',
-    }}
-  >
-    {/* New today */}
-   {/* New today — same visual height as other buttons */}
-<Tag
-  style={{
-    padding: isMobile ? '6px 10px' : '6px 12px',
-    fontSize: isMobile ? 12.5 : 16,
-    lineHeight: isMobile ? '20px' : '22px',
-    height: isMobile ? 36 : 'auto',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }}
->
-  New today: <strong>{cCountToday}</strong>
-</Tag>
+                {/* HEADER CONTROLS – compact on mobile */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: isMobile ? 'stretch' : 'center',
+                    gap: 12,
+                    flexDirection: isMobile ? 'column' : 'row',
+                    width: isMobile ? '100%' : 'auto',
+                  }}
+                >
+                  <Tag
+                    style={{
+                      ...(isMobile
+                        ? {
+                            height: 36,
+                            padding: '0 12px',
+                            fontSize: 13,
+                            lineHeight: '20px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }
+                        : { padding: '6px 12px' }),
+                    }}
+                  >
+                    New today: <strong>{cCountToday}</strong>
+                  </Tag>
 
-{/* Compensation Insights — compact */}
-<Button
-  onClick={loadInsights}
-  style={{
-    background: '#0EA5E9',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : undefined,
-    padding: isMobile ? '6px 10px' : '10px 14px',
-    fontSize: isMobile ? 13 : 14,
-    lineHeight: isMobile ? '20px' : '22px',
-    height: isMobile ? 36 : 'auto',
-    boxSizing: 'border-box',
-  }}
->
-  Compensation Insights
-</Button>
+                  <Button
+                    onClick={loadInsights}
+                    style={{
+                      background: '#0EA5E9',
+                      border: '1px solid #1F2937',
+                      width: isMobile ? '100%' : undefined,
+                      ...(isMobile
+                        ? {
+                            height: 36,
+                            padding: '0 12px',
+                            fontSize: 13,
+                            lineHeight: '20px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxSizing: 'border-box',
+                          }
+                        : {}),
+                    }}
+                  >
+                    Compensation Insights
+                  </Button>
 
-{/* Log out — compact */}
-<Button
-  onClick={logout}
-  style={{
-    background: '#0B1220',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : undefined,
-    padding: isMobile ? '6px 10px' : '10px 14px',
-    fontSize: isMobile ? 13 : 14,
-    lineHeight: isMobile ? '20px' : '22px',
-    height: isMobile ? 36 : 'auto',
-    boxSizing: 'border-box',
-  }}
->
-  Log out
-</Button>
-
-  </div>
-</div>
-
+                  <Button
+                    onClick={logout}
+                    style={{
+                      background: '#0B1220',
+                      border: '1px solid #1F2937',
+                      width: isMobile ? '100%' : undefined,
+                      ...(isMobile
+                        ? {
+                            height: 36,
+                            padding: '0 12px',
+                            fontSize: 13,
+                            lineHeight: '20px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxSizing: 'border-box',
+                          }
+                        : {}),
+                    }}
+                  >
+                    Log out
+                  </Button>
+                </div>
+              </div>
 
               <Card style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
                   <div style={{ minWidth: 0 }}>
                     <Label>Keyword</Label>
-   <Input
-  placeholder="description, law, title, metro, notes"
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-  style={{
-    width: '100%',
-    ...(isMobile ? { padding: '8px 12px', fontSize: 13, lineHeight: '20px' } : {}),
-  }}
-/>
-
-
+                    <Input
+                      placeholder="description, law, title, metro, notes"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        ...(isMobile
+                          ? {
+                              height: 36,
+                              padding: '0 12px',
+                              fontSize: 13,
+                              lineHeight: '20px',
+                              boxSizing: 'border-box',
+                            }
+                          : {}),
+                      }}
+                    />
                   </div>
 
-                 <div style={{ minWidth: 0 }}>
-  <Label>Metro Area</Label>
-  <select value={fMetro} onChange={(e) => setFMetro(e.target.value)} style={selectStyle}>
-    <option value="">Any</option>
-    {MAJOR_METROS.map((m) => (
-      <option key={m} value={m}>{m}</option>
-    ))}
-  </select>
-</div>
+                  <div style={{ minWidth: 0 }}>
+                    <Label>Metro Area</Label>
+                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {cities.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ minWidth: 0 }}>
+                    <Label>State</Label>
+                    <select value={fState} onChange={(e) => setFState(e.target.value)} style={selectStyle}>
+                      <option value="">Any</option>
+                      {STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div>
                     <Label>Title</Label>
@@ -1979,24 +2004,21 @@ export default function Page() {
                   <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
                     If you aren’t finding what you’re looking for, we can help.
                   </div>
-                <a
-  href="https://bhsg.com/partner-with-us"
-  target="_blank"
-  rel="noopener noreferrer"
-  style={{
-    ...buttonBaseStyle,
-    background: '#2563EB',
-    color: 'white',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : 'auto',
-    maxWidth: isMobile ? '100%' : 260,  // cap width on desktop
-    textAlign: 'center',
-  }}
->
-  Request our help with your search
-</a>
-
-
+                  <a
+                    href="https://bhsg.com/partner-with-us"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      ...buttonBaseStyle,
+                      background: '#2563EB',
+                      color: 'white',
+                      width: isMobile ? '100%' : 'fit-content',
+                      textAlign: 'center',
+                      border: '1px solid #1F2937',
+                    }}
+                  >
+                    Request our help with your search
+                  </a>
                 </div>
               </Card>
 
@@ -2080,22 +2102,19 @@ export default function Page() {
                             >
                               Additional information
                             </Button>
-                           <a
-  href={buildMailto(c)}
-  style={{
-    ...buttonBaseStyle,
-    background: '#2563EB',
-    color: 'white',
-    border: '1px solid #1F2937',
-    width: isMobile ? '100%' : 'auto',
-    maxWidth: isMobile ? '100%' : 260,  // cap width on desktop
-    textAlign: 'center',
-  }}
->
-  Email for more information
-</a>
-
-
+                            <a
+                              href={buildMailto(c)}
+                              style={{
+                                ...buttonBaseStyle,
+                                background: '#2563EB',
+                                color: 'white',
+                                width: isMobile ? '100%' : undefined,
+                                textAlign: 'center',
+                                border: '1px solid #1F2937',
+                              }}
+                            >
+                              Email for more information
+                            </a>
                           </div>
                         </div>
                         {expandedId === c.id && (
@@ -2562,22 +2581,13 @@ const selectStyle = {
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 
-// Consistent button base style (now exactly matches <Button/> dimensions)
+// Consistent button base style (matches <Button/> sizing)
 const buttonBaseStyle = {
-  display: 'inline-block',
   padding: '10px 14px',
   borderRadius: 10,
   border: '1px solid #1F2937',
-  background: '#3B82F6',
-  color: 'white',
   fontWeight: 600,
-  fontSize: 14,
-  lineHeight: '22px',
-  textAlign: 'center',
-  textDecoration: 'none',
-  boxSizing: 'border-box',
   cursor: 'pointer',
-  verticalAlign: 'middle',
+  display: 'inline-block',
+  textDecoration: 'none',
 };
-
-
