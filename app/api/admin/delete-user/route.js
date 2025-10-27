@@ -1,11 +1,10 @@
 // app/api/admin/delete-user/route.js
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { id } = body || {};
+    const { id } = (await req.json()) || {};
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Missing user id' }, { status: 400 });
     }
@@ -16,7 +15,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: authErr.message }, { status: 500 });
     }
 
-    // 2) clean up profile (optional)
+    // 2) delete profile row (optional but tidy)
     const { error: profErr } = await supabaseAdmin.from('profiles').delete().eq('id', id);
     if (profErr) {
       return NextResponse.json({ ok: false, error: profErr.message }, { status: 500 });
