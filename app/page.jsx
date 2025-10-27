@@ -2218,44 +2218,58 @@ function AdminPanel({ isMobile }) {
     if (errMsg) setErr(errMsg);
     if (okMsg || errMsg) setTimeout(() => { setFlash(''); setErr(''); }, 2500);
   }
+// --- robust fetch wrapper: always surface real server errors (no more "Unexpected token <") ---
+async function callApi(path, payload) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
 
-  async function invite() {
-    setFlash('');
-    setErr('');
-    try {
-      const em = (email || '').trim().toLowerCase();
-      if (!em || !tempPw) {
-        setErr('Email and temp password are required.');
-        return;
-      }
-      const res = await fetch('/api/admin/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: em,
-          role,
-          org: org.trim() || null,
-          amEmail: (amEmail || '').trim() || null,
-          password: tempPw,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setErr(json?.error || 'Invite failed');
-        return;
-      }
-      setEmail('');
-      setRole('client');
-      setOrg('');
-      setAmEmail('');
-      setTempPw('');
-      toast(`Invited ${em} as ${role}`);
-      await loadProfiles();
-    } catch (e) {
-      console.error(e);
-      setErr('Server error inviting user.');
-    }
+  // Read raw body first so HTML/empty responses don't crash JSON.parse
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`Server returned ${res.status} ${res.statusText}. Body (first 200): ${text.slice(0,200)}`);
   }
+
+  if (!res.ok || (data && data.ok === false)) {
+    throw new Error(data?.error || `Server error ${res.status} ${res.statusText}`);
+  }
+  return data;
+}
+
+ async function invite() {
+  setFlash('');
+  setErr('');
+  try {
+    const em = (email || '').trim().toLowerCase();
+    if (!em || !tempPw) {
+      setErr('Email and temp password are required.');
+      return;
+    }
+    await callApi('/api/admin/invite', {
+      email: em,
+      role,
+      org: org.trim() || null,
+      amEmail: (amEmail || '').trim() || null,
+      password: tempPw,
+    });
+    setEmail('');
+    setRole('client');
+    setOrg('');
+    setAmEmail('');
+    setTempPw('');
+    toast(`Invited ${em} as ${role}`);
+    await loadProfiles();
+  } catch (e) {
+    console.error(e);
+    setErr(e.message || 'Invite failed');
+  }
+}
+
 
   function startEdit(row) {
     setEditingId(row.id);
@@ -2295,73 +2309,61 @@ function AdminPanel({ isMobile }) {
   }
 
   async function resendInvite(row) {
-    try {
-      setBusy(row.id, true);
-      const res = await fetch('/api/admin/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: row.email,
-          role: row.role,
-          org: row.org || null,
-          amEmail: row.account_manager_email || null,
-          password: null,
-          resend: true,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || 'Resend failed.');
-      toast(`Resent invite to ${row.email}`);
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || 'Resend failed.');
-    } finally {
-      setBusy(row.id, false);
-    }
+  try {
+    setBusy(row.id, true);
+    await callApi('/api/admin/invite', {
+      email: row.email,
+      role: row.role,
+      org: row.org || null,
+      amEmail: row.account_manager_email || null,
+      password: null,
+      resend: true,
+    });
+    toast(`Resent invite to ${row.email}`);
+  } catch (e) {
+    console.error(e);
+    setErr(e.message || 'Resend failed.');
+  } finally {
+    setBusy(row.id, false);
   }
+}
 
-  async function resetPassword(row) {
-    try {
-      const newPw = prompt('Set a new temporary password for this user (min 8 chars):');
-      if (!newPw) return;
-      if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
-      setBusy(row.id, true);
-      const res = await fetch('/api/admin/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: row.email, password: newPw }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || 'Reset failed.');
-      toast('Temporary password set');
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || 'Password reset failed.');
-    } finally {
-      setBusy(row.id, false);
+
+ async function resetPassword(row) {
+  try {
+    const newPw = prompt('Set a new temporary password for this user (min 8 chars):');
+    if (!newPw) return;
+    if (newPw.length < 8) {
+      alert('Password must be at least 8 characters.');
+      return;
     }
+    setBusy(row.id, true);
+    await callApi('/api/admin/reset-password', { email: row.email, password: newPw });
+    toast('Temporary password set');
+  } catch (e) {
+    console.error(e);
+    setErr(e.message || 'Password reset failed.');
+  } finally {
+    setBusy(row.id, false);
   }
+}
+
 
   async function deleteUser(row) {
-    try {
-      if (!confirm(`Delete user ${row.email}? This cannot be undone.`)) return;
-      setBusy(row.id, true);
-      const res = await fetch('/api/admin/delete-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: row.id }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
-      toast(`Deleted ${row.email}`);
-      await loadProfiles();
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || 'Delete failed.');
-    } finally {
-      setBusy(row.id, false);
-    }
+  try {
+    if (!confirm(`Delete user ${row.email}? This cannot be undone.`)) return;
+    setBusy(row.id, true);
+    await callApi('/api/admin/delete-user', { id: row.id });
+    toast(`Deleted ${row.email}`);
+    await loadProfiles();
+  } catch (e) {
+    console.error(e);
+    setErr(e.message || 'Delete failed.');
+  } finally {
+    setBusy(row.id, false);
   }
+}
+
 
   const filtered = React.useMemo(() => {
     const s = (q || '').trim().toLowerCase();
