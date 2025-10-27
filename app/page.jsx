@@ -71,9 +71,6 @@ const Input = (props) => (
       outline: 'none',
       fontSize: 16,                   // prevent iOS zoom
       lineHeight: '22px',
-      pointerEvents: 'auto',
-      position: 'relative',
-      zIndex: 11,
       ...props.style,
     }}
   />
@@ -93,9 +90,6 @@ const TextArea = (props) => (
       outline: 'none',
       fontSize: 16,                    // prevent iOS zoom
       lineHeight: '22px',
-      pointerEvents: 'auto',
-      position: 'relative',
-      zIndex: 11,
       ...props.style,
     }}
   />
@@ -1539,7 +1533,7 @@ export default function Page() {
     function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
       return (
-        <Card style={{ marginTop: 12, position: 'relative', zIndex: 1 }}>
+        <Card style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
           <div style={{ display: 'grid', gap: 8 }}>
             {rows.map((r) => (
@@ -1595,7 +1589,7 @@ export default function Page() {
           </div>
 
           {/* Insights Filters */}
-          <Card style={{ marginTop: 12, position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
+          <Card style={{ marginTop: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
               <div>
                 <Label>Title</Label>
@@ -1678,7 +1672,7 @@ export default function Page() {
 
           {/* KPI row */}
           {insights?.kpi ? (
-            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12, position: 'relative', zIndex: 1 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
               <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
               <Kpi
                 label="Typical Salary Range"
@@ -1738,10 +1732,7 @@ export default function Page() {
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
                   <Button
-                    onClick={async () => {
-                      if (!showInsights) setShowInsights(true);
-                      await loadInsights();
-                    }}
+                    onClick={loadInsights}
                     style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
                   >
                     Compensation Insights
@@ -2037,15 +2028,9 @@ export default function Page() {
                             {formatMDY(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
-                            {/* CHANGED: Additional information -> light blue (#93C5FD) */}
                             <Button
                               onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                              style={{
-                                background: '#93C5FD',
-                                color: '#0B1220',
-                                border: '1px solid #4B77B9',
-                                width: isMobile ? '100%' : undefined,
-                              }}
+                              style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
                             >
                               Additional information
                             </Button>
@@ -2527,9 +2512,6 @@ const selectStyle = {
   lineHeight: '22px',
   WebkitAppearance: 'none',
   MozAppearance: 'none',
-  pointerEvents: 'auto',
-  position: 'relative',
-  zIndex: 11,
 };
 
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
