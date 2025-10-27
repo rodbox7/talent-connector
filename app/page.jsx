@@ -145,35 +145,46 @@ function presetRange(preset) { const toYMD = (d) => { const yyyy = d.getFullYear
 function useIsMobile(breakpoint = 768) { const [isMobile, setIsMobile] = React.useState(false); React.useEffect(() => { if (typeof window === 'undefined') return; const mql = window.matchMedia(`(max-width:${breakpoint}px)`); const onChange = () => setIsMobile(mql.matches); onChange(); mql.addEventListener('change', onChange); return () => mql.removeEventListener('change', onChange); }, [breakpoint]); return isMobile; }
 
 /* ---------- Simple Admin Panel (minimal, client-safe) ---------- */
+/* ---------- Simple Admin Panel (USERS) ---------- */
 function AdminPanel() {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
-  const [count, setCount] = React.useState(0);
   const [rows, setRows] = React.useState([]);
+  const [counts, setCounts] = React.useState({ total: 0, admin: 0, recruiter: 0, client: 0 });
 
   async function load() {
     try {
       setErr('');
       setLoading(true);
 
-      // Count candidates
-      const { count: cCount, error: cErr } = await supabase
-        .from('candidates')
-        .select('id', { count: 'exact', head: true });
-      if (cErr) throw cErr;
-      setCount(cCount || 0);
-
-      // Recent candidates (latest 50)
+      // Load USERS from profiles (id, email, role, org, AM email, created_at)
       const { data, error } = await supabase
-        .from('candidates')
-        .select('id,name,city,state,titles_csv,law_csv,date_entered,created_at,off_market')
+        .from('profiles')
+        .select('id,email,role,org,account_manager_email,created_at')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(1000);
+
       if (error) throw error;
-      setRows(data || []);
+
+      const list = data || [];
+      setRows(list);
+
+      // Simple role counts
+      const roleCounts = list.reduce(
+        (acc, r) => {
+          acc.total += 1;
+          const role = (r.role || '').toLowerCase();
+          if (role === 'admin') acc.admin += 1;
+          if (role === 'recruiter') acc.recruiter += 1;
+          if (role === 'client') acc.client += 1;
+          return acc;
+        },
+        { total: 0, admin: 0, recruiter: 0, client: 0 }
+      );
+      setCounts(roleCounts);
     } catch (e) {
       console.error(e);
-      setErr(e?.message || 'Failed to load admin data.');
+      setErr(e?.message || 'Failed to load users.');
     } finally {
       setLoading(false);
     }
@@ -181,11 +192,18 @@ function AdminPanel() {
 
   React.useEffect(() => { load(); }, []);
 
-  async function onDelete(id) {
+  async function onDeleteUser(id) {
     try {
-      if (!confirm('Delete this candidate?')) return;
-      const { error } = await supabase.from('candidates').delete().eq('id', id);
-      if (error) throw error;
+      if (!confirm('Delete this user (auth + profile)?')) return;
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || 'Delete failed');
+      }
       await load();
     } catch (e) {
       console.error(e);
@@ -193,11 +211,23 @@ function AdminPanel() {
     }
   }
 
+  function fmtDate(d) {
+    try {
+      const x = new Date(d);
+      const mm = String(x.getMonth() + 1).padStart(2, '0');
+      const dd = String(x.getDate()).padStart(2, '0');
+      const yyyy = x.getFullYear();
+      return `${mm}/${dd}/${yyyy}`;
+    } catch {
+      return '—';
+    }
+  }
+
   return (
     <>
       <Card style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontWeight: 800 }}>Admin overview</div>
+          <div style={{ fontWeight: 800 }}>User management</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={load} style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}>
               Refresh
@@ -205,20 +235,23 @@ function AdminPanel() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginTop: 12 }}>
+        {/* KPI strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginTop: 12 }}>
           <Card style={{ padding: 16 }}>
-            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Total candidates</div>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>{count}</div>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Total users</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{counts.total}</div>
           </Card>
           <Card style={{ padding: 16 }}>
-            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Recent window</div>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>Last 50</div>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Admins</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{counts.admin}</div>
           </Card>
           <Card style={{ padding: 16 }}>
-            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Status</div>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>
-              {loading ? 'Loading…' : (err ? 'Error' : 'OK')}
-            </div>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Recruiters</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{counts.recruiter}</div>
+          </Card>
+          <Card style={{ padding: 16 }}>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Clients</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{counts.client}</div>
           </Card>
         </div>
 
@@ -226,50 +259,37 @@ function AdminPanel() {
       </Card>
 
       <Card style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 12 }}>Recent candidates</div>
+        <div style={{ fontWeight: 800, marginBottom: 12 }}>Users (latest first)</div>
         {loading ? (
           <div style={{ color: '#9CA3AF', fontSize: 12 }}>Loading…</div>
         ) : rows.length === 0 ? (
-          <div style={{ color: '#9CA3AF', fontSize: 12 }}>No candidates found.</div>
+          <div style={{ color: '#9CA3AF', fontSize: 12 }}>No users found.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Location</th>
-                  <th style={thStyle}>Title</th>
-                  <th style={thStyle}>Law</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Email</th>
+                  <th style={thStyle}>Role</th>
+                  <th style={thStyle}>Org</th>
+                  <th style={thStyle}>Account Manager</th>
+                  <th style={thStyle}>Created</th>
                   <th style={thStyle}></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={tdStyle}>{r.name || '—'}</td>
-                    <td style={tdStyle}>{[r.city, r.state].filter(Boolean).join(', ') || '—'}</td>
-                    <td style={tdStyle}>{r.titles_csv || '—'}</td>
-                    <td style={tdStyle}>{r.law_csv || '—'}</td>
-                    <td style={tdStyle}>
-                      {(() => {
-                        const d = r.date_entered || r.created_at;
-                        try {
-                          const x = new Date(d);
-                          const mm = String(x.getMonth() + 1).padStart(2, '0');
-                          const dd = String(x.getDate()).padStart(2, '0');
-                          const yyyy = x.getFullYear();
-                          return `${mm}/${dd}/${yyyy}`;
-                        } catch { return '—'; }
-                      })()}
-                    </td>
-                    <td style={tdStyle}>{r.off_market ? 'Off-market' : 'Active'}</td>
+                    <td style={tdStyle}>{r.email || '—'}</td>
+                    <td style={tdStyle}>{r.role || '—'}</td>
+                    <td style={tdStyle}>{r.org || '—'}</td>
+                    <td style={tdStyle}>{r.account_manager_email || '—'}</td>
+                    <td style={tdStyle}>{fmtDate(r.created_at)}</td>
                     <td style={tdStyle}>
                       <Button
-                        onClick={() => onDelete(r.id)}
+                        onClick={() => onDeleteUser(r.id)}
                         style={{ background: '#7F1D1D', border: '1px solid #B91C1C', color: 'white', fontWeight: 700 }}
-                        title="Delete candidate"
+                        title="Delete user"
                       >
                         Delete
                       </Button>
