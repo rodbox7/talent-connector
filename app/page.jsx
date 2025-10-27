@@ -1706,6 +1706,23 @@ export default function Page() {
         </div>
       );
     }
+        } // end InsightsView
+
+    // Fixed compact size for the three header controls
+    const compactCtrl = {
+      height: 36,
+      padding: '0 12px',
+      fontSize: 14,
+      lineHeight: '20px',
+      borderRadius: 10,
+      boxSizing: 'border-box'
+    };
+
+    return (
+      <div style={pageWrap}>
+        <div style={overlay}>
+
+    
 
     return (
       <div style={pageWrap}>
