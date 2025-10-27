@@ -909,21 +909,30 @@ if (user.role === 'recruiter') {
                           <Label>Type(s) of Law</Label>
                           <Input value={editForm.law_csv || ''} onChange={(e) => changeEditField('law_csv', e.target.value)} />
                         </div>
-                        <div>
-                          <Label>City</Label>
-                          <Input value={editForm.city || ''} onChange={(e) => changeEditField('city', e.target.value)} />
-                        </div>
-                        <div>
-                          <Label>State</Label>
-                          <select
-                            value={editForm.state || ''}
-                            onChange={(e) => changeEditField('state', normState(e.target.value))}
-                            style={selectStyle}
-                          >
-                            <option value="">Select state</option>
-                            {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
+                       {/* Metro Area (writes city & state) */}
+<div>
+  <Label>Metro Area</Label>
+  <select
+    value={
+      editForm.city
+        ? `${editForm.city}${editForm.state ? `, ${editForm.state}` : ''}`
+        : ''
+    }
+    onChange={(e) => {
+      const v = e.target.value;
+      const [cName, st] = v.split(',').map(s => s.trim());
+      changeEditField('city', cName || '');
+      changeEditField('state', st || '');
+    }}
+    style={selectStyle}
+  >
+    <option value="">Select a metro</option>
+    {MAJOR_METROS.map((m) => (
+      <option key={m} value={m}>{m}</option>
+    ))}
+  </select>
+</div>
+
                         <div>
                           <Label>Years of experience</Label>
                           <Input inputMode="numeric" value={editForm.years ?? ''} onChange={(e) => changeEditField('years', e.target.value)} />
