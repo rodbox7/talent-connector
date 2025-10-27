@@ -1747,62 +1747,66 @@ const SMALL_CTRL = isMobile
     alignItems: isMobile ? 'stretch' : 'center',
     gap: 12,
     flexDirection: isMobile ? 'column' : 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    width: '100%',
+    width: isMobile ? '100%' : 'auto',
   }}
 >
-  {/* Left: title */}
-  <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-    Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-    <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
-  </div>
-
-  {/* Right: compact controls */}
-  <div
+  {/* New today (force compact size) */}
+  <Tag
     style={{
-      display: 'flex',
-      alignItems: isMobile ? 'stretch' : 'center',
-      gap: 12,
-      flexDirection: isMobile ? 'column' : 'row',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#111827',
+      color: '#E5E7EB',
+      fontWeight: 600,
+      // compact sizing
+      height: 40,
+      padding: '8px 12px',
+      fontSize: 14,
+      lineHeight: '18px',
       width: isMobile ? '100%' : 'auto',
     }}
   >
-    <Tag
-      style={{
-        ...compactCtrl,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      New today: <strong>{cCountToday}</strong>
-    </Tag>
+    New today: <strong style={{ marginLeft: 4 }}>{cCountToday}</strong>
+  </Tag>
 
-    <Button
-      onClick={loadInsights}
-      style={{
-        ...compactCtrl,
-        background: '#0EA5E9',
-        border: '1px solid #1F2937',
-        width: isMobile ? '100%' : undefined,
-      }}
-    >
-      Compensation Insights
-    </Button>
+  {/* Compensation Insights (force compact size) */}
+  <Button
+    onClick={loadInsights}
+    style={{
+      background: '#0EA5E9',
+      border: '1px solid #1F2937',
+      color: 'white',
+      fontWeight: 600,
+      // compact sizing
+      height: 40,
+      padding: '8px 12px',
+      fontSize: 14,
+      lineHeight: '18px',
+      width: isMobile ? '100%' : 'auto',
+    }}
+  >
+    Compensation Insights
+  </Button>
 
-    <Button
-      onClick={logout}
-      style={{
-        ...compactCtrl,
-        background: '#0B1220',
-        border: '1px solid #1F2937',
-        width: isMobile ? '100%' : undefined,
-      }}
-    >
-      Log out
-    </Button>
-  </div>
+  {/* Log out (force compact size) */}
+  <Button
+    onClick={logout}
+    style={{
+      background: '#0B1220',
+      border: '1px solid #1F2937',
+      color: 'white',
+      fontWeight: 600,
+      // compact sizing
+      height: 40,
+      padding: '8px 12px',
+      fontSize: 14,
+      lineHeight: '18px',
+      width: isMobile ? '100%' : 'auto',
+    }}
+  >
+    Log out
+  </Button>
 </div>
 
 
