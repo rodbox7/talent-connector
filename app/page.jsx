@@ -1366,17 +1366,17 @@ export default function Page() {
 
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
-      // force small, consistent control size on mobile
-  const compactCtrl = isMobile
-    ? {
-        height: 36,
-        padding: '0 12px',
-        fontSize: 13,
-        lineHeight: '20px',
-        boxSizing: 'border-box',
-        borderRadius: 10,
-      }
-    : {};
+    const compactCtrl = isMobile
+  ? {
+      height: 36,
+      padding: '0 12px',
+      fontSize: 13,
+      lineHeight: '20px',
+      boxSizing: 'border-box',
+      borderRadius: 10,
+    }
+  : {};
+
 
     function buildMailto(c) {
       const to = user.amEmail || 'info@youragency.com';
@@ -1724,66 +1724,69 @@ export default function Page() {
         <div style={overlay}>
           {!showInsights ? (
             <div style={{ width: 'min(1150px, 100%)' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: isMobile ? 'stretch' : 'center',
-                  gap: 12,
-                  flexDirection: isMobile ? 'column' : 'row',
-                  justifyContent: 'space-between',
-                  marginBottom: 10,
-                  width: '100%',
-                }}
-              >
-                <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-                  Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-                  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
-                </div>
-
-                {/* HEADER CONTROLS – compact on mobile */}
+             {/* Header row */}
 <div
   style={{
     display: 'flex',
     alignItems: isMobile ? 'stretch' : 'center',
     gap: 12,
     flexDirection: isMobile ? 'column' : 'row',
-    width: isMobile ? '100%' : 'auto',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    width: '100%',
   }}
 >
-  <Tag
-    style={{
-      ...compactCtrl,
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    New today: <strong>{cCountToday}</strong>
-  </Tag>
+  {/* Left: title */}
+  <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+    Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+    <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+  </div>
 
-  <Button
-    onClick={loadInsights}
+  {/* Right: compact controls */}
+  <div
     style={{
-      ...compactCtrl,
-      background: '#0EA5E9',
-      border: '1px solid #1F2937',
-      width: isMobile ? '100%' : undefined,
+      display: 'flex',
+      alignItems: isMobile ? 'stretch' : 'center',
+      gap: 12,
+      flexDirection: isMobile ? 'column' : 'row',
+      width: isMobile ? '100%' : 'auto',
     }}
   >
-    Compensation Insights
-  </Button>
+    <Tag
+      style={{
+        ...compactCtrl,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      New today: <strong>{cCountToday}</strong>
+    </Tag>
 
-  <Button
-    onClick={logout}
-    style={{
-      ...compactCtrl,
-      background: '#0B1220',
-      border: '1px solid #1F2937',
-      width: isMobile ? '100%' : undefined,
-    }}
-  >
-    Log out
-  </Button>
+    <Button
+      onClick={loadInsights}
+      style={{
+        ...compactCtrl,
+        background: '#0EA5E9',
+        border: '1px solid #1F2937',
+        width: isMobile ? '100%' : undefined,
+      }}
+    >
+      Compensation Insights
+    </Button>
+
+    <Button
+      onClick={logout}
+      style={{
+        ...compactCtrl,
+        background: '#0B1220',
+        border: '1px solid #1F2937',
+        width: isMobile ? '100%' : undefined,
+      }}
+    >
+      Log out
+    </Button>
+  </div>
 </div>
 
 
