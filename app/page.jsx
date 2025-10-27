@@ -1037,12 +1037,19 @@ if (user.role === 'recruiter') {
 
                       <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                         <Button onClick={() => startEdit(c)}>Edit</Button>
-                        <Button
-                          onClick={() => removeCandidate(c.id)}
-                          style={{ background: '#111827', border: '1px solid #1F2937' }}
-                        >
-                          Delete
-                        </Button>
+                       <Button
+  onClick={() => removeCandidate(c.id)}
+  style={{
+    background: '#7F1D1D',          // dark red background
+    border: '1px solid #B91C1C',    // brighter red border
+    color: 'white',
+    fontWeight: 700,
+  }}
+  title="Delete candidate"
+>
+  Delete
+</Button>
+
                       </div>
                     </Card>
                   )
