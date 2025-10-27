@@ -144,6 +144,147 @@ function matchesCSV(csv, needle) { if (!needle) return true; return String(csv |
 function presetRange(preset) { const toYMD = (d) => { const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${yyyy}-${mm}-${dd}`; }; const today = new Date(); const end = toYMD(today); const startOfYear = new Date(today.getFullYear(), 0, 1); const q = Math.floor(today.getMonth() / 3); const startOfQuarter = new Date(today.getFullYear(), q * 3, 1); const backDays = (n) => { const d = new Date(today); d.setDate(d.getDate() - n); return toYMD(d); }; switch (preset) { case 'LAST_30': return { start: backDays(30), end }; case 'LAST_60': return { start: backDays(60), end }; case 'LAST_90': return { start: backDays(90), end }; case 'LAST_180': return { start: backDays(180), end }; case 'YTD': return { start: toYMD(startOfYear), end }; case 'THIS_Q': return { start: toYMD(startOfQuarter), end }; case 'ALL': return { start: '', end: '' }; default: return { start: '', end: '' }; } }
 function useIsMobile(breakpoint = 768) { const [isMobile, setIsMobile] = React.useState(false); React.useEffect(() => { if (typeof window === 'undefined') return; const mql = window.matchMedia(`(max-width:${breakpoint}px)`); const onChange = () => setIsMobile(mql.matches); onChange(); mql.addEventListener('change', onChange); return () => mql.removeEventListener('change', onChange); }, [breakpoint]); return isMobile; }
 
+/* ---------- Simple Admin Panel (minimal, client-safe) ---------- */
+function AdminPanel() {
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState('');
+  const [count, setCount] = React.useState(0);
+  const [rows, setRows] = React.useState([]);
+
+  async function load() {
+    try {
+      setErr('');
+      setLoading(true);
+
+      // Count candidates
+      const { count: cCount, error: cErr } = await supabase
+        .from('candidates')
+        .select('id', { count: 'exact', head: true });
+      if (cErr) throw cErr;
+      setCount(cCount || 0);
+
+      // Recent candidates (latest 50)
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('id,name,city,state,titles_csv,law_csv,date_entered,created_at,off_market')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setRows(data || []);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Failed to load admin data.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { load(); }, []);
+
+  async function onDelete(id) {
+    try {
+      if (!confirm('Delete this candidate?')) return;
+      const { error } = await supabase.from('candidates').delete().eq('id', id);
+      if (error) throw error;
+      await load();
+    } catch (e) {
+      console.error(e);
+      alert(`Delete failed${e?.message ? `: ${e.message}` : ''}`);
+    }
+  }
+
+  return (
+    <>
+      <Card style={{ marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontWeight: 800 }}>Admin overview</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button onClick={load} style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginTop: 12 }}>
+          <Card style={{ padding: 16 }}>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Total candidates</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{count}</div>
+          </Card>
+          <Card style={{ padding: 16 }}>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Recent window</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>Last 50</div>
+          </Card>
+          <Card style={{ padding: 16 }}>
+            <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Status</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>
+              {loading ? 'Loading…' : (err ? 'Error' : 'OK')}
+            </div>
+          </Card>
+        </div>
+
+        {err ? <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div> : null}
+      </Card>
+
+      <Card style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 12 }}>Recent candidates</div>
+        {loading ? (
+          <div style={{ color: '#9CA3AF', fontSize: 12 }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ color: '#9CA3AF', fontSize: 12 }}>No candidates found.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Name</th>
+                  <th style={thStyle}>Location</th>
+                  <th style={thStyle}>Title</th>
+                  <th style={thStyle}>Law</th>
+                  <th style={thStyle}>Date</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td style={tdStyle}>{r.name || '—'}</td>
+                    <td style={tdStyle}>{[r.city, r.state].filter(Boolean).join(', ') || '—'}</td>
+                    <td style={tdStyle}>{r.titles_csv || '—'}</td>
+                    <td style={tdStyle}>{r.law_csv || '—'}</td>
+                    <td style={tdStyle}>
+                      {(() => {
+                        const d = r.date_entered || r.created_at;
+                        try {
+                          const x = new Date(d);
+                          const mm = String(x.getMonth() + 1).padStart(2, '0');
+                          const dd = String(x.getDate()).padStart(2, '0');
+                          const yyyy = x.getFullYear();
+                          return `${mm}/${dd}/${yyyy}`;
+                        } catch { return '—'; }
+                      })()}
+                    </td>
+                    <td style={tdStyle}>{r.off_market ? 'Off-market' : 'Active'}</td>
+                    <td style={tdStyle}>
+                      <Button
+                        onClick={() => onDelete(r.id)}
+                        style={{ background: '#7F1D1D', border: '1px solid #B91C1C', color: 'white', fontWeight: 700 }}
+                        title="Delete candidate"
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
 /* ---------- Page ---------- */
 export default function Page() {
   const isMobile = useIsMobile(768);
@@ -1368,7 +1509,7 @@ if (user.role === 'recruiter') {
     );
   }
 
-  /* ---------- Admin UI ---------- */
+   /* ---------- Admin UI ---------- */
   return (
     <div style={pageWrap}>
       <div style={overlay}>
@@ -1389,7 +1530,9 @@ if (user.role === 'recruiter') {
               Log out
             </Button>
           </div>
-          {/* AdminPanel content unchanged */}
+
+          {/* Actual admin content */}
+          <AdminPanel />
         </div>
       </div>
     </div>
