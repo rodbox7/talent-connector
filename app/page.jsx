@@ -146,30 +146,36 @@ function useIsMobile(breakpoint = 768) { const [isMobile, setIsMobile] = React.u
 
 /* ---------- Simple Admin Panel (minimal, client-safe) ---------- */
 /* ---------- Simple Admin Panel (USERS) ---------- */
+/* ---------- Simple Admin Panel (USERS) with ADD ---------- */
 function AdminPanel() {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState('');
   const [rows, setRows] = React.useState([]);
   const [counts, setCounts] = React.useState({ total: 0, admin: 0, recruiter: 0, client: 0 });
 
+  // Add-new-user form state
+  const [nEmail, setNEmail] = React.useState('');
+  const [nPwd, setNPwd] = React.useState('');
+  const [nRole, setNRole] = React.useState('recruiter');
+  const [nOrg, setNOrg] = React.useState('');
+  const [nAM, setNAM] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+
   async function load() {
     try {
       setErr('');
       setLoading(true);
 
-      // Load USERS from profiles (id, email, role, org, AM email, created_at)
       const { data, error } = await supabase
         .from('profiles')
         .select('id,email,role,org,account_manager_email,created_at')
         .order('created_at', { ascending: false })
         .limit(1000);
-
       if (error) throw error;
 
       const list = data || [];
       setRows(list);
 
-      // Simple role counts
       const roleCounts = list.reduce(
         (acc, r) => {
           acc.total += 1;
@@ -191,6 +197,56 @@ function AdminPanel() {
   }
 
   React.useEffect(() => { load(); }, []);
+
+  function genPassword(len = 12) {
+    const chars =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    let out = '';
+    for (let i = 0; i < len; i++) {
+      out += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return out;
+  }
+
+  async function onCreateUser() {
+    try {
+      setErr('');
+      if (!nEmail) { setErr('Email required'); return; }
+      const email = nEmail.trim().toLowerCase();
+      const pwd = nPwd || genPassword();
+      setSubmitting(true);
+
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password: pwd,
+          role: nRole,
+          org: nOrg || null,
+          account_manager_email: nAM || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || 'Create failed');
+      }
+
+      // Clear form + reload
+      setNEmail('');
+      setNPwd('');
+      setNRole('recruiter');
+      setNOrg('');
+      setNAM('');
+      await load();
+      alert(`User created. Temp password: ${pwd}`);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Create failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function onDeleteUser(id) {
     try {
@@ -225,6 +281,67 @@ function AdminPanel() {
 
   return (
     <>
+      {/* ADD NEW USER */}
+      <Card style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 12 }}>Add new user</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <div>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="person@company.com"
+              value={nEmail}
+              onChange={(e) => setNEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Temporary password (leave blank to auto-generate)</Label>
+            <Input
+              type="text"
+              placeholder="Auto-generate if blank"
+              value={nPwd}
+              onChange={(e) => setNPwd(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Role</Label>
+            <select
+              value={nRole}
+              onChange={(e) => setNRole(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="recruiter">Recruiter</option>
+              <option value="client">Client</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <Label>Organization</Label>
+            <Input
+              placeholder="Client org or internal team"
+              value={nOrg}
+              onChange={(e) => setNOrg(e.target.value)}
+            />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Label>Account Manager Email (for client users)</Label>
+            <Input
+              type="email"
+              placeholder="am@beaconhillstaffing.com"
+              value={nAM}
+              onChange={(e) => setNAM(e.target.value)}
+            />
+          </div>
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+          <Button onClick={onCreateUser} disabled={submitting}>
+            {submitting ? 'Creating…' : 'Create user'}
+          </Button>
+          {err ? <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{err}</div> : null}
+        </div>
+      </Card>
+
+      {/* KPI + REFRESH */}
       <Card style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontWeight: 800 }}>User management</div>
@@ -235,7 +352,6 @@ function AdminPanel() {
           </div>
         </div>
 
-        {/* KPI strip */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginTop: 12 }}>
           <Card style={{ padding: 16 }}>
             <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Total users</div>
@@ -254,10 +370,9 @@ function AdminPanel() {
             <div style={{ fontSize: 22, fontWeight: 800 }}>{counts.client}</div>
           </Card>
         </div>
-
-        {err ? <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div> : null}
       </Card>
 
+      {/* USERS TABLE */}
       <Card style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 12 }}>Users (latest first)</div>
         {loading ? (
