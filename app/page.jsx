@@ -1366,16 +1366,32 @@ export default function Page() {
 
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
-    const compactCtrl = isMobile
+    // Force compact sizing for header controls on mobile
+const SMALL_CTRL = isMobile
   ? {
-      height: 36,
-      padding: '0 12px',
-      fontSize: 13,
-      lineHeight: '20px',
-      boxSizing: 'border-box',
+      padding: '8px 12px',
+      fontSize: 12,
+      lineHeight: '18px',
+      height: 34,
       borderRadius: 10,
+      border: '1px solid #1F2937',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxSizing: 'border-box',
+      width: '100%',
     }
-  : {};
+  : {
+      padding: '8px 12px',
+      lineHeight: '18px',
+      borderRadius: 10,
+      border: '1px solid #1F2937',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxSizing: 'border-box',
+    };
+
 
 
     function buildMailto(c) {
