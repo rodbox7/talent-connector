@@ -919,186 +919,215 @@ export default function Page() {
               </div>
             </Card>
 
-            <Card style={{ marginTop: 14 }}>
-              <div style={{ fontWeight: 800, marginBottom: 12 }}>
-                {isSuperRecruiter ? 'All recent candidates (superuser)' : 'My recent candidates'}
+           <Card style={{ marginTop: 14 }}>
+  <div style={{ fontWeight: 800, marginBottom: 12 }}>
+    {isSuperRecruiter ? 'All recent candidates (superuser)' : 'My recent candidates'}
+  </div>
+
+  {loadingList ? (
+    <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
+  ) : myRecent.length === 0 ? (
+    <div style={{ fontSize: 14, color: '#9CA3AF' }}>No candidates yet.</div>
+  ) : (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {myRecent.map((c) =>
+        editingId === c.id ? (
+          /* ------------ EDIT MODE CARD ------------ */
+          <Card key={c.id} style={{ padding: 16, background: '#0B1220' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0,1fr))', gap: 12 }}>
+              <div>
+                <Label>Description</Label>
+                <Input
+                  value={editForm.name || ''}
+                  onChange={(e) => changeEditField('name', e.target.value)}
+                />
               </div>
 
-              {loadingList ? (
-                <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
-              ) : myRecent.length === 0 ? (
-                <div style={{ fontSize: 14, color: '#9CA3AF' }}>No candidates yet.</div>
-              ) : (
-                <div style={{ display: 'grid', gap: 10 }}>
-                {myRecent.map((c) =>
-  editingId === c.id ? (
-    /* -------- EDIT MODE -------- */
-    <Card key={c.id} style={{ padding: 14 }}>
-      <div style={{ fontWeight: 800, marginBottom: 10 }}>Edit candidate</div>
+              <div>
+                <Label>Title(s)</Label>
+                <Input
+                  value={editForm.titles_csv || ''}
+                  onChange={(e) => changeEditField('titles_csv', e.target.value)}
+                  placeholder="Paralegal, Legal Support"
+                />
+              </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0,1fr))',
-          gap: 12,
-        }}
-      >
-        <div style={{ gridColumn: '1 / -1' }}>
-          <Label>Description</Label>
-          <Input
-            value={editForm.name || ''}
-            onChange={(e) => changeEditField('name', e.target.value)}
-          />
-        </div>
+              <div>
+                <Label>Type(s) of Law</Label>
+                <Input
+                  value={editForm.law_csv || ''}
+                  onChange={(e) => changeEditField('law_csv', e.target.value)}
+                  placeholder="Litigation, Securities"
+                />
+              </div>
 
-        <div>
-          <Label>Title(s)</Label>
-          <Input
-            placeholder="comma-separated"
-            value={editForm.titles_csv || ''}
-            onChange={(e) => changeEditField('titles_csv', e.target.value)}
-          />
-        </div>
+              <div>
+                <Label>City</Label>
+                <Input
+                  value={editForm.city || ''}
+                  onChange={(e) => changeEditField('city', e.target.value)}
+                />
+              </div>
 
-        <div>
-          <Label>Type(s) of Law</Label>
-          <Input
-            placeholder="comma-separated"
-            value={editForm.law_csv || ''}
-            onChange={(e) => changeEditField('law_csv', e.target.value)}
-          />
-        </div>
+              <div>
+                <Label>State</Label>
+                <select
+                  value={editForm.state || ''}
+                  onChange={(e) => changeEditField('state', normState(e.target.value))}
+                  style={selectStyle}
+                >
+                  <option value="">Select state</option>
+                  {STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
 
-        <div>
-          <Label>State</Label>
-          <select
-            value={editForm.state || ''}
-            onChange={(e) => changeEditField('state', normState(e.target.value))}
-            style={selectStyle}
-          >
-            <option value="">Select state</option>
-            {STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+              <div>
+                <Label>Years of experience</Label>
+                <Input
+                  inputMode="numeric"
+                  value={editForm.years ?? ''}
+                  onChange={(e) => changeEditField('years', e.target.value)}
+                />
+              </div>
 
-        <div>
-          <Label>City</Label>
-          <Input
-            value={editForm.city || ''}
-            onChange={(e) => changeEditField('city', toTitleCaseCity(e.target.value))}
-          />
-        </div>
+              <div>
+                <Label>Years in most recent job</Label>
+                <Input
+                  inputMode="numeric"
+                  value={editForm.recent_role_years ?? ''}
+                  onChange={(e) => changeEditField('recent_role_years', e.target.value)}
+                />
+              </div>
 
-        <div>
-          <Label>Years of experience</Label>
-          <Input
-            inputMode="numeric"
-            value={editForm.years ?? ''}
-            onChange={(e) => changeEditField('years', e.target.value)}
-          />
-        </div>
+              <div>
+                <Label>Salary desired</Label>
+                <Input
+                  inputMode="numeric"
+                  value={editForm.salary ?? ''}
+                  onChange={(e) => changeEditField('salary', e.target.value)}
+                />
+              </div>
 
-        <div>
-          <Label>Years in most recent job</Label>
-          <Input
-            inputMode="numeric"
-            value={editForm.recent_role_years ?? ''}
-            onChange={(e) => changeEditField('recent_role_years', e.target.value)}
-          />
-        </div>
+              <div>
+                <Label>Date entered</Label>
+                <Input
+                  type="date"
+                  value={editForm.date_entered || ''}
+                  onChange={(e) => changeEditField('date_entered', e.target.value)}
+                />
+              </div>
 
-        <div>
-          <Label>Salary desired</Label>
-          <Input
-            inputMode="numeric"
-            value={editForm.salary ?? ''}
-            onChange={(e) => changeEditField('salary', e.target.value)}
-          />
-        </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!editForm.contract}
+                    onChange={(e) => changeEditField('contract', e.target.checked)}
+                  />
+                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
+                </label>
+                {editForm.contract ? (
+                  <div style={{ flex: 1 }}>
+                    <Input
+                      placeholder="Hourly rate"
+                      inputMode="numeric"
+                      value={editForm.hourly ?? ''}
+                      onChange={(e) => changeEditField('hourly', e.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </div>
 
-        <div>
-          <Label>Date entered</Label>
-          <Input
-            type="date"
-            value={editForm.date_entered || ''}
-            onChange={(e) => changeEditField('date_entered', e.target.value)}
-          />
-        </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!editForm.on_assignment}
+                    onChange={(e) => changeEditField('on_assignment', e.target.checked)}
+                  />
+                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>On assignment</span>
+                </label>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <input
-              type="checkbox"
-              checked={!!editForm.contract}
-              onChange={(e) => changeEditField('contract', e.target.checked)}
-            />
-            <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
-          </label>
-          {editForm.contract ? (
-            <div style={{ flex: 1 }}>
-              <Input
-                placeholder="Hourly rate"
-                inputMode="numeric"
-                value={editForm.hourly ?? ''}
-                onChange={(e) => changeEditField('hourly', e.target.value)}
-              />
+                <div style={{ flex: 1 }}>
+                  <Label>Est. available date</Label>
+                  <Input
+                    type="date"
+                    value={editForm.est_available_date || ''}
+                    onChange={(e) => changeEditField('est_available_date', e.target.value)}
+                    disabled={!editForm.on_assignment}
+                  />
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!editForm.off_market}
+                    onChange={(e) => changeEditField('off_market', e.target.checked)}
+                  />
+                  <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off market</span>
+                </label>
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Label>Notes</Label>
+                <TextArea
+                  value={editForm.notes || ''}
+                  onChange={(e) => changeEditField('notes', e.target.value)}
+                />
+              </div>
             </div>
-          ) : null}
-        </div>
 
-        <div style={{ gridColumn: '1 / -1' }}>
-          <Label>Notes</Label>
-          <TextArea
-            value={editForm.notes || ''}
-            onChange={(e) => changeEditField('notes', e.target.value)}
-          />
-        </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+              <Button onClick={saveEdit}>Save</Button>
+              <Button
+                onClick={cancelEdit}
+                style={{ background: '#111827', border: '1px solid #1F2937' }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          /* ------------ READ-ONLY CARD ------------ */
+          <Card key={c.id} style={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ fontWeight: 700 }}>
+                {c.name || 'Untitled'}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Tag>{displayCompRecruiter(c)}</Tag>
+                <Tag>{[c.city, c.state].filter(Boolean).join(', ') || '—'}</Tag>
+                <Tag>{c.contract ? 'Contract OK' : 'Perm only'}</Tag>
+                {c.off_market ? <Tag style={{ borderColor: '#7F1D1D', background: '#111' }}>Off market</Tag> : null}
+              </div>
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!editForm.on_assignment}
-              onChange={(e) => changeEditField('on_assignment', e.target.checked)}
-            />
-            <span style={{ color: '#E5E7EB', fontSize: 13 }}>On assignment</span>
-          </label>
+            <div style={{ marginTop: 6, color: '#9CA3AF', fontSize: 13 }}>
+              {c.titles_csv || '—'} • {c.law_csv || '—'} • {c.years ?? '—'} yrs • Entered {formatMDY(c.date_entered || c.created_at)}
+            </div>
 
-          <div>
-            <Label>Est. available date</Label>
-            <Input
-              type="date"
-              value={editForm.est_available_date || ''}
-              onChange={(e) => changeEditField('est_available_date', e.target.value)}
-              disabled={!editForm.on_assignment}
-            />
-          </div>
+            {c.notes ? (
+              <div style={{ marginTop: 8, fontSize: 14 }}>{c.notes}</div>
+            ) : null}
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!editForm.off_market}
-              onChange={(e) => changeEditField('off_market', e.target.checked)}
-            />
-            <span style={{ color: '#E5E7EB', fontSize: 13 }}>Off market</span>
-          </label>
-        </div>
-      </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <Button onClick={() => startEdit(c)}>Edit</Button>
+              <Button
+                onClick={() => removeCandidate(c.id)}
+                style={{ background: '#111827', border: '1px solid #1F2937' }}
+              >
+                Delete
+              </Button>
+            </div>
+          </Card>
+        )
+      )}
+    </div>
+  )}
+</Card>
 
-      <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-        <Button onClick={saveEdit}>Save changes</Button>
-        <Button
-          onClick={cancelEdit}
-          style={{ background: '#111827', border: '1px solid #1F2937' }}
-        >
-          Cancel
-        </Button>
-      </div>
-    </Card>
   ) : (
     /* -------- READ-ONLY ROW -------- */
     <Card
