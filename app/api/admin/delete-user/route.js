@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
+
 export async function POST(req) {
   try {
     const { id } = (await req.json()) || {};
