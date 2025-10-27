@@ -63,14 +63,17 @@ const Input = (props) => (
     {...props}
     style={{
       width: '100%',
-      padding: '12px 14px',
+      padding: '12px 14px',           // mobile-friendly touch target
       borderRadius: 10,
       border: '1px solid #1F2937',
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      fontSize: 16,
+      fontSize: 16,                   // prevent iOS zoom
       lineHeight: '22px',
+      pointerEvents: 'auto',
+      position: 'relative',
+      zIndex: 11,
       ...props.style,
     }}
   />
@@ -88,8 +91,11 @@ const TextArea = (props) => (
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      fontSize: 16,
+      fontSize: 16,                    // prevent iOS zoom
       lineHeight: '22px',
+      pointerEvents: 'auto',
+      position: 'relative',
+      zIndex: 11,
       ...props.style,
     }}
   />
@@ -788,7 +794,7 @@ export default function Page() {
     backgroundImage: `url(${NYC})`,
     backgroundPosition: isMobile ? 'center top' : 'center',
     backgroundSize: 'cover',
-    backgroundAttachment: isMobile ? 'scroll' : 'fixed',
+    backgroundAttachment: isMobile ? 'scroll' : 'fixed', // mobile fix
   };
   const overlayCentered = {
     minHeight: '100vh',
@@ -1533,7 +1539,7 @@ export default function Page() {
     function BarChart({ title, rows, money = true }) {
       const max = Math.max(...rows.map((r) => r.avg), 1);
       return (
-        <Card style={{ marginTop: 12 }}>
+        <Card style={{ marginTop: 12, position: 'relative', zIndex: 1 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
           <div style={{ display: 'grid', gap: 8 }}>
             {rows.map((r) => (
@@ -1589,7 +1595,7 @@ export default function Page() {
           </div>
 
           {/* Insights Filters */}
-          <Card style={{ marginTop: 12 }}>
+          <Card style={{ marginTop: 12, position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
               <div>
                 <Label>Title</Label>
@@ -1672,7 +1678,7 @@ export default function Page() {
 
           {/* KPI row */}
           {insights?.kpi ? (
-            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12, position: 'relative', zIndex: 1 }}>
               <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
               <Kpi
                 label="Typical Salary Range"
@@ -1727,78 +1733,20 @@ export default function Page() {
                   Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
-
-                {/* HEADER CONTROLS – compact on mobile */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: isMobile ? 'stretch' : 'center',
-                    gap: 12,
-                    flexDirection: isMobile ? 'column' : 'row',
-                    width: isMobile ? '100%' : 'auto',
-                  }}
-                >
-                  <Tag
-                    style={{
-                      ...(isMobile
-                        ? {
-                            height: 36,
-                            padding: '0 12px',
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }
-                        : { padding: '6px 12px' }),
-                    }}
-                  >
+                <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
+                  <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
-
                   <Button
-                    onClick={loadInsights}
-                    style={{
-                      background: '#0EA5E9',
-                      border: '1px solid #1F2937',
-                      width: isMobile ? '100%' : undefined,
-                      ...(isMobile
-                        ? {
-                            height: 36,
-                            padding: '0 12px',
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxSizing: 'border-box',
-                          }
-                        : {}),
+                    onClick={async () => {
+                      if (!showInsights) setShowInsights(true);
+                      await loadInsights();
                     }}
+                    style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
                   >
                     Compensation Insights
                   </Button>
-
-                  <Button
-                    onClick={logout}
-                    style={{
-                      background: '#0B1220',
-                      border: '1px solid #1F2937',
-                      width: isMobile ? '100%' : undefined,
-                      ...(isMobile
-                        ? {
-                            height: 36,
-                            padding: '0 12px',
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxSizing: 'border-box',
-                          }
-                        : {}),
-                    }}
-                  >
+                  <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
                     Log out
                   </Button>
                 </div>
@@ -1810,26 +1758,15 @@ export default function Page() {
                   <div style={{ minWidth: 0 }}>
                     <Label>Keyword</Label>
                     <Input
-                      placeholder="description, law, title, metro, notes"
+                      placeholder="description, law, title, city/state, notes"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      style={{
-                        width: '100%',
-                        ...(isMobile
-                          ? {
-                              height: 36,
-                              padding: '0 12px',
-                              fontSize: 13,
-                              lineHeight: '20px',
-                              boxSizing: 'border-box',
-                            }
-                          : {}),
-                      }}
+                      style={{ width: '100%' }}
                     />
                   </div>
 
                   <div style={{ minWidth: 0 }}>
-                    <Label>Metro Area</Label>
+                    <Label>City</Label>
                     <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
                       <option value="">Any</option>
                       {cities.map((c) => (
@@ -2009,12 +1946,16 @@ export default function Page() {
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      ...buttonBaseStyle,
+                      display: 'inline-block',
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: '1px solid #243041',
                       background: '#2563EB',
                       color: 'white',
+                      fontWeight: 600,
+                      textDecoration: 'none',
                       width: isMobile ? '100%' : 'fit-content',
                       textAlign: 'center',
-                      border: '1px solid #1F2937',
                     }}
                   >
                     Request our help with your search
@@ -2096,21 +2037,31 @@ export default function Page() {
                             {formatMDY(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
+                            {/* CHANGED: Additional information -> light blue (#93C5FD) */}
                             <Button
                               onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
-                              style={{ background: '#111827', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+                              style={{
+                                background: '#93C5FD',
+                                color: '#0B1220',
+                                border: '1px solid #4B77B9',
+                                width: isMobile ? '100%' : undefined,
+                              }}
                             >
                               Additional information
                             </Button>
                             <a
                               href={buildMailto(c)}
                               style={{
-                                ...buttonBaseStyle,
+                                display: 'inline-block',
+                                padding: '10px 14px',
+                                borderRadius: 10,
+                                border: '1px solid #243041',
                                 background: '#2563EB',
                                 color: 'white',
+                                fontWeight: 600,
+                                textDecoration: 'none',
                                 width: isMobile ? '100%' : undefined,
                                 textAlign: 'center',
-                                border: '1px solid #1F2937',
                               }}
                             >
                               Email for more information
@@ -2218,58 +2169,44 @@ function AdminPanel({ isMobile }) {
     if (errMsg) setErr(errMsg);
     if (okMsg || errMsg) setTimeout(() => { setFlash(''); setErr(''); }, 2500);
   }
-// --- robust fetch wrapper: always surface real server errors (no more "Unexpected token <") ---
-async function callApi(path, payload) {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload || {}),
-  });
 
-  // Read raw body first so HTML/empty responses don't crash JSON.parse
-  const text = await res.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    throw new Error(`Server returned ${res.status} ${res.statusText}. Body (first 200): ${text.slice(0,200)}`);
-  }
-
-  if (!res.ok || (data && data.ok === false)) {
-    throw new Error(data?.error || `Server error ${res.status} ${res.statusText}`);
-  }
-  return data;
-}
-
- async function invite() {
-  setFlash('');
-  setErr('');
-  try {
-    const em = (email || '').trim().toLowerCase();
-    if (!em || !tempPw) {
-      setErr('Email and temp password are required.');
-      return;
+  async function invite() {
+    setFlash('');
+    setErr('');
+    try {
+      const em = (email || '').trim().toLowerCase();
+      if (!em || !tempPw) {
+        setErr('Email and temp password are required.');
+        return;
+      }
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: em,
+          role,
+          org: org.trim() || null,
+          amEmail: (amEmail || '').trim() || null,
+          password: tempPw,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setErr(json?.error || 'Invite failed');
+        return;
+      }
+      setEmail('');
+      setRole('client');
+      setOrg('');
+      setAmEmail('');
+      setTempPw('');
+      toast(`Invited ${em} as ${role}`);
+      await loadProfiles();
+    } catch (e) {
+      console.error(e);
+      setErr('Server error inviting user.');
     }
-    await callApi('/api/admin/invite', {
-      email: em,
-      role,
-      org: org.trim() || null,
-      amEmail: (amEmail || '').trim() || null,
-      password: tempPw,
-    });
-    setEmail('');
-    setRole('client');
-    setOrg('');
-    setAmEmail('');
-    setTempPw('');
-    toast(`Invited ${em} as ${role}`);
-    await loadProfiles();
-  } catch (e) {
-    console.error(e);
-    setErr(e.message || 'Invite failed');
   }
-}
-
 
   function startEdit(row) {
     setEditingId(row.id);
@@ -2309,61 +2246,73 @@ async function callApi(path, payload) {
   }
 
   async function resendInvite(row) {
-  try {
-    setBusy(row.id, true);
-    await callApi('/api/admin/invite', {
-      email: row.email,
-      role: row.role,
-      org: row.org || null,
-      amEmail: row.account_manager_email || null,
-      password: null,
-      resend: true,
-    });
-    toast(`Resent invite to ${row.email}`);
-  } catch (e) {
-    console.error(e);
-    setErr(e.message || 'Resend failed.');
-  } finally {
-    setBusy(row.id, false);
-  }
-}
-
-
- async function resetPassword(row) {
-  try {
-    const newPw = prompt('Set a new temporary password for this user (min 8 chars):');
-    if (!newPw) return;
-    if (newPw.length < 8) {
-      alert('Password must be at least 8 characters.');
-      return;
+    try {
+      setBusy(row.id, true);
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: row.email,
+          role: row.role,
+          org: row.org || null,
+          amEmail: row.account_manager_email || null,
+          password: null,
+          resend: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Resend failed.');
+      toast(`Resent invite to ${row.email}`);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Resend failed.');
+    } finally {
+      setBusy(row.id, false);
     }
-    setBusy(row.id, true);
-    await callApi('/api/admin/reset-password', { email: row.email, password: newPw });
-    toast('Temporary password set');
-  } catch (e) {
-    console.error(e);
-    setErr(e.message || 'Password reset failed.');
-  } finally {
-    setBusy(row.id, false);
   }
-}
 
+  async function resetPassword(row) {
+    try {
+      const newPw = prompt('Set a new temporary password for this user (min 8 chars):');
+      if (!newPw) return;
+      if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
+      setBusy(row.id, true);
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: row.email, password: newPw }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Reset failed.');
+      toast('Temporary password set');
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Password reset failed.');
+    } finally {
+      setBusy(row.id, false);
+    }
+  }
 
   async function deleteUser(row) {
-  try {
-    if (!confirm(`Delete user ${row.email}? This cannot be undone.`)) return;
-    setBusy(row.id, true);
-    await callApi('/api/admin/delete-user', { id: row.id });
-    toast(`Deleted ${row.email}`);
-    await loadProfiles();
-  } catch (e) {
-    console.error(e);
-    setErr(e.message || 'Delete failed.');
-  } finally {
-    setBusy(row.id, false);
+    try {
+      if (!confirm(`Delete user ${row.email}? This cannot be undone.`)) return;
+      setBusy(row.id, true);
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
+      toast(`Deleted ${row.email}`);
+      await loadProfiles();
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Delete failed.');
+    } finally {
+      setBusy(row.id, false);
+    }
   }
-}
-
 
   const filtered = React.useMemo(() => {
     const s = (q || '').trim().toLowerCase();
@@ -2574,22 +2523,14 @@ const selectStyle = {
   background: '#0F172A',
   color: '#E5E7EB',
   outline: 'none',
-  fontSize: 16,
+  fontSize: 16,           // iOS zoom prevention
   lineHeight: '22px',
   WebkitAppearance: 'none',
   MozAppearance: 'none',
+  pointerEvents: 'auto',
+  position: 'relative',
+  zIndex: 11,
 };
 
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
-
-// Consistent button base style (matches <Button/> sizing)
-const buttonBaseStyle = {
-  padding: '10px 14px',
-  borderRadius: 10,
-  border: '1px solid #1F2937',
-  fontWeight: 600,
-  cursor: 'pointer',
-  display: 'inline-block',
-  textDecoration: 'none',
-};
