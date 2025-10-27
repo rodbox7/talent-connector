@@ -1698,30 +1698,14 @@ export default function Page() {
           ) : null}
 
           {/* Charts */}
-                   <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
+          <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
           <BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
           <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
           <BarChart title="Avg Hourly (Billable) by City" rows={insights.byCityHourly} money />
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
         </div>
       );
-    } // end InsightsView
-
-    // Fixed compact size for the three header controls
-    const compactCtrl = {
-      height: 36,
-      padding: '0 12px',
-      fontSize: 14,
-      lineHeight: '20px',
-      borderRadius: 10,
-      boxSizing: 'border-box'
-    };
-
-    return (
-      <div style={pageWrap}>
-        <div style={overlay}>
-
-    
+    }
 
     return (
       <div style={pageWrap}>
