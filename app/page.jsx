@@ -1985,73 +1985,111 @@ function InsightsView({
   iStartDate, iEndDate,
   setShowInsights,
 }) {
-  const [kpis, setKpis] = React.useState({
-    avgSalary: null, medSalary: null, p25Salary: null, p75Salary: null,
-    avgBill: null, sample: 0, titleAverages: [],
-  });
+  const [stats, setStats] = React.useState(null);
 
-  async function refresh() {
+  async function loadInsights() {
     const { data } = await supabase
       .from('candidates')
-      .select('titles_csv,law_csv,city,state,years,salary,contract,hourly,off_market')
+      .select('salary,hourly,titles_csv,law_csv')
       .limit(2000);
 
-    const salaries = data.map(r => Number(r.salary)).filter(n => n > 0);
-    const s = statsFrom(salaries);
+    const base = data.map(r => Number(r.salary)).filter(n => n > 0);
+    const hourly = data.map(r => Number(r.hourly)).filter(n => n > 0);
 
-    const titles = ['Attorney','Paralegal','Administrative','Legal Support'];
-    const byTitle = titles.map(t => {
+    const baseStats = statsFrom(base);
+    const hourlyStats = statsFrom(hourly);
+
+    const byTitle = ['Attorney','Paralegal','Administrative','Legal Support'].map(t => {
       const vals = data
-        .filter(r => (r.titles_csv||'').split(',').includes(t))
+        .filter(r => (r.titles_csv||'').includes(t))
         .map(r => Number(r.salary))
         .filter(n => n > 0);
-      const st = statsFrom(vals);
-      return { label:t, value:st.avg };
+      const s = statsFrom(vals);
+      return { label: t, value: s.avg };
     });
-    const max = Math.max(...byTitle.map(b=>b.value||0),1);
-    const titleAverages = byTitle.map(b=>({...b,pct:Math.round((b.value/max)*100)}));
+    const max = Math.max(...byTitle.map(b => b.value || 0), 1);
+    const titleAverages = byTitle.map(b => ({
+      ...b,
+      pct: Math.round((b.value / max) * 100),
+    }));
 
-    setKpis({
-      avgSalary:s.avg, medSalary:s.median, p25Salary:s.p25, p75Salary:s.p75,
-      avgBill:null, sample:data.length, titleAverages,
+    setStats({
+      baseStats,
+      hourlyStats,
+      nBase: base.length,
+      nHr: hourly.length,
+      titleAverages,
     });
   }
 
-  React.useEffect(()=>{refresh();},[]);
+  React.useEffect(() => { loadInsights(); }, []);
+
+  if (!stats) return (
+    <div style={{ color: '#9CA3AF', textAlign: 'center', marginTop: 50 }}>
+      Loading insights...
+    </div>
+  );
 
   return (
-    <div style={{ width:'min(1150px,100%)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
-        <div style={{ fontWeight:800 }}>Compensation Insights</div>
-        <Button onClick={()=>setShowInsights(false)}>Back to Candidate Search</Button>
+    <div style={{ width: 'min(1150px,100%)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+          Compensation Insights — {presetRange.label}
+        </div>
+        <Button onClick={() => setShowInsights(false)}>Back to Candidate Search</Button>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-        <Card><div>Avg Salary</div><div style={{fontSize:22,fontWeight:800}}>${kpis.avgSalary?.toLocaleString()||'—'}</div></Card>
-        <Card><div>Median</div><div style={{fontSize:22,fontWeight:800}}>${kpis.medSalary?.toLocaleString()||'—'}</div></Card>
-        <Card><div>P25–P75</div><div style={{fontSize:22,fontWeight:800}}>${kpis.p25Salary?.toLocaleString()||'—'}–${kpis.p75Salary?.toLocaleString()||'—'}</div></Card>
-        <Card><div>Sample</div><div style={{fontSize:22,fontWeight:800}}>{kpis.sample}</div></Card>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+        <Card style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, color: '#9CA3AF' }}>Salary (base)</div>
+          <div style={{ marginTop: 4 }}>n={stats.nBase}</div>
+          <div style={{ marginTop: 4, fontSize: 15 }}>
+            Median ${stats.baseStats.median.toLocaleString()} •
+            P25 ${stats.baseStats.p25.toLocaleString()} •
+            P75 ${stats.baseStats.p75.toLocaleString()}
+          </div>
+        </Card>
+
+        <Card style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, color: '#9CA3AF' }}>Hourly (billable)</div>
+          <div style={{ marginTop: 4 }}>n={stats.nHr}</div>
+          <div style={{ marginTop: 4, fontSize: 15 }}>
+            Median ${stats.hourlyStats.median.toLocaleString()}/hr •
+            P25 ${stats.hourlyStats.p25.toLocaleString()}/hr •
+            P75 ${stats.hourlyStats.p75.toLocaleString()}/hr
+          </div>
+        </Card>
       </div>
 
-      <Card style={{marginTop:12}}>
-        <div style={{fontWeight:800,marginBottom:6}}>Avg Salary by Title</div>
-        <BarChart data={kpis.titleAverages}/>
+      <Card>
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>Avg Salary by Title</div>
+        {stats.titleAverages.map(row => (
+          <div key={row.label} style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 130, color: '#E5E7EB', fontSize: 14 }}>{row.label}</div>
+              <div style={{
+                flex: 1,
+                height: 10,
+                background: '#0B1220',
+                border: '1px solid #1F2937',
+                borderRadius: 999,
+              }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${row.pct}%`,
+                    background: '#3B82F6',
+                    borderRadius: 999,
+                  }}
+                />
+              </div>
+              <div style={{ width: 90, textAlign: 'right', fontSize: 12, color: '#9CA3AF' }}>
+                ${row.value.toLocaleString()}
+              </div>
+            </div>
+          </div>
+        ))}
       </Card>
     </div>
   );
 }
-
-
-const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
-const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
-
-// Consistent button base style (matches <Button/> sizing)
-const buttonBaseStyle = {
-  padding: '10px 14px',
-  borderRadius: 10,
-  border: '1px solid #1F2937',
-  fontWeight: 600,
-  cursor: 'pointer',
-  display: 'inline-block',
-  textDecoration: 'none',
-};
