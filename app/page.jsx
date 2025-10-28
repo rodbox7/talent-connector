@@ -1943,142 +1943,339 @@ const selectStyle = {
   MozAppearance: 'none',
 };
 
-/* ---------- Compensation Insights (fully restored original UI) ---------- */
-function BarChart({ data }) {
+/* ---------- Compensation Insights ---------- */
+
+// simple helpers used only by Insights
+const money = (n) => (Number.isFinite(n) ? `$${Number(n).toLocaleString()}` : '—');
+const pct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
+const toYMD = (d) => {
+  const yyyy = d.getFullYear(); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+const rangeFromPreset = (preset) => {
+  const today = new Date();
+  const end = toYMD(today);
+  const back = (days) => { const x = new Date(today); x.setDate(x.getDate()-days); return toYMD(x); };
+  switch (preset) {
+    case 'LAST_30':  return { start: back(30),  end };
+    case 'LAST_60':  return { start: back(60),  end };
+    case 'LAST_90':  return { start: back(90),  end };
+    case 'LAST_180': return { start: back(180), end };
+    case 'YTD': {
+      const s = new Date(today.getFullYear(),0,1); return { start: toYMD(s), end };
+    }
+    case 'ALL': default: return { start: '', end: '' };
+  }
+};
+const formatMDY = (val) => {
+  if (!val) return '';
+  const d = new Date(val);
+  const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); const yy = d.getFullYear();
+  return `${mm}/${dd}/${yy}`;
+};
+const toDateKey = (val) => {
+  if (!val) return null;
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  try { return toYMD(new Date(val)); } catch { return null; }
+};
+const statsFrom = (values) => {
+  const v = values.filter((x) => Number.isFinite(x)).sort((a,b)=>a-b);
+  const n = v.length;
+  if (!n) return { n:0, avg:null, median:null, p25:null, p75:null };
+  const avg = Math.round(v.reduce((a,c)=>a+c,0)/n);
+  const q = (p) => {
+    const idx = (p/100)*(n-1); const lo = Math.floor(idx), hi = Math.ceil(idx);
+    if (lo===hi) return v[lo];
+    const t = idx-lo; return Math.round(v[lo]*(1-t) + v[hi]*t);
+  };
+  return { n, avg, median:q(50), p25:q(25), p75:q(75) };
+};
+const getMetro = (r) => (r.metro_area && r.metro_area.trim())
+  ? r.metro_area.trim()
+  : [r.city, r.state].filter(Boolean).join(', ');
+
+// minimal bar rows (no external libs)
+function BarRows({ title, rows }) {
+  const max = Math.max(...rows.map(r => r.value || 0), 1);
   return (
-    <div style={{ marginTop: 20 }}>
-      {data.map((row) => (
-        <div key={row.label} style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 140, fontSize: 14, color: '#E5E7EB' }}>{row.label}</div>
-            <div style={{ flex: 1, height: 10, background: '#0B1220', borderRadius: 999 }}>
-              <div
-                style={{
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontWeight: 800, marginBottom: 8 }}>{title}</div>
+      <div>
+        {rows.map((r) => (
+          <div key={r.label} style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 180, color: '#E5E7EB', fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {r.label}
+              </div>
+              <div style={{ flex: 1, height: 10, background: '#0B1220', border: '1px solid #1F2937', borderRadius: 999 }}>
+                <div style={{
                   height: '100%',
-                  width: `${row.pct}%`,
+                  width: pct((r.value || 0) / max * 100),
                   background: '#3B82F6',
-                  borderRadius: 999,
-                }}
-              />
-            </div>
-            <div style={{ width: 90, textAlign: 'right', fontSize: 12, color: '#9CA3AF' }}>
-              {row.value != null ? `$${row.value.toLocaleString()}` : '—'}
+                  borderRadius: 999
+                }}/>
+              </div>
+              <div style={{ width: 110, textAlign: 'right', fontSize: 12, color: '#9CA3AF' }}>
+                {money(r.value)}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
-function InsightsView({
-  isMobile,
-  statsFrom,
-  presetRange,
-  iTitle, setITitle,
-  iLaw, setILaw,
-  iState, setIState,
-  iCity, setICity,
-  iYearsRange, setIYearsRange,
-  iContractOnly, setIContractOnly,
-  iPreset, setIPreset,
-  iStartDate, iEndDate,
-  setShowInsights,
-}) {
-  const [kpis, setKpis] = React.useState({
-    medSalary: null, p25Salary: null, p75Salary: null,
-    medBill: null, p25Bill: null, p75Bill: null,
-    nBase: 0, nHr: 0, titleAverages: [],
-  });
+// CLASSIC Insights (self-contained; parent renders <InsightsView/>)
+function InsightsView() {
+  // filters UI
+  const [fTitle, setFTitle] = React.useState('');
+  const [fLaw, setFLaw] = React.useState('');
+  const [fState, setFState] = React.useState('');
+  const [fCity, setFCity] = React.useState('');          // acts as Metro Area filter
+  const [fYears, setFYears] = React.useState('');
+  const [contractOnly, setContractOnly] = React.useState(false);
+  const [preset, setPreset] = React.useState('LAST_180');
+  const [{start,end}, setRange] = React.useState(rangeFromPreset('LAST_180'));
+  const [loading, setLoading] = React.useState(false);
+  const [rows, setRows] = React.useState([]);
+  const [err, setErr] = React.useState('');
 
-  const formatDate = (d) => {
-    const date = new Date(d);
-    return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date
-      .getDate()
-      .toString()
-      .padStart(2, '0')}/${date.getFullYear()}`;
-  };
-
+  // refresh button
   async function refresh() {
-    const { data, error } = await supabase
-      .from('candidates')
-      .select('titles_csv,law_csv,city,state,years,salary,contract,hourly,off_market,date_entered')
-      .limit(2000);
-    if (error) return console.error(error);
+    try {
+      setErr('');
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('id,name,titles_csv,law_csv,metro_area,city,state,years,salary,contract,hourly,date_entered,created_at,off_market')
+        .limit(5000);
+      if (error) throw error;
 
-    const base = data.map(r => Number(r.salary)).filter(n => n > 0);
-    const bill = data.map(r => (r.contract ? Number(r.hourly) : null))
-                    .filter(n => Number.isFinite(n) && n > 0);
+      // date gate
+      const gate = (d) => {
+        const k = toDateKey(d); if (!k) return true;
+        if (start && k < start) return false;
+        if (end   && k > end)   return false;
+        return true;
+      };
 
-    const sStats = statsFrom(base);
-    const hStats = statsFrom(bill);
+      // years filter parse
+      const yrs = (() => {
+        if (!fYears) return {min:null,max:null};
+        const [a,b] = fYears.split('-');
+        const min = a ? Number(a) : null, max = b ? Number(b) : null;
+        return { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null };
+      })();
 
-    const titles = ['Attorney', 'Paralegal', 'Administrative', 'Legal Support'];
-    const byTitle = titles.map(t => {
-      const vals = data
-        .filter(r => (r.titles_csv || '').includes(t))
-        .map(r => Number(r.salary))
-        .filter(n => n > 0);
-      const st = statsFrom(vals);
-      return { label: t, value: st.avg };
-    });
-    const max = Math.max(...byTitle.map(b => b.value || 0), 1);
-    const titleAverages = byTitle.map(b => ({ ...b, pct: Math.round((b.value / max) * 100) }));
+      const filtered = (data||[]).filter((r) => {
+        if (fTitle) {
+          const csv = String(r.titles_csv||'').toLowerCase();
+          if (!csv.split(',').map(x=>x.trim()).includes(fTitle.toLowerCase())) return false;
+        }
+        if (fLaw) {
+          const csv = String(r.law_csv||'').toLowerCase();
+          if (!csv.split(',').map(x=>x.trim()).includes(fLaw.toLowerCase())) return false;
+        }
+        if (fState && String(r.state||'') !== fState) return false;
+        if (fCity) {
+          const metro = getMetro(r);
+          if (metro !== fCity) return false;
+        }
+        if (yrs.min!=null || yrs.max!=null) {
+          const y = Number(r.years);
+          if (!Number.isFinite(y)) return false;
+          if (yrs.min!=null && y < yrs.min) return false;
+          if (yrs.max!=null && y > yrs.max) return false;
+        }
+        if (contractOnly && !r.contract) return false;
+        if (!gate(r.date_entered || r.created_at)) return false;
+        return true;
+      });
 
-    setKpis({
-      medSalary: sStats.median, p25Salary: sStats.p25, p75Salary: sStats.p75,
-      medBill: hStats.median, p25Bill: hStats.p25, p75Bill: hStats.p75,
-      nBase: base.length, nHr: bill.length,
-      titleAverages,
-    });
+      setRows(filtered);
+    } catch (e) {
+      console.error(e);
+      setErr('Failed to load insights.');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  React.useEffect(() => { refresh(); }, []);
+  // keep dates in sync with preset
+  React.useEffect(() => { setRange(rangeFromPreset(preset)); }, [preset]);
+  React.useEffect(() => { refresh(); }, [preset]); // initial + preset change
+
+  // derive KPIs
+  const salaries = rows.map(r => Number(r.salary)).filter(n => Number.isFinite(n) && n>0);
+  const salaryStats = statsFrom(salaries);
+  const hourliesBill = rows
+    .map(r => (r.contract && Number.isFinite(Number(r.hourly)) ? Math.round(Number(r.hourly)*1.66) : null))
+    .filter(n => Number.isFinite(n) && n>0);
+  const hourlyStats = statsFrom(hourliesBill);
+
+  const dateLabel = `${formatMDY(start || 'start')} — ${formatMDY(end || new Date())}`;
+
+  // chart buckets
+  const titleList = ['Attorney','Paralegal','Administrative','Legal Support'];
+  const byTitleSalary = titleList.map(t => {
+    const vals = rows
+      .filter(r => String(r.titles_csv||'').split(',').map(x=>x.trim()).includes(t))
+      .map(r => Number(r.salary))
+      .filter(n => Number.isFinite(n) && n>0);
+    const s = statsFrom(vals);
+    return { label: t, value: s.avg || 0 };
+  });
+  const byTitleHourly = ['Attorney','Paralegal'].map(t => {
+    const vals = rows
+      .filter(r => r.contract && String(r.titles_csv||'').split(',').map(x=>x.trim()).includes(t))
+      .map(r => Number(r.hourly))
+      .filter(n => Number.isFinite(n) && n>0)
+      .map(n => Math.round(n*1.66));
+    const s = statsFrom(vals);
+    return { label: t, value: s.avg || 0 };
+  });
+  // average salary by metro/city (top 10)
+  const mapCity = new Map();
+  rows.forEach(r => {
+    const m = getMetro(r) || '—';
+    const s = Number(r.salary);
+    if (Number.isFinite(s) && s>0) {
+      const bucket = mapCity.get(m) || [];
+      bucket.push(s);
+      mapCity.set(m, bucket);
+    }
+  });
+  const byCity = Array.from(mapCity.entries())
+    .map(([label, arr]) => ({ label, value: statsFrom(arr).avg || 0 }))
+    .sort((a,b)=> (b.value||0) - (a.value||0))
+    .slice(0, 10);
 
   return (
-    <div
-      style={{
-        width: 'min(1150px,100%)',
-        color: '#F3F4F6',
-        fontFamily: 'Inter, sans-serif',
-        background: 'rgba(0,0,0,0.5)',
-        borderRadius: 12,
-        padding: 20,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+    <div style={{ width: 'min(1150px, 100%)' }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
         <div style={{ fontWeight: 800 }}>
-          Compensation Insights — {formatDate(iStartDate)} — {formatDate(iEndDate)}
+          Compensation Insights <span style={{ color:'#93C5FD' }}>—</span>{' '}
+          <span style={{ color:'#9CA3AF' }}>salary & hourly trends</span>
         </div>
-        <Button onClick={() => setShowInsights(false)}>Back to Candidate Search</Button>
+        <div style={{ display:'flex', gap:8 }}>
+          <Button onClick={refresh} style={{ background:'#0EA5E9', border:'1px solid #1F2937' }}>Refresh</Button>
+          <Button onClick={() => setShowInsights(false)} style={{ background:'#0B1220', border:'1px solid #1F2937' }}>
+            Back to Candidate Search
+          </Button>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
-        <Card>
-          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Salary (base)</div>
-          <div>n={kpis.nBase}</div>
-          <div style={{ marginTop: 6 }}>
-            Median ${kpis.medSalary?.toLocaleString() || '—'} •
-            P25 ${kpis.p25Salary?.toLocaleString() || '—'} •
-            P75 ${kpis.p75Salary?.toLocaleString() || '—'}
+      {/* FILTER STRIP (classic layout) */}
+      <Card style={{ marginTop: 8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(5, minmax(0,1fr))', gap:12 }}>
+          <div>
+            <Label>Title</Label>
+            <Input list="insights-titles" placeholder="Any" value={fTitle} onChange={(e)=>setFTitle(e.target.value)} />
+            <datalist id="insights-titles">
+              {['Attorney','Paralegal','Administrative','Legal Support'].map(t=> <option key={t} value={t} />)}
+            </datalist>
           </div>
-        </Card>
-
-        <Card>
-          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Hourly (billable)</div>
-          <div>n={kpis.nHr}</div>
-          <div style={{ marginTop: 6 }}>
-            Median ${kpis.medBill?.toLocaleString() || '—'}/hr •
-            P25 ${kpis.p25Bill?.toLocaleString() || '—'}/hr •
-            P75 ${kpis.p75Bill?.toLocaleString() || '—'}/hr
+          <div>
+            <Label>Type of Law</Label>
+            <Input list="insights-laws" placeholder="Any" value={fLaw} onChange={(e)=>setFLaw(e.target.value)} />
+            <datalist id="insights-laws">
+              {(LAW_OPTIONS||[]).map(l => <option key={l} value={l} />)}
+            </datalist>
           </div>
-        </Card>
-      </div>
+          <div>
+            <Label>State</Label>
+            <select value={fState} onChange={(e)=>setFState(e.target.value)} style={selectStyle}>
+              <option value="">Any</option>
+              {STATES.map(s=> <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label>City (Metro Area)</Label>
+            <Input placeholder="Any" value={fCity} onChange={(e)=>setFCity(e.target.value)} />
+          </div>
+          <div>
+            <Label>Years of experience</Label>
+            <select value={fYears} onChange={(e)=>setFYears(e.target.value)} style={selectStyle}>
+              <option value="">Any</option>
+              <option value="0-2">0–2</option>
+              <option value="3-5">3–5</option>
+              <option value="6-10">6–10</option>
+              <option value="11-20">11–20</option>
+              <option value="21-">21+</option>
+            </select>
+          </div>
+        </div>
 
-      <Card style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Avg Salary by Title</div>
-        <BarChart data={kpis.titleAverages} />
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:12, flexWrap:'wrap' }}>
+          <div style={{ flex:'0 0 220px' }}>
+            <Label>Date range</Label>
+            <select value={preset} onChange={(e)=>setPreset(e.target.value)} style={selectStyle}>
+              <option value="LAST_30">Last 30 days</option>
+              <option value="LAST_60">Last 60 days</option>
+              <option value="LAST_90">Last 90 days</option>
+              <option value="LAST_180">Last 180 days</option>
+              <option value="YTD">Year to date</option>
+              <option value="ALL">All time</option>
+            </select>
+          </div>
+
+          <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:22 }}>
+            <input type="checkbox" checked={contractOnly} onChange={(e)=>setContractOnly(e.target.checked)} />
+            <span style={{ color:'#E5E7EB', fontSize:13 }}>Contract only</span>
+          </label>
+
+          <div style={{ display:'flex', gap:8, marginTop:20 }}>
+            <Button onClick={refresh}>Apply</Button>
+            <Button onClick={() => { setFTitle(''); setFLaw(''); setFState(''); setFCity(''); setFYears(''); setContractOnly(false); setPreset('LAST_180'); }} style={{ background:'#111827', border:'1px solid #1F2937' }}>
+              Clear
+            </Button>
+          </div>
+
+          {err ? <div style={{ color:'#F87171', fontSize:12 }}>{err}</div> : null}
+        </div>
       </Card>
+
+      {/* KPI strip */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5, minmax(0, 1fr))', gap:12, marginTop:12 }}>
+        <Card style={{ padding:16 }}>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginBottom:6 }}>Avg Salary</div>
+          <div style={{ fontSize:22, fontWeight:800 }}>{money(salaryStats.avg)}</div>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginTop:2 }}>Median {money(salaryStats.median)}</div>
+        </Card>
+        <Card style={{ padding:16 }}>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginBottom:6 }}>Typical Salary Range</div>
+          <div style={{ fontSize:22, fontWeight:800 }}>
+            {money(salaryStats.p25)}–{money(salaryStats.p75)}
+          </div>
+        </Card>
+        <Card style={{ padding:16 }}>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginBottom:6 }}>Avg Billable Hourly</div>
+          <div style={{ fontSize:22, fontWeight:800 }}>{hourlyStats.n ? `${money(hourlyStats.avg)}/hr` : '—'}</div>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginTop:2 }}>Contract roles only</div>
+        </Card>
+        <Card style={{ padding:16 }}>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginBottom:6 }}>Sample Size</div>
+          <div style={{ fontSize:22, fontWeight:800 }}>{rows.length}</div>
+        </Card>
+        <Card style={{ padding:16 }}>
+          <div style={{ color:'#9CA3AF', fontSize:12, marginBottom:6 }}>Filter</div>
+          <div style={{ fontSize:22, fontWeight:800 }}>
+            {formatMDY(start)} → {formatMDY(end)}
+          </div>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr', gap:12 }}>
+        <BarRows title="Avg Salary by Title" rows={byTitleSalary} />
+        <BarRows title="Avg Hourly (Billable) by Title" rows={byTitleHourly} />
+        <BarRows title="Avg Salary by City" rows={byCity} />
+      </div>
     </div>
   );
 }
