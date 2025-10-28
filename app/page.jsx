@@ -1377,8 +1377,197 @@ if (user.role === 'recruiter') {
     // compact control metrics used to match "Additional information" / "Email for more information"
     const compact = { padding: '8px 12px', fontSize: 14, lineHeight: '20px', borderRadius: 10 };
 
-    function BarChart(){ return null; } // (omitted for brevity – unchanged)
-    function InsightsView(){ return null; } // (omitted for brevity – unchanged)
+    // Simple placeholder chart (text-only, no external libs)
+function BarChart({ title, items }) {
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontWeight: 700, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 12, color: '#9CA3AF' }}>
+        {items?.length ? items.join(' • ') : 'No data'}
+      </div>
+    </Card>
+  );
+}
+
+function InsightsView() {
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [rows, setRows] = React.useState([]);
+
+  // pull inputs from parent state
+  const filters = {
+    title: iTitle,
+    law: iLaw,
+    city: iCity,
+    state: iState,
+    yearsRange: iYearsRange,
+    contractOnly: iContractOnly,
+    start: iStartDate,
+    end: iEndDate,
+  };
+
+  // reuse helpers from file scope
+  const rangeToObj = (val) => {
+    if (!val) return { min: null, max: null };
+    const [a, b] = val.split('-');
+    const min = a ? Number(a) : null;
+    const max = b ? Number(b) : null;
+    return {
+      min: Number.isFinite(min) ? min : null,
+      max: Number.isFinite(max) ? max : null,
+    };
+  };
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        setErr('');
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('candidates')
+          .select(
+            'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,off_market'
+          )
+          .limit(5000);
+        if (error) throw error;
+
+        // Filter in-memory using the same logic as client list
+        const yrsRange = rangeToObj(filters.yearsRange);
+        const filtered = (data || []).filter((r) => {
+          // title / law must include selection if set
+          if (filters.title) {
+            const csv = String(r.titles_csv || '').toLowerCase();
+            if (!csv.split(',').some((x) => x.trim() === filters.title.toLowerCase())) return false;
+          }
+          if (filters.law) {
+            const csv = String(r.law_csv || '').toLowerCase();
+            if (!csv.split(',').some((x) => x.trim() === filters.law.toLowerCase())) return false;
+          }
+          if (filters.city && String(r.city || '') !== filters.city) return false;
+          if (filters.state && String(r.state || '') !== filters.state) return false;
+
+          if (yrsRange.min != null || yrsRange.max != null) {
+            const y = Number(r.years);
+            if (!Number.isFinite(y)) return false;
+            if (yrsRange.min != null && y < yrsRange.min) return false;
+            if (yrsRange.max != null && y > yrsRange.max) return false;
+          }
+
+          if (filters.contractOnly && !r.contract) return false;
+
+          if (filters.start) {
+            const d = ymd(r.date_entered || r.created_at) || '';
+            if (d && d < filters.start) return false;
+          }
+          if (filters.end) {
+            const d = ymd(r.date_entered || r.created_at) || '';
+            if (d && d > filters.end) return false;
+          }
+
+          return true;
+        });
+
+        setRows(filtered);
+      } catch (e) {
+        console.error(e);
+        setErr('Failed to load insights.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [iTitle, iLaw, iCity, iState, iYearsRange, iContractOnly, iStartDate, iEndDate]);
+
+  // compute quick stats
+  const salaries = rows
+    .map((r) => Number(r.salary))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const hourliesBill = rows
+    .map((r) => (r.contract && Number.isFinite(Number(r.hourly)) ? Math.round(Number(r.hourly) * 1.66) : null))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  const sStats = statsFrom(salaries);
+  const hStats = statsFrom(hourliesBill);
+
+  const dateLabel = (() => {
+    const a = iStartDate ? formatMDY(iStartDate) : 'start';
+    const b = iEndDate ? formatMDY(iEndDate) : 'today';
+    return `${a} — ${b}`;
+  })();
+
+  return (
+    <div style={{ width: 'min(1150px, 100%)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+          Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
+          <span style={{ color: '#9CA3AF' }}>{dateLabel}</span>
+        </div>
+        <Button
+          onClick={() => setShowInsights(false)}
+          style={{ background: '#0B1220', border: '1px solid #1F2937' }}
+        >
+          Back to Candidate search
+        </Button>
+      </div>
+
+      {err ? <div style={{ color: '#F87171', fontSize: 12, marginBottom: 10 }}>{err}</div> : null}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
+        <Card>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Candidates in scope</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{rows.length}</div>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>
+            Filters applied: {[
+              iTitle ? `Title: ${iTitle}` : null,
+              iLaw ? `Law: ${iLaw}` : null,
+              iCity ? `City: ${iCity}` : null,
+              iState ? `State: ${iState}` : null,
+              iYearsRange ? `Years: ${iYearsRange}` : null,
+              iContractOnly ? 'Contract only' : null,
+            ].filter(Boolean).join(' • ') || 'None'}
+          </div>
+        </Card>
+
+        <Card>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Salary (base)</div>
+          <div style={{ fontSize: 16 }}>
+            n={sStats.n || 0}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 14 }}>
+            {sStats.n
+              ? <>Median ${sStats.median?.toLocaleString()} • P25 ${sStats.p25?.toLocaleString()} • P75 ${sStats.p75?.toLocaleString()}</>
+              : 'No salary data'}
+          </div>
+        </Card>
+
+        <Card>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Hourly (billable)</div>
+          <div style={{ fontSize: 16 }}>
+            n={hStats.n || 0}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 14 }}>
+            {hStats.n
+              ? <>Median ${hStats.median?.toLocaleString()}/hr • P25 ${hStats.p25?.toLocaleString()}/hr • P75 ${hStats.p75?.toLocaleString()}/hr</>
+              : 'No hourly data'}
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <BarChart
+          title="Top titles in scope"
+          items={[...new Set(rows.flatMap((r) => String(r.titles_csv || '')
+            .split(',').map((x) => x.trim()).filter(Boolean)))].slice(0, 8)}
+        />
+        <BarChart
+          title="Top practice areas in scope"
+          items={[...new Set(rows.flatMap((r) => String(r.law_csv || '')
+            .split(',').map((x) => x.trim()).filter(Boolean)))].slice(0, 8)}
+        />
+      </div>
+    </div>
+  );
+}
+
 
     return (
       <div style={pageWrap}>
@@ -1629,10 +1818,74 @@ if (user.role === 'recruiter') {
               </Card>
 
               {/* (Results / cards unchanged) */}
-              <Card style={{ marginTop: 14 }}>
-                <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
-                {/* ... keep your existing results list rendering here ... */}
-              </Card>
+             <Card style={{ marginTop: 14 }}>
+  <div style={{ fontWeight: 800, marginBottom: 12 }}>
+    Results {clientLoading ? <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(Loading…)</span> : null}
+  </div>
+
+  {clientErr ? (
+    <div style={{ color: '#F87171', fontSize: 12, marginBottom: 10 }}>{clientErr}</div>
+  ) : null}
+
+  {!clientLoading && clientRows.length === 0 ? (
+    <div style={{ fontSize: 14, color: '#9CA3AF' }}>No matches. Adjust filters above and try again.</div>
+  ) : null}
+
+  <div style={{ display: 'grid', gap: 10 }}>
+    {clientRows.map((c) => {
+      const comp = displayCompClient(c);
+      const loc = [c.city, c.state].filter(Boolean).join(', ');
+      const dateShow = formatMDY(ymd(c.date_entered || c.created_at));
+
+      return (
+        <div key={c.id} style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}>
+          {/* top row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontWeight: 700 }}>{c.name || 'Untitled candidate'}</div>
+              {c.titles_csv ? <Tag>{c.titles_csv}</Tag> : null}
+              {c.law_csv ? <Tag style={{ background: '#0F172A' }}>{c.law_csv}</Tag> : null}
+              {loc ? <Tag style={{ background: '#0F172A' }}>{loc}</Tag> : null}
+              {c.off_market ? <Tag style={{ background: '#111827', border: '1px solid #4B5563' }}>Off market</Tag> : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <a
+                href={buildMailto(c)}
+                style={{ ...buttonBaseStyle, background: '#0EA5E9', border: '1px solid #1F2937', color: 'white' }}
+              >
+                Email for more information
+              </a>
+              <button
+                onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                style={{ ...buttonBaseStyle, background: '#111827', border: '1px solid #1F2937', color: 'white' }}
+              >
+                {expandedId === c.id ? 'Hide details' : 'Additional information'}
+              </button>
+            </div>
+          </div>
+
+          {/* second row */}
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 13, color: '#E5E7EB' }}>
+            <div><strong>Comp:</strong> {comp}</div>
+            <div><strong>Years:</strong> {Number.isFinite(Number(c.years)) ? Number(c.years) : '—'}</div>
+            {c.contract && Number.isFinite(Number(c.hourly)) ? (
+              <div><strong>Contract billable:</strong> ${Math.round(Number(c.hourly) * 1.66)}/hr</div>
+            ) : null}
+            <div><strong>Date:</strong> {dateShow || '—'}</div>
+          </div>
+
+          {/* expanded */}
+          {expandedId === c.id ? (
+            <div style={{ marginTop: 10, fontSize: 14, color: '#D1D5DB' }}>
+              {c.notes ? <div style={{ whiteSpace: 'pre-wrap' }}>{c.notes}</div> : <em>No additional notes</em>}
+            </div>
+          ) : null}
+        </div>
+      );
+    })}
+  </div>
+</Card>
+
             </div>
           ) : (
             <div style={{ width: 'min(1150px, 100%)' }}>
