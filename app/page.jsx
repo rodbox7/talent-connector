@@ -1887,11 +1887,12 @@ function InsightsView() {
 </Card>
 
             </div>
-          ) : (
-            <div style={{ width: 'min(1150px, 100%)' }}>
-              {/* InsightsView rendering (unchanged) */}
-            </div>
-          )}
+              ) : (
+        <div style={{ width: 'min(1150px, 100%)' }}>
+          <InsightsView />
+        </div>
+      )}
+
         </div>
       </div>
     );
