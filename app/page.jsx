@@ -1943,6 +1943,105 @@ const selectStyle = {
   MozAppearance: 'none',
 };
 
+/* ---------- Compensation Insights ---------- */
+function BarChart({ data }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      {data.map((row) => (
+        <div key={row.label} style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 140, fontSize: 14, color: '#E5E7EB' }}>{row.label}</div>
+            <div style={{ flex: 1, height: 10, background: '#0B1220', border: '1px solid #1F2937', borderRadius: 999 }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: `${row.pct}%`,
+                  background: '#3B82F6',
+                  borderRadius: 999,
+                }}
+              />
+            </div>
+            <div style={{ width: 90, textAlign: 'right', fontSize: 12, color: '#9CA3AF' }}>
+              {row.value != null ? `$${row.value.toLocaleString()}` : '—'}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InsightsView({
+  isMobile,
+  statsFrom,
+  presetRange,
+  iTitle, setITitle,
+  iLaw, setILaw,
+  iState, setIState,
+  iCity, setICity,
+  iYearsRange, setIYearsRange,
+  iContractOnly, setIContractOnly,
+  iPreset, setIPreset,
+  iStartDate, iEndDate,
+  setShowInsights,
+}) {
+  const [kpis, setKpis] = React.useState({
+    avgSalary: null, medSalary: null, p25Salary: null, p75Salary: null,
+    avgBill: null, sample: 0, titleAverages: [],
+  });
+
+  async function refresh() {
+    const { data } = await supabase
+      .from('candidates')
+      .select('titles_csv,law_csv,city,state,years,salary,contract,hourly,off_market')
+      .limit(2000);
+
+    const salaries = data.map(r => Number(r.salary)).filter(n => n > 0);
+    const s = statsFrom(salaries);
+
+    const titles = ['Attorney','Paralegal','Administrative','Legal Support'];
+    const byTitle = titles.map(t => {
+      const vals = data
+        .filter(r => (r.titles_csv||'').split(',').includes(t))
+        .map(r => Number(r.salary))
+        .filter(n => n > 0);
+      const st = statsFrom(vals);
+      return { label:t, value:st.avg };
+    });
+    const max = Math.max(...byTitle.map(b=>b.value||0),1);
+    const titleAverages = byTitle.map(b=>({...b,pct:Math.round((b.value/max)*100)}));
+
+    setKpis({
+      avgSalary:s.avg, medSalary:s.median, p25Salary:s.p25, p75Salary:s.p75,
+      avgBill:null, sample:data.length, titleAverages,
+    });
+  }
+
+  React.useEffect(()=>{refresh();},[]);
+
+  return (
+    <div style={{ width:'min(1150px,100%)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
+        <div style={{ fontWeight:800 }}>Compensation Insights</div>
+        <Button onClick={()=>setShowInsights(false)}>Back to Candidate Search</Button>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+        <Card><div>Avg Salary</div><div style={{fontSize:22,fontWeight:800}}>${kpis.avgSalary?.toLocaleString()||'—'}</div></Card>
+        <Card><div>Median</div><div style={{fontSize:22,fontWeight:800}}>${kpis.medSalary?.toLocaleString()||'—'}</div></Card>
+        <Card><div>P25–P75</div><div style={{fontSize:22,fontWeight:800}}>${kpis.p25Salary?.toLocaleString()||'—'}–${kpis.p75Salary?.toLocaleString()||'—'}</div></Card>
+        <Card><div>Sample</div><div style={{fontSize:22,fontWeight:800}}>{kpis.sample}</div></Card>
+      </div>
+
+      <Card style={{marginTop:12}}>
+        <div style={{fontWeight:800,marginBottom:6}}>Avg Salary by Title</div>
+        <BarChart data={kpis.titleAverages}/>
+      </Card>
+    </div>
+  );
+}
+
+
 const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
 
