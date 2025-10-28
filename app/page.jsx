@@ -1943,15 +1943,15 @@ const selectStyle = {
   MozAppearance: 'none',
 };
 
-/* ---------- Compensation Insights ---------- */
+/* ---------- Compensation Insights (fully restored original UI) ---------- */
 function BarChart({ data }) {
   return (
-    <div style={{ marginTop: 12 }}>
+    <div style={{ marginTop: 20 }}>
       {data.map((row) => (
         <div key={row.label} style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 140, fontSize: 14, color: '#E5E7EB' }}>{row.label}</div>
-            <div style={{ flex: 1, height: 10, background: '#0B1220', border: '1px solid #1F2937', borderRadius: 999 }}>
+            <div style={{ flex: 1, height: 10, background: '#0B1220', borderRadius: 999 }}>
               <div
                 style={{
                   height: '100%',
@@ -1985,110 +1985,99 @@ function InsightsView({
   iStartDate, iEndDate,
   setShowInsights,
 }) {
-  const [stats, setStats] = React.useState(null);
+  const [kpis, setKpis] = React.useState({
+    medSalary: null, p25Salary: null, p75Salary: null,
+    medBill: null, p25Bill: null, p75Bill: null,
+    nBase: 0, nHr: 0, titleAverages: [],
+  });
 
-  async function loadInsights() {
-    const { data } = await supabase
+  const formatDate = (d) => {
+    const date = new Date(d);
+    return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date
+      .getDate()
+      .toString()
+      .padStart(2, '0')}/${date.getFullYear()}`;
+  };
+
+  async function refresh() {
+    const { data, error } = await supabase
       .from('candidates')
-      .select('salary,hourly,titles_csv,law_csv')
+      .select('titles_csv,law_csv,city,state,years,salary,contract,hourly,off_market,date_entered')
       .limit(2000);
+    if (error) return console.error(error);
 
     const base = data.map(r => Number(r.salary)).filter(n => n > 0);
-    const hourly = data.map(r => Number(r.hourly)).filter(n => n > 0);
+    const bill = data.map(r => (r.contract ? Number(r.hourly) : null))
+                    .filter(n => Number.isFinite(n) && n > 0);
 
-    const baseStats = statsFrom(base);
-    const hourlyStats = statsFrom(hourly);
+    const sStats = statsFrom(base);
+    const hStats = statsFrom(bill);
 
-    const byTitle = ['Attorney','Paralegal','Administrative','Legal Support'].map(t => {
+    const titles = ['Attorney', 'Paralegal', 'Administrative', 'Legal Support'];
+    const byTitle = titles.map(t => {
       const vals = data
-        .filter(r => (r.titles_csv||'').includes(t))
+        .filter(r => (r.titles_csv || '').includes(t))
         .map(r => Number(r.salary))
         .filter(n => n > 0);
-      const s = statsFrom(vals);
-      return { label: t, value: s.avg };
+      const st = statsFrom(vals);
+      return { label: t, value: st.avg };
     });
     const max = Math.max(...byTitle.map(b => b.value || 0), 1);
-    const titleAverages = byTitle.map(b => ({
-      ...b,
-      pct: Math.round((b.value / max) * 100),
-    }));
+    const titleAverages = byTitle.map(b => ({ ...b, pct: Math.round((b.value / max) * 100) }));
 
-    setStats({
-      baseStats,
-      hourlyStats,
-      nBase: base.length,
-      nHr: hourly.length,
+    setKpis({
+      medSalary: sStats.median, p25Salary: sStats.p25, p75Salary: sStats.p75,
+      medBill: hStats.median, p25Bill: hStats.p25, p75Bill: hStats.p75,
+      nBase: base.length, nHr: bill.length,
       titleAverages,
     });
   }
 
-  React.useEffect(() => { loadInsights(); }, []);
-
-  if (!stats) return (
-    <div style={{ color: '#9CA3AF', textAlign: 'center', marginTop: 50 }}>
-      Loading insights...
-    </div>
-  );
+  React.useEffect(() => { refresh(); }, []);
 
   return (
-    <div style={{ width: 'min(1150px,100%)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-          Compensation Insights — {presetRange.label}
+    <div
+      style={{
+        width: 'min(1150px,100%)',
+        color: '#F3F4F6',
+        fontFamily: 'Inter, sans-serif',
+        background: 'rgba(0,0,0,0.5)',
+        borderRadius: 12,
+        padding: 20,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontWeight: 800 }}>
+          Compensation Insights — {formatDate(iStartDate)} — {formatDate(iEndDate)}
         </div>
         <Button onClick={() => setShowInsights(false)}>Back to Candidate Search</Button>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-        <Card style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, color: '#9CA3AF' }}>Salary (base)</div>
-          <div style={{ marginTop: 4 }}>n={stats.nBase}</div>
-          <div style={{ marginTop: 4, fontSize: 15 }}>
-            Median ${stats.baseStats.median.toLocaleString()} •
-            P25 ${stats.baseStats.p25.toLocaleString()} •
-            P75 ${stats.baseStats.p75.toLocaleString()}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+        <Card>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Salary (base)</div>
+          <div>n={kpis.nBase}</div>
+          <div style={{ marginTop: 6 }}>
+            Median ${kpis.medSalary?.toLocaleString() || '—'} •
+            P25 ${kpis.p25Salary?.toLocaleString() || '—'} •
+            P75 ${kpis.p75Salary?.toLocaleString() || '—'}
           </div>
         </Card>
 
-        <Card style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, color: '#9CA3AF' }}>Hourly (billable)</div>
-          <div style={{ marginTop: 4 }}>n={stats.nHr}</div>
-          <div style={{ marginTop: 4, fontSize: 15 }}>
-            Median ${stats.hourlyStats.median.toLocaleString()}/hr •
-            P25 ${stats.hourlyStats.p25.toLocaleString()}/hr •
-            P75 ${stats.hourlyStats.p75.toLocaleString()}/hr
+        <Card>
+          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>Hourly (billable)</div>
+          <div>n={kpis.nHr}</div>
+          <div style={{ marginTop: 6 }}>
+            Median ${kpis.medBill?.toLocaleString() || '—'}/hr •
+            P25 ${kpis.p25Bill?.toLocaleString() || '—'}/hr •
+            P75 ${kpis.p75Bill?.toLocaleString() || '—'}/hr
           </div>
         </Card>
       </div>
 
-      <Card>
+      <Card style={{ marginTop: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Avg Salary by Title</div>
-        {stats.titleAverages.map(row => (
-          <div key={row.label} style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 130, color: '#E5E7EB', fontSize: 14 }}>{row.label}</div>
-              <div style={{
-                flex: 1,
-                height: 10,
-                background: '#0B1220',
-                border: '1px solid #1F2937',
-                borderRadius: 999,
-              }}>
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${row.pct}%`,
-                    background: '#3B82F6',
-                    borderRadius: 999,
-                  }}
-                />
-              </div>
-              <div style={{ width: 90, textAlign: 'right', fontSize: 12, color: '#9CA3AF' }}>
-                ${row.value.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        ))}
+        <BarChart data={kpis.titleAverages} />
       </Card>
     </div>
   );
