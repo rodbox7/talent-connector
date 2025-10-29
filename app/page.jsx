@@ -933,82 +933,90 @@ export default function Page() {
     padding: isMobile ? '20px 16px' : '40px 16px',
   };
 
-  /* ---------- Logged-out ---------- */
-  if (!user) {
-    return (
-      <div style={pageWrap}>
-        <div style={overlayCentered}>
-          <Card style={{ width: 520, padding: 24 }}>
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
-              Talent Connector – Powered by Beacon Hill Legal
-            </div>
-            <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
-              Invitation-only access
-            </div>
+ /* ---------- Logged-out ---------- */
+if (!user) {
+  return (
+    <div style={pageWrap}>
+      <div style={overlayCentered}>
+        <Card style={{ width: 520, padding: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
+            Talent Connector – Powered by Beacon Hill Legal
+          </div>
+          <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
+            Invitation-only access
+          </div>
 
-            {/* Role tabs */}
+          {/* Role tabs */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              marginBottom: 16,
+            }}
+          >
+            {['recruiter', 'client', 'admin'].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: '1px solid #1F2937',
+                  background: mode === m ? '#1F2937' : '#0B1220',
+                  color: '#E5E7EB',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {m[0].toUpperCase() + m.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Center the inputs + button */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ width: '100%', maxWidth: 400 }}>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div style={{ width: '100%', maxWidth: 400, marginTop: 10 }}>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                placeholder="your password"
+                value={pwd}
+                onChange={(e) => setPwd(e.target.value)}
+              />
+            </div>
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 8,
-                marginBottom: 16,
+                marginTop: 14,
+                width: '100%',
+                maxWidth: 400,
+                display: 'flex',
+                justifyContent: 'center',
               }}
             >
-              {['recruiter', 'client', 'admin'].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 10,
-                    border: '1px solid #1F2937',
-                    background: mode === m ? '#1F2937' : '#0B1220',
-                    color: '#E5E7EB',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {m[0].toUpperCase() + m.slice(1)}
-                </button>
-              ))}
+              <Button onClick={login} style={{ width: '100%' }}>
+                Log in
+              </Button>
             </div>
+          </div>
 
-            {/* Center the inputs + button */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ width: '100%', maxWidth: 400 }}>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div style={{ width: '100%', maxWidth: 400, marginTop: 10 }}>
-                <Label>Password</Label>
-                <Input
-                  type="password"
-                  placeholder="your password"
-                  value={pwd}
-                  onChange={(e) => setPwd(e.target.value)}
-                />
-              </div>
-              <div style={{ marginTop: 14, width: '100%', maxWidth: 400, display: 'flex', justifyContent: 'center' }}>
-                <Button onClick={login} style={{ width: '100%' }}>
-                  Log in
-                </Button>
-              </div>
-            </div>
-
-            {err ? (
-              <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
-            ) : null}
-          </Card>
-        </div>
+          {err ? (
+            <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
+          ) : null}
+        </Card>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
 /* ---------- Recruiter UI ---------- */
 if (user.role === 'recruiter') {
