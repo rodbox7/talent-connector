@@ -1768,7 +1768,7 @@ export default function Page() {
                   </div>
 
                   <div style={{ minWidth: 0 }}>
-                    <Label>City</Label>
+                      <Label>Metro Area</Label>
                     <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
                       <option value="">Any</option>
                       {cities.map((c) => (
