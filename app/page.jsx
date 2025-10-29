@@ -880,11 +880,12 @@ export default function Page() {
                   onChange={(e) => setPwd(e.target.value)}
                 />
               </div>
-              <div style={{ marginTop: 14, width: '100%', maxWidth: 400 }}>
-  <Button onClick={login} style={{ width: '100%' }}>
+             <div style={{ marginTop: 14, width: '100%' }}>
+  <Button onClick={login} style={{ width: '100%', display: 'block' }}>
     Log in
   </Button>
 </div>
+
 
             </div>
 
