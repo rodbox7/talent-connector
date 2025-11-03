@@ -36,11 +36,6 @@ function getMetroRaw(m) {
   return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
 }
 
-function formatMetro(m) {
-  const raw = getMetroRaw(m).trim();
-  if (!raw) return '';
-  return raw.split(/[-–—]/).map(titleCasePart).join('-');
-}
 
 function formatMetro(s = '') {
   return s
