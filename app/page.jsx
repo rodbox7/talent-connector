@@ -1,6 +1,32 @@
 'use client';
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
+// --- Metro label formatter (fixes "Dallas-fort Worth", "San Francisco-oakland", "Tampa-st. Petersburg") ---
+const WORD_SEP = /[-–—]/; // hyphen/en dash/em dash
+const SMALL = new Set(['of', 'and', 'the', 'for', 'to', 'in', 'on', 'at', 'by']);
+
+function titleCasePart(part = '') {
+  return part
+    .trim()
+    .split(/\s+/)
+    .map((w, i) => {
+      const lw = w.toLowerCase().replace(/\.$/, '');
+      if (lw === 'st') return 'St.';   // St. Louis, St. Petersburg
+      if (lw === 'ft') return 'Ft.';   // Ft. Lauderdale
+      if (SMALL.has(lw) && i !== 0) return lw;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+function formatMetro(s = '') {
+  return s
+    .split(WORD_SEP)
+    .map(p => titleCasePart(p))
+    .join('-'); // keep a simple hyphen in UI
+}
+// --- end metro formatter ---
+
 
 const NYC =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
