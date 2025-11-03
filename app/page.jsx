@@ -18,19 +18,17 @@ function titleCasePart(part = '') {
     })
     .join(' ');
 }
-function titleCasePart(part = '') {
-  return part
-    .trim()
-    .split(/\s+/)
-    .map((w, i) => {
-      const lw = w.toLowerCase().replace(/\.$/, '');
-      if (lw === 'st') return 'St.';   // St. Louis, St. Petersburg
-      if (lw === 'ft') return 'Ft.';   // Ft. Lauderdale
-      if (SMALL.has(lw) && i !== 0) return lw;
-      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-    })
-    .join(' ');
+function getMetroRaw(m) {
+  if (typeof m === 'string') return m;
+  return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
 }
+
+function formatMetro(m) {
+  const raw = getMetroRaw(m).trim();
+  if (!raw) return '';
+  return raw.split(/[-–—]/).map(titleCasePart).join('-');
+}
+
 
 // ✅ paste this block directly below
 function getMetroRaw(m) {
