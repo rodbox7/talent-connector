@@ -1027,8 +1027,7 @@ export default function Page() {
                         {metros.map(m => (
   <option key={m} value={m}>{formatMetro(m)}</option>
 ))}
-
-                        ))}
+                        
                       </select>
                     </div>
 
