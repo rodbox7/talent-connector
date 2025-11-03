@@ -1024,8 +1024,10 @@ export default function Page() {
                         style={selectStyle}
                       >
                         <option value="">Select a metro</option>
-                        {MAJOR_METROS.map((m) => (
-                          <option key={m} value={m}>{m}</option>
+                        {metros.map(m => (
+  <option key={m} value={m}>{formatMetro(m)}</option>
+))}
+
                         ))}
                       </select>
                     </div>
