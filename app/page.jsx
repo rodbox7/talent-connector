@@ -18,6 +18,31 @@ function titleCasePart(part = '') {
     })
     .join(' ');
 }
+function titleCasePart(part = '') {
+  return part
+    .trim()
+    .split(/\s+/)
+    .map((w, i) => {
+      const lw = w.toLowerCase().replace(/\.$/, '');
+      if (lw === 'st') return 'St.';   // St. Louis, St. Petersburg
+      if (lw === 'ft') return 'Ft.';   // Ft. Lauderdale
+      if (SMALL.has(lw) && i !== 0) return lw;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+// ✅ paste this block directly below
+function getMetroRaw(m) {
+  if (typeof m === 'string') return m;
+  return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
+}
+
+function formatMetro(m) {
+  const raw = getMetroRaw(m).trim();
+  if (!raw) return '';
+  return raw.split(/[-–—]/).map(titleCasePart).join('-');
+}
 
 function formatMetro(s = '') {
   return s
@@ -1798,11 +1823,15 @@ export default function Page() {
                       <Label>Metro Area</Label>
                     <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
                       <option value="">Any</option>
-                      {cities.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                     {(cities ?? []).map((c) => {
+  const raw = typeof c === 'string' ? c : (c?.value ?? c?.metro ?? c?.label ?? c?.name ?? '');
+  return (
+    <option key={raw} value={raw}>
+      {formatMetro(c)}
+    </option>
+  );
+})}
+
                     </select>
                   </div>
 
