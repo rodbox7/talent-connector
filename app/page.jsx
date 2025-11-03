@@ -1,23 +1,25 @@
 'use client';
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
-// --- Metro label formatter (fixes "Dallas-fort Worth", "San Francisco-oakland", "Tampa-st. Petersburg") ---
-const WORD_SEP = /[-–—]/; // hyphen/en dash/em dash
-const SMALL = new Set(['of', 'and', 'the', 'for', 'to', 'in', 'on', 'at', 'by']);
+// --- CANONICAL METRO FORMATTER ---
+const WORD_SEP = /[–—-]/; // en dash, em dash, hyphen
+const SMALL = new Set(['of','and','the','for','to','in','on','at','by']);
 
 function titleCasePart(part = '') {
   return part
     .trim()
     .split(/\s+/)
     .map((w, i) => {
-      const lw = w.toLowerCase().replace(/\.$/, '');
-      if (lw === 'st') return 'St.';   // St. Louis, St. Petersburg
+      const base = w.replace(/\.$/, '');
+      const lw = base.toLowerCase();
+      if (lw === 'st') return 'St.';   // St. Petersburg
       if (lw === 'ft') return 'Ft.';   // Ft. Lauderdale
-      if (SMALL.has(lw) && i !== 0) return lw;
-      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      if (SMALL.has(lw) && i !== 0) return lw; // keep small words lower unless first
+      return lw.replace(/(^[a-z])|([-'][a-z])/g, (m) => m.toUpperCase()); // O'Connor, McDonald
     })
     .join(' ');
 }
+
 function getMetroRaw(m) {
   if (typeof m === 'string') return m;
   return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
@@ -26,24 +28,9 @@ function getMetroRaw(m) {
 function formatMetro(m) {
   const raw = getMetroRaw(m).trim();
   if (!raw) return '';
-  return raw.split(/[-–—]/).map(titleCasePart).join('-');
+  return raw.split(WORD_SEP).map(titleCasePart).join('-');
 }
-
-
-// ✅ paste this block directly below
-function getMetroRaw(m) {
-  if (typeof m === 'string') return m;
-  return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
-}
-
-
-function formatMetro(s = '') {
-  return s
-    .split(WORD_SEP)
-    .map(p => titleCasePart(p))
-    .join('-'); // keep a simple hyphen in UI
-}
-// --- end metro formatter ---
+// --- END CANONICAL METRO FORMATTER ---
 
 
 const NYC =
