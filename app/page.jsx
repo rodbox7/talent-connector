@@ -1,6 +1,37 @@
 'use client';
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
+
+const NYC =
+  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
+
+// ---------- METROS (single source of truth) ----------
+const METROS = [
+  'Atlanta, GA','Austin, TX','Baltimore, MD','Birmingham, AL','Boston, MA',
+  'Buffalo, NY','Charlotte, NC','Chicago, IL','Cincinnati, OH','Cleveland, OH',
+  'Columbus, OH','Dallas–Fort Worth, TX','Denver, CO','Detroit, MI','Hartford, CT',
+  'Honolulu, HI','Houston, TX','Indianapolis, IN','Jacksonville, FL','Kansas City, MO',
+  'Las Vegas, NV','Los Angeles, CA','Louisville, KY','Memphis, TN','Miami, FL',
+  'Milwaukee, WI','Minneapolis–St. Paul, MN','Nashville, TN','New Orleans, LA','New York City, NY',
+  'Oklahoma City, OK','Orlando, FL','Philadelphia, PA','Phoenix, AZ','Pittsburgh, PA',
+  'Portland, OR','Providence, RI','Raleigh–Durham, NC','Richmond, VA','Sacramento, CA',
+  'Salt Lake City, UT','San Antonio, TX','San Diego, CA','San Francisco–Oakland, CA','San Jose, CA',
+  'Seattle, WA','St. Louis, MO','Tampa–St. Petersburg, FL','Tucson, AZ','Washington, DC'
+];
+
+// Temporary global alias so any old `metros` references in child components won't crash
+if (typeof globalThis !== 'undefined') globalThis.metros = METROS;
+
+
+// US states (2-letter)
+const STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+];
+
 // --- CANONICAL METRO FORMATTER ---
 const WORD_SEP = /[–—-]/; // en dash, em dash, hyphen
 const SMALL = new Set(['of','and','the','for','to','in','on','at','by']);
@@ -30,34 +61,7 @@ function formatMetro(m) {
   if (!raw) return '';
   return raw.split(WORD_SEP).map(titleCasePart).join('-');
 }
-// --- END CANONICAL METRO FORMATTER ---
 
-
-const NYC =
-  'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
-
-// US states (2-letter)
-const STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
-  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
-  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
-  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
-];
-
-// Major US metros (alpha)
-const MAJOR_METROS = [
-  'Atlanta, GA','Austin, TX','Baltimore, MD','Birmingham, AL','Boston, MA',
-  'Buffalo, NY','Charlotte, NC','Chicago, IL','Cincinnati, OH','Cleveland, OH',
-  'Columbus, OH','Dallas–Fort Worth, TX','Denver, CO','Detroit, MI','Hartford, CT',
-  'Honolulu, HI','Houston, TX','Indianapolis, IN','Jacksonville, FL','Kansas City, MO',
-  'Las Vegas, NV','Los Angeles, CA','Louisville, KY','Memphis, TN','Miami, FL',
-  'Milwaukee, WI','Minneapolis–St. Paul, MN','Nashville, TN','New Orleans, LA','New York City, NY',
-  'Oklahoma City, OK','Orlando, FL','Philadelphia, PA','Phoenix, AZ','Pittsburgh, PA',
-  'Portland, OR','Providence, RI','Raleigh–Durham, NC','Richmond, VA','Sacramento, CA',
-  'Salt Lake City, UT','San Antonio, TX','San Diego, CA','San Francisco–Oakland, CA','San Jose, CA',
-  'Seattle, WA','St. Louis, MO','Tampa–St. Petersburg, FL','Tucson, AZ','Washington, DC',
-];
 
 /* ---------- NEW: Title/Practice options ---------- */
 const TITLE_OPTIONS = [
@@ -328,6 +332,62 @@ function useIsMobile(breakpoint = 768) {
 
 /* ---------- Page ---------- */
 export default function Page() {
+  // ---- Dynamic Metro options ----
+const [metrosList, setMetrosList] = React.useState(METROS);
+
+const metros = METROS;
+
+React.useEffect(() => {
+  let isMounted = true;
+  (async () => {
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('metro')
+      .neq('metro', '')
+      .not('metro', 'is', null);
+
+    if (!error && isMounted) {
+      const unique = Array.from(new Set((data || []).map(r => r.metro))).sort();
+      setMetrosList(unique);
+    }
+  })();
+  return () => { isMounted = false; };
+}, []);
+
+// ---- AI write-up state ----
+const [aiWriting, setAiWriting] = React.useState(false);
+const [aiText, setAiText] = React.useState('');
+// Call our /api/writeup route with the currently selected candidate
+async function handleGenerateWriteup() {
+  try {
+    if (!selectedCandidate) {
+      alert('Select a candidate first.');
+      return;
+    }
+    setAiWriting(true);
+
+    const res = await fetch('/api/writeup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate: selectedCandidate }),
+    });
+
+    const data = await res.json();
+    if (data?.result) {
+      setAiText(data.result);
+    } else {
+      alert('Error generating write-up.');
+    }
+  } catch (e) {
+    console.error(e);
+    alert('AI write-up failed.');
+  } finally {
+    setAiWriting(false);
+  }
+}
+
+
+
   const isMobile = useIsMobile(768);
 
   const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
@@ -929,9 +989,15 @@ export default function Page() {
     );
   }
 
+
   /* ---------- Recruiter UI ---------- */
   if (user.role === 'recruiter') {
     const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
+    // Dynamic Metro options from Supabase
+
+const metros = METROS || globalThis.metros || [];
+
+
 
     return (
       <div style={pageWrap}>
@@ -942,9 +1008,37 @@ export default function Page() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: 10,
-              }}
-            >
+               marginBottom: 10,
+}}>
+
+ {/* ---------- AI Write-Up Generator ---------- */}
+<div style={{ margin: '10px 0' }}>
+  <button
+    onClick={handleGenerateWriteup}
+    disabled={aiWriting}
+    style={{
+      background: '#2563EB',
+      color: 'white',
+      fontWeight: 600,
+      border: 'none',
+      borderRadius: 6,
+      padding: '8px 14px',
+      cursor: aiWriting ? 'not-allowed' : 'pointer',
+    }}
+  >
+    {aiWriting ? 'Generating…' : 'Generate AI Write-Up'}
+  </button>
+
+  {aiText && (
+    <div style={{ marginTop: 10, background: '#F9FAFB', padding: 10, borderRadius: 6 }}>
+      <b>AI Summary:</b>
+      <p>{aiText}</p>
+    </div>
+  )}
+</div>
+
+
+            
               <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
                 Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                 <span style={{ color: '#9CA3AF' }}>RECRUITER workspace</span>
@@ -1028,10 +1122,13 @@ export default function Page() {
                         }}
                         style={selectStyle}
                       >
-                        <option value="">Select a metro</option>
-                        {metros.map(m => (
-  <option key={m} value={m}>{formatMetro(m)}</option>
+                       {(metrosList || []).map((m) => (
+  <option key={m} value={m}>
+    {typeof formatMetro === 'function' ? formatMetro(m) : m}
+  </option>
 ))}
+
+
                         
                       </select>
                     </div>
@@ -1200,10 +1297,13 @@ export default function Page() {
                               }}
                               style={selectStyle}
                             >
-                              <option value="">Select a metro</option>
-                              {MAJOR_METROS.map((m) => (
-                                <option key={m} value={m}>{m}</option>
-                              ))}
+                             <option value="">Select a metro</option>
+{(Array.isArray(metrosList) ? metrosList : []).map((m) => (
+  <option key={m} value={m}>
+    {typeof formatMetro === 'function' ? formatMetro(m) : m}
+  </option>
+))}
+
                             </select>
                           </div>
 
