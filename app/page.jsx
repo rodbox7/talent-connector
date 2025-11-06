@@ -338,25 +338,61 @@ const [metrosList, setMetrosList] = React.useState(METROS);
 const metros = METROS;
 
 React.useEffect(() => {
-  let isMounted = true;
+  let mounted = true;
   (async () => {
-    const { data, error } = await supabase
-      .from('candidates')
-      .select('metro')
-      .neq('metro', '')
-      .not('metro', 'is', null);
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('id, name, titles, city, state, law, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-    if (!error && isMounted) {
-      const unique = Array.from(new Set((data || []).map(r => r.metro))).sort();
-      setMetrosList(unique);
+      if (error) {
+        console.error('Supabase error:', error);
+      } else if (mounted) {
+        console.log('Loaded candidates:', data);
+        alert('Loaded ' + (data?.length || 0) + ' candidates');
+        setAiCandidateList(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Unexpected Supabase error:', e);
     }
   })();
-  return () => { isMounted = false; };
+
+  return () => {
+    mounted = false;
+  };
 }, []);
+
+
 
 // ---- AI write-up state ----
 const [aiWriting, setAiWriting] = React.useState(false);
 const [aiText, setAiText] = React.useState('');
+const [aiErr, setAiErr] = React.useState('');
+
+// ---- Selected candidate (AI uses this) ----
+const [selectedCandidate, setSelectedCandidate] = React.useState(null);
+const [aiCandidateList, setAiCandidateList] = React.useState([]);
+// Load a small list of recent candidates for the AI selector
+React.useEffect(() => {
+  let mounted = true;
+  (async () => {
+    const { data, error } = await supabase
+  .from('candidates')
+  .select('id, name, titles, city, state, law, created_at')
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+
+    if (!error && mounted) {
+      setAiCandidateList(data || []);
+    }
+  })();
+  return () => { mounted = false; };
+}, []);
+
+
 // Call our /api/writeup route with the currently selected candidate
 async function handleGenerateWriteup() {
   try {
@@ -395,6 +431,7 @@ async function handleGenerateWriteup() {
   const [pwd, setPwd] = React.useState('');
   const [err, setErr] = React.useState('');
   const [user, setUser] = React.useState(null);
+
 
   async function login() {
     try {
@@ -1011,31 +1048,143 @@ const metros = METROS || globalThis.metros || [];
                marginBottom: 10,
 }}>
 
- {/* ---------- AI Write-Up Generator ---------- */}
-<div style={{ margin: '10px 0' }}>
+{/* ---------- AI Write-Up Generator (minimal, safe) ---------- */}
+<div style={{ margin: '14px 0' }}>
+  {/* Candidate selector */}
+  <div style={{ margin: '10px 0' }}>
+    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+      Candidate for AI Write-Up
+    </label>
+    <select
+      value={selectedCandidate?.id || ''}
+      onChange={(e) => {
+        const chosen = aiCandidateList.find((x) => String(x.id) === e.target.value);
+        setSelectedCandidate(chosen || null);
+      }}
+      style={{
+        width: '100%',
+        maxWidth: 420,
+        padding: 8,
+        borderRadius: 6,
+        border: '1px solid #E5E7EB',
+        background: 'white',
+      }}
+    >
+      <option value="">— Select a candidate —</option>
+     {aiCandidateList.map((c) => {
+  const displayTitle = (c.titles || '').trim();
+  const displayLaw = (c.law || '').trim();
+  const displayLocation =
+    c.city && c.state
+      ? ` (${c.city}, ${c.state})`
+      : c.city
+      ? ` (${c.city})`
+      : c.state
+      ? ` (${c.state})`
+      : '';
+
+  const main = [c.name, displayTitle, displayLaw].filter(Boolean).join(' — ');
+
+  return (
+    <option key={c.id} value={String(c.id)}>
+      {main}{displayLocation}
+    </option>
+  );
+})}
+
+    </select>
+  </div>
+
+  {/* Button */}
   <button
-    onClick={handleGenerateWriteup}
+    onClick={async () => {
+      try {
+        setAiErr('');
+        setAiText('');
+
+        if (!selectedCandidate) {
+          alert('Select a candidate first.');
+          return;
+        }
+
+        setAiWriting(true);
+
+        const res = await fetch('/api/writeup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate: selectedCandidate }),
+        });
+
+        if (!res.ok) {
+          const msg = `Request failed (${res.status})`;
+          setAiErr(msg);
+          alert(msg);
+          return;
+        }
+
+        const data = await res.json();
+        const text =
+          (data && data.result) ||
+          (data && data.text) ||
+          (data && data.message) ||
+          (typeof data === 'string' ? data : '');
+
+        if (!text) {
+          setAiErr('Empty response from AI.');
+          alert('Empty response from AI.');
+          return;
+        }
+
+        setAiText(text);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Unknown error';
+        setAiErr(msg);
+        alert('AI error: ' + msg);
+      } finally {
+        setAiWriting(false);
+      }
+    }}
     disabled={aiWriting}
     style={{
-      background: '#2563EB',
+      background: aiWriting ? '#93C5FD' : '#2563EB',
       color: 'white',
-      fontWeight: 600,
+      fontWeight: 700,
       border: 'none',
       borderRadius: 6,
-      padding: '8px 14px',
+      padding: '10px 16px',
       cursor: aiWriting ? 'not-allowed' : 'pointer',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
     }}
   >
     {aiWriting ? 'Generating…' : 'Generate AI Write-Up'}
   </button>
 
-  {aiText && (
-    <div style={{ marginTop: 10, background: '#F9FAFB', padding: 10, borderRadius: 6 }}>
-      <b>AI Summary:</b>
-      <p>{aiText}</p>
+  {/* Summary / error box */}
+  {(aiText || aiErr) && (
+    <div
+      style={{
+        marginTop: 12,
+        background: '#F9FAFB',
+        border: '1px solid #E5E7EB',
+        padding: 12,
+        borderRadius: 8,
+      }}
+    >
+      {aiText && (
+        <>
+          <b>AI Summary:</b>
+          <p style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{aiText}</p>
+        </>
+      )}
+      {aiErr && (
+        <p style={{ color: '#B91C1C', marginTop: 6 }}>
+          Error: {aiErr}
+        </p>
+      )}
     </div>
   )}
 </div>
+
 
 
             
