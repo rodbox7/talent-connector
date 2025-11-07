@@ -332,6 +332,9 @@ function useIsMobile(breakpoint = 768) {
 
 /* ---------- Page ---------- */
 export default function Page() {
+  React.useEffect(() => {
+  loadClientCandidates();
+}, []);
   // ---- Dynamic Metro options ----
 const [metrosList, setMetrosList] = React.useState(METROS);
 
@@ -345,7 +348,6 @@ React.useEffect(() => {
         .from('candidates')
         .select('id, name, titles, city, state, law, created_at')
         .order('created_at', { ascending: false })
-        .limit(50);
 
       if (error) {
         console.error('Supabase error:', error);
@@ -377,18 +379,23 @@ const [aiCandidateList, setAiCandidateList] = React.useState([]);
 // Load a small list of recent candidates for the AI selector
 React.useEffect(() => {
   let mounted = true;
-  (async () => {
-    const { data, error } = await supabase
-  .from('candidates')
-  .select('id, name, titles, city, state, law, created_at')
-  .order('created_at', { ascending: false })
-  .limit(50);
+  // Move this outside of any useEffect first:
+async function loadAiCandidates() {
+  const { data, error } = await supabase
+    .from('candidates')
+    .select('id, name, titles, city, state, law, created_at')
+    .order('created_at', { ascending: false })
+
+  if (!error && mounted) {
+    setAiCandidateList(data || []);
+  } else if (error) {
+    console.error('Error loading candidates:', error.message);
+  }
+}
+
+// Run it once when the component mounts
 
 
-    if (!error && mounted) {
-      setAiCandidateList(data || []);
-    }
-  })();
   return () => { mounted = false; };
 }, []);
 
@@ -649,27 +656,30 @@ async function handleGenerateWriteup() {
       const { error } = await supabase.from('candidates').insert(payload);
       if (error) throw error;
 
-      setAddMsg('Candidate added');
+    setAddMsg('Candidate added');
 
-      setName('');
-      setTitles('');
-      setLaw('');
-      setCity('');
-      setState('');
-      setYears('');
-      setRecentYears('');
-      setSalary('');
-      setContract(false);
-      setHourly('');
-      setNotes('');
-      {
-        const d = new Date();
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        setDateEntered(`${yyyy}-${mm}-${dd}`);
-      }
-      await refreshMyRecent();
+await loadClientCandidates(); // ✅ REFRESH CLIENT LIST
+
+setName('');
+setTitles('');
+setLaw('');
+setCity('');
+setState('');
+setYears('');
+setRecentYears('');
+setSalary('');
+setContract(false);
+setHourly('');
+setNotes('');
+{
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  setDateEntered(`${yyyy}-${mm}-${dd}`);
+}
+await refreshMyRecent();
+
     } catch (e) {
       console.error(e);
       setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
@@ -740,39 +750,30 @@ async function handleGenerateWriteup() {
     })();
   }, [user, todayStr]);
 
-  React.useEffect(() => {
-    if (user?.role !== 'client') return;
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('candidates')
-          .select('city,state,titles_csv,law_csv')
-          .limit(1000);
-        if (error) throw error;
-        const cset = new Set(), sset = new Set(), tset = new Set(), lset = new Set();
-        for (const r of data || []) {
-          if (r.city) cset.add(r.city.trim());
-          if (r.state) sset.add(r.state.trim());
-          (r.titles_csv || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean)
-            .forEach((x) => tset.add(x));
-          (r.law_csv || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean)
-            .forEach((x) => lset.add(x));
-        }
-        setCities([...cset].sort());
-        setStates([...sset].sort());
-        setTitleOptions([...tset].sort());
-        setLawOptions([...lset].sort());
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, [user]);
+  // Reusable loader for the client-facing list
+const loadClientCandidates = React.useCallback(async () => {
+  try {
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('city,state,titles_csv,law_csv')
+      .limit(1000);
+
+    if (error) throw error;
+
+ 
+      setAiCandidateList(data || []);
+    
+  } catch (err) {
+    console.error('Error loading client candidate list:', err?.message || err);
+  }
+}, [supabase]);
+
+// Run once on mount for client role (and whenever role flips to client)
+React.useEffect(() => {
+  if (user?.role !== 'client') return;
+  loadClientCandidates();
+}, [user?.role, loadClientCandidates]);
+
 
   function parseRange(val) {
     if (!val) return { min: null, max: null };
