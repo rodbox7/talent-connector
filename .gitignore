@@ -1,2 +1,4 @@
 .env.local
 
+.next/
+git-filter-repo.py
