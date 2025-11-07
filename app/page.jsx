@@ -1169,12 +1169,13 @@ const metros = METROS || globalThis.metros || [];
         border: '1px solid #E5E7EB',
         padding: 12,
         borderRadius: 8,
+        color: '#111827',
       }}
     >
       {aiText && (
         <>
           <b>AI Summary:</b>
-          <p style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{aiText}</p>
+          <p style={{ marginTop: 8, whiteSpace: 'pre-wrap', color: '#111827' }}>{aiText}</p>
         </>
       )}
       {aiErr && (
