@@ -2,3 +2,9 @@
 
 .next/
 git-filter-repo.py
+node_modules/
+.next/
+.env.local
+.DS_Store
+out/
+npm-debug.log*
