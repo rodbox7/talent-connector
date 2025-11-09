@@ -72,6 +72,12 @@ const LAW_OPTIONS = [
   "40's Act",'Administrative','Administrative Manager','Antitrust','Appellate','Asbestos','Associate','Attorney','Banking','Bankruptcy','Commercial Litigation','Commercial Real Estate','Compliance','Conflicts','Conflicts Analyst','Construction','Contracts','Corporate','Criminal','Data Privacy/Cybersecurity','Docketing','Document Review','Employee Benefits/Executive Comp/ERISA','Energy','Entertainment','Environmental','Family','FCPA','FDA','Finance','Financial Services','FinTech','Foreclosure','Foreign Filing','Foreign Language Review','Franchise','General Counsel','Government Contracts','Government Contracts Attorney','Healthcare','HSR','Immigration','In House Associate','Insurance Coverage','Insurance Defense','Insurance Litigation','Insurance Regulatory','International Arbitration','International Trade','Labor & Employment','Law Clerk','Law Student','Leasing','Legal JD','Legal Malpractice','Legal Marketing','Legal Support','Life Sciences','Litigation','Litigation Technology','Medical Malpractice','Mergers and Acquisitions','MRS Project Manager','Mutual Fund','Nurse','Oil & Gas','Paralegal','Partner','Patent Agent','Patent Counsel','Patent Litigation','Patent Prosecution','Personal Injury','Project Finance','Project Manager','Public Finance','Real Estate Finance','Regulatory','Residential Real Estate','Restructuring','Securities','Securities Litigation','Syndication','Tax','Technology','Technology Transactions','Toxic Tort','Trade Attorney','Trademark','Trust & Estate',"Worker's Compensation",'White Collar Litigation',
 ];
 
+if (typeof window !== 'undefined') {
+  window.TITLE_OPTIONS = TITLE_OPTIONS;
+  window.LAW_OPTIONS = LAW_OPTIONS;
+}
+
+
 /* ---------- Small UI helpers ---------- */
 const Card = ({ children, style }) => (
   <div
@@ -702,6 +708,17 @@ await refreshMyRecent();
   const [states, setStates] = React.useState([]);
   const [titleOptions, setTitleOptions] = React.useState([]);
   const [lawOptions, setLawOptions] = React.useState([]);
+React.useEffect(() => {
+  try {
+    console.log("Setting dropdown options...");
+    setTitleOptions(Array.isArray(window?.TITLE_OPTIONS) ? window.TITLE_OPTIONS : TITLE_OPTIONS);
+    setLawOptions(Array.isArray(window?.LAW_OPTIONS) ? window.LAW_OPTIONS : LAW_OPTIONS);
+  } catch (err) {
+    console.error("Error setting dropdown options:", err);
+  }
+}, []);
+
+
 
   const [fCity, setFCity] = React.useState('');
   const [fState, setFState] = React.useState('');
@@ -1883,18 +1900,27 @@ const metros = METROS || globalThis.metros || [];
           <Card style={{ marginTop: 12, position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
               <div>
-                <Label>Title</Label>
-                <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
-                  <option value="">Any</option>
-                  {titleOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+               <Label>Title</Label>
+<select value={iTitle} onChange={(e) => setITitle(e.target.value)} style={selectStyle}>
+  <option value="">Any</option>
+  {TITLE_OPTIONS.map((t) => (
+    <option key={t} value={t}>
+      {t}
+    </option>
+  ))}
+</select>
               </div>
               <div>
                 <Label>Type of Law</Label>
-                <select value={iLaw} onChange={(e)=>setILaw(e.target.value)} style={selectStyle}>
-                  <option value="">Any</option>
-                  {lawOptions.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
+<select value={iLaw} onChange={(e) => setILaw(e.target.value)} style={selectStyle}>
+  <option value="">Any</option>
+  {LAW_OPTIONS.map((l) => (
+    <option key={l} value={l}>
+      {l}
+    </option>
+  ))}
+</select>
+
               </div>
               <div>
                 <Label>State</Label>
@@ -2053,15 +2079,13 @@ const metros = METROS || globalThis.metros || [];
                   <div style={{ minWidth: 0 }}>
                       <Label>Metro Area</Label>
                     <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                     {(cities ?? []).map((c) => {
-  const raw = typeof c === 'string' ? c : (c?.value ?? c?.metro ?? c?.label ?? c?.name ?? '');
-  return (
-    <option key={raw} value={raw}>
-      {formatMetro(c)}
-    </option>
-  );
-})}
+                     <option value="">Any</option>
+{METROS.map((m) => (
+  <option key={m} value={m}>
+    {typeof formatMetro === 'function' ? formatMetro(m) : m}
+  </option>
+))}
+
 
                     </select>
                   </div>
