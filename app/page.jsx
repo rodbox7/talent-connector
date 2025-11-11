@@ -2,6 +2,7 @@
 import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
+/* ---------- Constants ---------- */
 const NYC =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
@@ -22,7 +23,6 @@ const METROS = [
 // Temporary global alias so any old `metros` references in child components won't crash
 if (typeof globalThis !== 'undefined') globalThis.metros = METROS;
 
-
 // US states (2-letter)
 const STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
@@ -32,7 +32,7 @@ const STATES = [
   'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
 ];
 
-// --- CANONICAL METRO FORMATTER ---
+/* ---------- Canonical Metro formatter ---------- */
 const WORD_SEP = /[–—-]/; // en dash, em dash, hyphen
 const SMALL = new Set(['of','and','the','for','to','in','on','at','by']);
 
@@ -50,24 +50,16 @@ function titleCasePart(part = '') {
     })
     .join(' ');
 }
-
 function getMetroRaw(m) {
   if (typeof m === 'string') return m;
   return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
 }
 
-function formatMetro(m) {
-  const raw = getMetroRaw(m).trim();
-  if (!raw) return '';
-  return raw.split(WORD_SEP).map(titleCasePart).join('-');
-}
 
-
-/* ---------- NEW: Title/Practice options ---------- */
+/* ---------- Title/Practice options (base lists) ---------- */
 const TITLE_OPTIONS = [
   'Administrative','Legal Support','Paralegal','Attorney',
 ];
-
 const LAW_OPTIONS = [
   "40's Act",'Administrative','Administrative Manager','Antitrust','Appellate','Asbestos','Associate','Attorney','Banking','Bankruptcy','Commercial Litigation','Commercial Real Estate','Compliance','Conflicts','Conflicts Analyst','Construction','Contracts','Corporate','Criminal','Data Privacy/Cybersecurity','Docketing','Document Review','Employee Benefits/Executive Comp/ERISA','Energy','Entertainment','Environmental','Family','FCPA','FDA','Finance','Financial Services','FinTech','Foreclosure','Foreign Filing','Foreign Language Review','Franchise','General Counsel','Government Contracts','Government Contracts Attorney','Healthcare','HSR','Immigration','In House Associate','Insurance Coverage','Insurance Defense','Insurance Litigation','Insurance Regulatory','International Arbitration','International Trade','Labor & Employment','Law Clerk','Law Student','Leasing','Legal JD','Legal Malpractice','Legal Marketing','Legal Support','Life Sciences','Litigation','Litigation Technology','Medical Malpractice','Mergers and Acquisitions','MRS Project Manager','Mutual Fund','Nurse','Oil & Gas','Paralegal','Partner','Patent Agent','Patent Counsel','Patent Litigation','Patent Prosecution','Personal Injury','Project Finance','Project Manager','Public Finance','Real Estate Finance','Regulatory','Residential Real Estate','Restructuring','Securities','Securities Litigation','Syndication','Tax','Technology','Technology Transactions','Toxic Tort','Trade Attorney','Trademark','Trust & Estate',"Worker's Compensation",'White Collar Litigation',
 ];
@@ -80,31 +72,28 @@ const Card = ({ children, style }) => (
       border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: 16,
       padding: 20,
-      boxShadow:
-        '0 0 0 1px rgba(255,255,255,0.04) inset, 0 8px 30px rgba(0,0,0,0.45)',
+      boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset, 0 8px 30px rgba(0,0,0,0.45)',
       ...style,
     }}
   >
     {children}
   </div>
 );
-
 const Label = ({ children, style }) => (
   <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 6, ...(style || {}) }}>{children}</div>
 );
-
 const Input = (props) => (
   <input
     {...props}
     style={{
       width: '100%',
-      padding: '12px 14px',           // mobile-friendly touch target
+      padding: '12px 14px',
       borderRadius: 10,
       border: '1px solid #1F2937',
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      fontSize: 16,                   // prevent iOS zoom
+      fontSize: 16,
       lineHeight: '22px',
       pointerEvents: 'auto',
       position: 'relative',
@@ -113,7 +102,6 @@ const Input = (props) => (
     }}
   />
 );
-
 const TextArea = (props) => (
   <textarea
     {...props}
@@ -126,7 +114,7 @@ const TextArea = (props) => (
       background: '#0F172A',
       color: '#E5E7EB',
       outline: 'none',
-      fontSize: 16,                    // prevent iOS zoom
+      fontSize: 16,
       lineHeight: '22px',
       pointerEvents: 'auto',
       position: 'relative',
@@ -135,7 +123,6 @@ const TextArea = (props) => (
     }}
   />
 );
-
 const Button = ({ children, ...rest }) => (
   <button
     {...rest}
@@ -153,7 +140,6 @@ const Button = ({ children, ...rest }) => (
     {children}
   </button>
 );
-
 const Tag = ({ children, style }) => (
   <span
     style={{
@@ -184,7 +170,6 @@ function renderDate(val) {
     return String(val);
   }
 }
-
 function formatMDY(val) {
   if (!val) return '';
   if (typeof val === 'string') {
@@ -201,7 +186,6 @@ function formatMDY(val) {
     return String(val);
   }
 }
-
 function ymd(val) {
   if (!val) return null;
   if (typeof val === 'string') {
@@ -218,12 +202,10 @@ function ymd(val) {
     return null;
   }
 }
-
 const numOrNull = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
-
 function toTitleCaseCity(s) {
   if (!s) return '';
   return s
@@ -233,12 +215,10 @@ function toTitleCaseCity(s) {
     .join(' ')
     .replace(/\b(Of|And|The|De|La|Da|Van|Von)\b/g, (m) => m.toLowerCase());
 }
-
 function normState(s) {
   if (!s) return '';
   return s.trim().toUpperCase();
 }
-
 function displayCompRecruiter(c) {
   const bill = (c.contract && Number.isFinite(Number(c.hourly)))
     ? Math.round(Number(c.hourly) * 1.66)
@@ -249,7 +229,6 @@ function displayCompRecruiter(c) {
   if (bill) return `$${bill}/hr`;
   return '—';
 }
-
 function displayCompClient(c) {
   const bill = (c.contract && Number.isFinite(Number(c.hourly)))
     ? Math.round(Number(c.hourly) * 1.66)
@@ -260,7 +239,6 @@ function displayCompClient(c) {
   if (bill) return `$${bill}/hr`;
   return '—';
 }
-
 function statsFrom(values) {
   const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
   const n = v.length;
@@ -275,7 +253,6 @@ function statsFrom(values) {
   };
   return { n, avg, median: q(50), p25: q(25), p75: q(75) };
 }
-
 function matchesCSV(csv, needle) {
   if (!needle) return true;
   return String(csv || '')
@@ -283,7 +260,6 @@ function matchesCSV(csv, needle) {
     .map((s) => s.trim().toLowerCase())
     .some((s) => s.includes(String(needle).trim().toLowerCase()));
 }
-
 function presetRange(preset) {
   const toYMD = (d) => {
     const yyyy = d.getFullYear();
@@ -291,20 +267,16 @@ function presetRange(preset) {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
-
   const today = new Date();
   const end = toYMD(today);
-
   const startOfYear = new Date(today.getFullYear(), 0, 1);
   const q = Math.floor(today.getMonth() / 3);
   const startOfQuarter = new Date(today.getFullYear(), q * 3, 1);
-
   const backDays = (n) => {
     const d = new Date(today);
     d.setDate(d.getDate() - n);
     return toYMD(d);
   };
-
   switch (preset) {
     case 'LAST_30':  return { start: backDays(30),  end };
     case 'LAST_60':  return { start: backDays(60),  end };
@@ -316,7 +288,6 @@ function presetRange(preset) {
     default:         return { start: '', end: '' };
   }
 }
-
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = React.useState(false);
   React.useEffect(() => {
@@ -330,115 +301,29 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
-/* ---------- Page ---------- */
+/* =========================================================
+   Page
+   ========================================================= */
 export default function Page() {
-  React.useEffect(() => {
-  loadClientCandidates();
-}, []);
-  // ---- Dynamic Metro options ----
-const [metrosList, setMetrosList] = React.useState(METROS);
-
-const metros = METROS;
-
-React.useEffect(() => {
-  let mounted = true;
-  (async () => {
-    try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('id, name, titles, city, state, law, created_at')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Supabase error:', error);
-      } else if (mounted) {
-        console.log('Loaded candidates:', data);
-        alert('Loaded ' + (data?.length || 0) + ' candidates');
-        setAiCandidateList(Array.isArray(data) ? data : []);
-      }
-    } catch (e) {
-      console.error('Unexpected Supabase error:', e);
-    }
-  })();
-
-  return () => {
-    mounted = false;
-  };
-}, []);
-
-
-
-// ---- AI write-up state ----
-const [aiWriting, setAiWriting] = React.useState(false);
-const [aiText, setAiText] = React.useState('');
-const [aiErr, setAiErr] = React.useState('');
-
-// ---- Selected candidate (AI uses this) ----
-const [selectedCandidate, setSelectedCandidate] = React.useState(null);
-const [aiCandidateList, setAiCandidateList] = React.useState([]);
-// Load a small list of recent candidates for the AI selector
-React.useEffect(() => {
-  let mounted = true;
-  // Move this outside of any useEffect first:
-async function loadAiCandidates() {
-  const { data, error } = await supabase
-    .from('candidates')
-    .select('id, name, titles, city, state, law, created_at')
-    .order('created_at', { ascending: false })
-
-  if (!error && mounted) {
-    setAiCandidateList(data || []);
-  } else if (error) {
-    console.error('Error loading candidates:', error.message);
-  }
-}
-
-// Run it once when the component mounts
-
-
-  return () => { mounted = false; };
-}, []);
-
-
-// Call our /api/writeup route with the currently selected candidate
-async function handleGenerateWriteup() {
-  try {
-    if (!selectedCandidate) {
-      alert('Select a candidate first.');
-      return;
-    }
-    setAiWriting(true);
-
-    const res = await fetch('/api/writeup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidate: selectedCandidate }),
-    });
-
-    const data = await res.json();
-    if (data?.result) {
-      setAiText(data.result);
-    } else {
-      alert('Error generating write-up.');
-    }
-  } catch (e) {
-    console.error(e);
-    alert('AI write-up failed.');
-  } finally {
-    setAiWriting(false);
-  }
-}
-
-
-
   const isMobile = useIsMobile(768);
 
+  // Helper to format metro names correctly
+  function formatMetro(m) {
+    const raw = getMetroRaw(m).trim();
+    if (!raw) return '';
+    return raw.split(WORD_SEP).map(titleCasePart).join('-');
+  }
+
+
+  // ---- Dynamic Metro options ----
+  const [metrosList] = React.useState(METROS);
+
+  // ---- Auth ----
   const [mode, setMode] = React.useState('recruiter'); // recruiter | client | admin
   const [email, setEmail] = React.useState('');
   const [pwd, setPwd] = React.useState('');
   const [err, setErr] = React.useState('');
   const [user, setUser] = React.useState(null);
-
 
   async function login() {
     try {
@@ -480,11 +365,8 @@ async function handleGenerateWriteup() {
       setErr('Login failed.');
     }
   }
-
   async function logout() {
-    try {
-      await supabase.auth.signOut();
-    } catch {}
+    try { await supabase.auth.signOut(); } catch {}
     setUser(null);
     setEmail('');
     setPwd('');
@@ -492,7 +374,81 @@ async function handleGenerateWriteup() {
     setErr('');
   }
 
-  /* ---------- Recruiter state & functions ---------- */
+  /* ---------- AI write-up state ---------- */
+  const [aiWriting, setAiWriting] = React.useState(false);
+  const [aiText, setAiText] = React.useState('');
+  const [aiErr, setAiErr] = React.useState('');
+  const [selectedCandidate, setSelectedCandidate] = React.useState(null);
+  const [aiCandidateList, setAiCandidateList] = React.useState([]);
+
+  // Load a small list of recent candidates for the AI selector (once on mount)
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('candidates')
+          .select('id, name, titles_csv, law_csv, city, state, created_at')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (error) throw error;
+        if (mounted) {
+          setAiCandidateList(data || []);
+        }
+      } catch (e) {
+        console.error('Error loading candidates for AI:', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  async function handleGenerateWriteup() {
+    try {
+      if (!selectedCandidate) {
+        alert('Select a candidate first.');
+        return;
+      }
+      setAiWriting(true);
+      setAiErr('');
+      setAiText('');
+
+      // Send the full row; your /api/writeup can pick fields it needs
+      const res = await fetch('/api/writeup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate: selectedCandidate }),
+      });
+
+      if (!res.ok) {
+        const msg = `Request failed (${res.status})`;
+        setAiErr(msg);
+        alert(msg);
+        return;
+      }
+
+      const data = await res.json();
+      const text =
+        (data && data.result) ||
+        (data && data.text) ||
+        (data && data.message) ||
+        (typeof data === 'string' ? data : '');
+
+      if (!text) {
+        setAiErr('Empty response from AI.');
+        alert('Empty response from AI.');
+        return;
+      }
+      setAiText(text);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      setAiErr(msg);
+      alert('AI error: ' + msg);
+    } finally {
+      setAiWriting(false);
+    }
+  }
+
+  /* ---------- Recruiter state ---------- */
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
@@ -515,7 +471,6 @@ async function handleGenerateWriteup() {
 
   const [myRecent, setMyRecent] = React.useState([]);
   const [loadingList, setLoadingList] = React.useState(false);
-
   const [editingId, setEditingId] = React.useState(null);
   const [editForm, setEditForm] = React.useState({});
 
@@ -539,7 +494,6 @@ async function handleGenerateWriteup() {
       off_market: !!row.off_market,
     });
   }
-
   function cancelEdit() {
     setEditingId(null);
     setEditForm({});
@@ -587,7 +541,6 @@ async function handleGenerateWriteup() {
       alert(`Update failed${e?.message ? `: ${e.message}` : ''}`);
     }
   }
-
   async function removeCandidate(id) {
     try {
       if (!confirm('Delete this candidate?')) return;
@@ -599,7 +552,6 @@ async function handleGenerateWriteup() {
       alert(`Delete failed${e?.message ? `: ${e.message}` : ''}`);
     }
   }
-
   async function refreshMyRecent() {
     if (!user || user.role !== 'recruiter') return;
     setLoadingList(true);
@@ -607,7 +559,7 @@ async function handleGenerateWriteup() {
     let query = supabase
       .from('candidates')
       .select(
-        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,created_by'
       )
       .order('created_at', { ascending: false })
       .limit(50);
@@ -620,7 +572,6 @@ async function handleGenerateWriteup() {
     if (!error && data) setMyRecent(data);
     setLoadingList(false);
   }
-
   React.useEffect(() => {
     if (user?.role === 'recruiter') {
       refreshMyRecent();
@@ -656,37 +607,37 @@ async function handleGenerateWriteup() {
       const { error } = await supabase.from('candidates').insert(payload);
       if (error) throw error;
 
-    setAddMsg('Candidate added');
+      setAddMsg('Candidate added');
 
-await loadClientCandidates(); // ✅ REFRESH CLIENT LIST
-
-setName('');
-setTitles('');
-setLaw('');
-setCity('');
-setState('');
-setYears('');
-setRecentYears('');
-setSalary('');
-setContract(false);
-setHourly('');
-setNotes('');
-{
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  setDateEntered(`${yyyy}-${mm}-${dd}`);
-}
-await refreshMyRecent();
-
+      // Reset form
+      setName('');
+      setTitles('');
+      setLaw('');
+      setCity('');
+      setState('');
+      setYears('');
+      setRecentYears('');
+      setSalary('');
+      setContract(false);
+      setHourly('');
+      setNotes('');
+      {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        setDateEntered(`${yyyy}-${mm}-${dd}`);
+      }
+      await refreshMyRecent();
+      // Also refresh client-side lists if needed (safe no-op for other roles)
+      await loadClientCandidates();
     } catch (e) {
       console.error(e);
       setAddMsg(`Database error adding candidate${e?.message ? `: ${e.message}` : ''}`);
     }
   }
 
-  /* ---------- Client state & functions ---------- */
+  /* ---------- Client state ---------- */
   const [cCountToday, setCCountToday] = React.useState(0);
   const [search, setSearch] = React.useState('');
 
@@ -700,8 +651,8 @@ await refreshMyRecent();
 
   const [cities, setCities] = React.useState([]);
   const [states, setStates] = React.useState([]);
-  const [titleOptions, setTitleOptions] = React.useState([]);
-  const [lawOptions, setLawOptions] = React.useState([]);
+  const [titleOptions, setTitleOptions] = React.useState(TITLE_OPTIONS);
+  const [lawOptions, setLawOptions] = React.useState(LAW_OPTIONS);
 
   const [fCity, setFCity] = React.useState('');
   const [fState, setFState] = React.useState('');
@@ -739,6 +690,7 @@ await refreshMyRecent();
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
+  // Count new today for clients
   React.useEffect(() => {
     if (user?.role !== 'client') return;
     (async () => {
@@ -750,30 +702,65 @@ await refreshMyRecent();
     })();
   }, [user, todayStr]);
 
-  // Reusable loader for the client-facing list
-const loadClientCandidates = React.useCallback(async () => {
-  try {
-    const { data, error } = await supabase
-      .from('candidates')
-      .select('city,state,titles_csv,law_csv')
-      .limit(1000);
+  // Loader for client-facing options and searchable list population
+  const loadClientCandidates = React.useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('city,state,titles_csv,law_csv')
+        .limit(5000);
 
-    if (error) throw error;
+      if (error) throw error;
 
- 
-      setAiCandidateList(data || []);
-    
-  } catch (err) {
-    console.error('Error loading client candidate list:', err?.message || err);
-  }
-}, [supabase]);
+      const rows = data || [];
 
-// Run once on mount for client role (and whenever role flips to client)
-React.useEffect(() => {
-  if (user?.role !== 'client') return;
-  loadClientCandidates();
-}, [user?.role, loadClientCandidates]);
+      // Cities (display as "City, ST") from rows + METROS fallback
+      const setC = new Set(
+        rows
+          .map((r) => [r.city, r.state].filter(Boolean).join(', '))
+          .filter((s) => s && s.includes(','))
+      );
+      METROS.forEach((m) => setC.add(m));
+      const cityList = Array.from(setC).sort((a, b) => a.localeCompare(b));
 
+      // States from data + STATES fallback
+      const setS = new Set(rows.map((r) => (r.state || '').trim()).filter(Boolean));
+      STATES.forEach((s) => setS.add(s));
+      const stateList = Array.from(setS).sort();
+
+      // Titles and Law: merge constants with any values found in CSVs
+      const foundTitles = new Set(TITLE_OPTIONS);
+      const foundLaw = new Set(LAW_OPTIONS);
+      rows.forEach((r) => {
+        String(r.titles_csv || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .forEach((t) => foundTitles.add(t));
+        String(r.law_csv || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .forEach((l) => foundLaw.add(l));
+      });
+
+      setCities(cityList);
+      setStates(stateList);
+      setTitleOptions(Array.from(foundTitles).sort((a, b) => a.localeCompare(b)));
+      setLawOptions(Array.from(foundLaw).sort((a, b) => a.localeCompare(b)));
+
+      // A friendly alert the first time (per your preference)
+      alert('Loaded ' + rows.length + ' candidates');
+    } catch (err) {
+      console.error('Error loading client candidate list:', err?.message || err);
+    }
+  }, []);
+
+  // Run once when role flips to client
+  React.useEffect(() => {
+    if (user?.role !== 'client') return;
+    loadClientCandidates();
+  }, [user?.role, loadClientCandidates]);
 
   function parseRange(val) {
     if (!val) return { min: null, max: null };
@@ -782,7 +769,6 @@ React.useEffect(() => {
     const max = maxStr ? Number(maxStr) : null;
     return { min: Number.isFinite(min) ? min : null, max: Number.isFinite(max) ? max : null };
   }
-
   function billToRecruiterRange(val) {
     const r = parseRange(val);
     const k = 1.66;
@@ -791,7 +777,6 @@ React.useEffect(() => {
     if (r.max != null) max = Math.floor(r.max / k);
     return { min, max };
   }
-
   async function fetchClientRows() {
     try {
       setClientErr('');
@@ -810,24 +795,20 @@ React.useEffect(() => {
       const { min: salMin, max: salMax } = parseRange(salaryRange);
       const { min: yrsMin, max: yrsMax } = parseRange(yearsRange);
       const hrRecRange = billToRecruiterRange(hourlyBillRange);
-
       const term = (search || '').trim().toLowerCase();
 
       const rows = (data || []).filter((r) => {
         if (term) {
           const blob = [
             r.name, r.titles_csv, r.law_csv, r.city, r.state, r.notes,
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
+          ].filter(Boolean).join(' ').toLowerCase();
           if (!blob.includes(term)) return false;
         }
-
         if (!showOffMarket && r.off_market) return false;
-
-        if (fCity && String(r.city || '') !== fCity) return false;
+        if (fCity && `${r.city || ''}${r.state ? `, ${r.state}` : ''}` !== fCity) return false;
         if (fState && String(r.state || '') !== fState) return false;
+        if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
+        if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
 
         if (salMin != null || salMax != null) {
           const s = Number(r.salary);
@@ -836,14 +817,12 @@ React.useEffect(() => {
           if (salMin != null && s < salMin) return false;
           if (salMax != null && s > salMax) return false;
         }
-
         if (yrsMin != null || yrsMax != null) {
           const y = Number(r.years);
           if (!Number.isFinite(y)) return false;
           if (yrsMin != null && y < yrsMin) return false;
           if (yrsMax != null && y > yrsMax) return false;
         }
-
         if (contractOnly && !r.contract) return false;
         if (contractOnly && hourlyBillRange) {
           const h = Number(r.hourly);
@@ -897,7 +876,6 @@ React.useEffect(() => {
       setClientLoading(false);
     }
   }
-
   function clearClientFilters() {
     setSearch('');
     setFCity('');
@@ -912,18 +890,14 @@ React.useEffect(() => {
     fetchClientRows();
   }
 
-  React.useEffect(() => {
-    if (user?.role === 'client') fetchClientRows();
-  }, [user]);
-
-  /* ---------- Layout (mobile-aware) ---------- */
+  /* ---------- Logged-out ---------- */
   const pageWrap = {
     minHeight: '100vh',
     width: '100%',
     backgroundImage: `url(${NYC})`,
     backgroundPosition: isMobile ? 'center top' : 'center',
     backgroundSize: 'cover',
-    backgroundAttachment: isMobile ? 'scroll' : 'fixed', // mobile fix
+    backgroundAttachment: isMobile ? 'scroll' : 'fixed',
   };
   const overlayCentered = {
     minHeight: '100vh',
@@ -948,7 +922,6 @@ React.useEffect(() => {
     padding: isMobile ? '20px 16px' : '40px 16px',
   };
 
-  /* ---------- Logged-out ---------- */
   if (!user) {
     return (
       <div style={pageWrap}>
@@ -989,7 +962,6 @@ React.useEffect(() => {
               ))}
             </div>
 
-            {/* Center the inputs + button */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ width: '100%', maxWidth: 400 }}>
                 <Label>Email</Label>
@@ -1009,13 +981,11 @@ React.useEffect(() => {
                   onChange={(e) => setPwd(e.target.value)}
                 />
               </div>
-             <div style={{ marginTop: 14, width: '100%' }}>
-  <Button onClick={login} style={{ width: '100%', display: 'block' }}>
-    Log in
-  </Button>
-</div>
-
-
+              <div style={{ marginTop: 14, width: '100%' }}>
+                <Button onClick={login} style={{ width: '100%', display: 'block' }}>
+                  Log in
+                </Button>
+              </div>
             </div>
 
             {err ? (
@@ -1027,15 +997,9 @@ React.useEffect(() => {
     );
   }
 
-
   /* ---------- Recruiter UI ---------- */
   if (user.role === 'recruiter') {
     const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
-    // Dynamic Metro options from Supabase
-
-const metros = METROS || globalThis.metros || [];
-
-
 
     return (
       <div style={pageWrap}>
@@ -1046,162 +1010,105 @@ const metros = METROS || globalThis.metros || [];
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-               marginBottom: 10,
-}}>
+                marginBottom: 10,
+              }}
+            >
+              {/* AI Write-Up Generator */}
+              <div style={{ margin: '14px 0', flex: 1, marginRight: 12 }}>
+                <div style={{ margin: '10px 0' }}>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+                    Candidate for AI Write-Up
+                  </label>
+                  <select
+                    value={selectedCandidate?.id || ''}
+                    onChange={(e) => {
+                      const chosen = aiCandidateList.find((x) => String(x.id) === e.target.value);
+                      setSelectedCandidate(chosen || null);
+                    }}
+                    style={{
+                      width: '100%',
+                      maxWidth: 420,
+                      padding: 8,
+                      borderRadius: 6,
+                      border: '1px solid #E5E7EB',
+                      background: 'white',
+                    }}
+                  >
+                    <option value="">— Select a candidate —</option>
+                    {aiCandidateList.map((c) => {
+                      const displayTitle = (c.titles_csv || '').trim();
+                      const displayLaw = (c.law_csv || '').trim();
+                      const displayLocation =
+                        c.city && c.state
+                          ? ` (${c.city}, ${c.state})`
+                          : c.city
+                          ? ` (${c.city})`
+                          : c.state
+                          ? ` (${c.state})`
+                          : '';
+                      const main = [c.name, displayTitle, displayLaw].filter(Boolean).join(' — ');
+                      return (
+                        <option key={c.id} value={String(c.id)}>
+                          {main}{displayLocation}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
 
-{/* ---------- AI Write-Up Generator (minimal, safe) ---------- */}
-<div style={{ margin: '14px 0' }}>
-  {/* Candidate selector */}
-  <div style={{ margin: '10px 0' }}>
-    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
-      Candidate for AI Write-Up
-    </label>
-    <select
-      value={selectedCandidate?.id || ''}
-      onChange={(e) => {
-        const chosen = aiCandidateList.find((x) => String(x.id) === e.target.value);
-        setSelectedCandidate(chosen || null);
-      }}
-      style={{
-        width: '100%',
-        maxWidth: 420,
-        padding: 8,
-        borderRadius: 6,
-        border: '1px solid #E5E7EB',
-        background: 'white',
-      }}
-    >
-      <option value="">— Select a candidate —</option>
-     {aiCandidateList.map((c) => {
-  const displayTitle = (c.titles || '').trim();
-  const displayLaw = (c.law || '').trim();
-  const displayLocation =
-    c.city && c.state
-      ? ` (${c.city}, ${c.state})`
-      : c.city
-      ? ` (${c.city})`
-      : c.state
-      ? ` (${c.state})`
-      : '';
+                <button
+                  onClick={handleGenerateWriteup}
+                  disabled={aiWriting}
+                  style={{
+                    background: aiWriting ? '#93C5FD' : '#2563EB',
+                    color: 'white',
+                    fontWeight: 700,
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '10px 16px',
+                    cursor: aiWriting ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                  }}
+                >
+                  {aiWriting ? 'Generating…' : 'Generate AI Write-Up'}
+                </button>
 
-  const main = [c.name, displayTitle, displayLaw].filter(Boolean).join(' — ');
+                {(aiText || aiErr) && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      padding: 12,
+                      borderRadius: 8,
+                    }}
+                  >
+                    {aiText && (
+                      <>
+                        <b>AI Summary:</b>
+                        <p style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{aiText}</p>
+                      </>
+                    )}
+                    {aiErr && (
+                      <p style={{ color: '#B91C1C', marginTop: 6 }}>
+                        Error: {aiErr}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
-  return (
-    <option key={c.id} value={String(c.id)}>
-      {main}{displayLocation}
-    </option>
-  );
-})}
-
-    </select>
-  </div>
-
-  {/* Button */}
-  <button
-    onClick={async () => {
-      try {
-        setAiErr('');
-        setAiText('');
-
-        if (!selectedCandidate) {
-          alert('Select a candidate first.');
-          return;
-        }
-
-        setAiWriting(true);
-
-        const res = await fetch('/api/writeup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate: selectedCandidate }),
-        });
-
-        if (!res.ok) {
-          const msg = `Request failed (${res.status})`;
-          setAiErr(msg);
-          alert(msg);
-          return;
-        }
-
-        const data = await res.json();
-        const text =
-          (data && data.result) ||
-          (data && data.text) ||
-          (data && data.message) ||
-          (typeof data === 'string' ? data : '');
-
-        if (!text) {
-          setAiErr('Empty response from AI.');
-          alert('Empty response from AI.');
-          return;
-        }
-
-        setAiText(text);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Unknown error';
-        setAiErr(msg);
-        alert('AI error: ' + msg);
-      } finally {
-        setAiWriting(false);
-      }
-    }}
-    disabled={aiWriting}
-    style={{
-      background: aiWriting ? '#93C5FD' : '#2563EB',
-      color: 'white',
-      fontWeight: 700,
-      border: 'none',
-      borderRadius: 6,
-      padding: '10px 16px',
-      cursor: aiWriting ? 'not-allowed' : 'pointer',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-    }}
-  >
-    {aiWriting ? 'Generating…' : 'Generate AI Write-Up'}
-  </button>
-
-  {/* Summary / error box */}
-  {(aiText || aiErr) && (
-    <div
-      style={{
-        marginTop: 12,
-        background: '#F9FAFB',
-        border: '1px solid #E5E7EB',
-        padding: 12,
-        borderRadius: 8,
-      }}
-    >
-      {aiText && (
-        <>
-          <b>AI Summary:</b>
-          <p style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{aiText}</p>
-        </>
-      )}
-      {aiErr && (
-        <p style={{ color: '#B91C1C', marginTop: 6 }}>
-          Error: {aiErr}
-        </p>
-      )}
-    </div>
-  )}
-</div>
-
-
-
-            
               <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
                 Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                 <span style={{ color: '#9CA3AF' }}>RECRUITER workspace</span>
               </div>
-              <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
+              <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', marginLeft: 12 }}>
                 Log out
               </Button>
             </div>
 
             <Card style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 800, marginBottom: 14 }}>Add candidate</div>
-
-              {/* Center the form grid within the card */}
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: '100%', maxWidth: 980 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
@@ -1214,14 +1121,9 @@ const metros = METROS || globalThis.metros || [];
                       />
                     </div>
 
-                    {/* Title dropdown */}
                     <div>
                       <Label>Title</Label>
-                      <select
-                        value={titles}
-                        onChange={(e) => setTitles(e.target.value)}
-                        style={selectStyle}
-                      >
+                      <select value={titles} onChange={(e) => setTitles(e.target.value)} style={selectStyle}>
                         <option value="">Select title</option>
                         {TITLE_OPTIONS.map((t) => (
                           <option key={t} value={t}>{t}</option>
@@ -1229,14 +1131,9 @@ const metros = METROS || globalThis.metros || [];
                       </select>
                     </div>
 
-                    {/* Type of Law dropdown */}
                     <div>
                       <Label>Type of Law</Label>
-                      <select
-                        value={law}
-                        onChange={(e) => setLaw(e.target.value)}
-                        style={selectStyle}
-                      >
+                      <select value={law} onChange={(e) => setLaw(e.target.value)} style={selectStyle}>
                         <option value="">Select type of law</option>
                         {LAW_OPTIONS.map((l) => (
                           <option key={l} value={l}>{l}</option>
@@ -1244,7 +1141,6 @@ const metros = METROS || globalThis.metros || [];
                       </select>
                     </div>
 
-                    {/* State dropdown */}
                     <div>
                       <Label>State</Label>
                       <select
@@ -1259,7 +1155,6 @@ const metros = METROS || globalThis.metros || [];
                       </select>
                     </div>
 
-                    {/* Metro select writes city/state */}
                     <div>
                       <Label>Metro Area</Label>
                       <select
@@ -1272,14 +1167,12 @@ const metros = METROS || globalThis.metros || [];
                         }}
                         style={selectStyle}
                       >
-                       {(metrosList || []).map((m) => (
-  <option key={m} value={m}>
-    {typeof formatMetro === 'function' ? formatMetro(m) : m}
-  </option>
-))}
-
-
-                        
+                        <option value="">Select a metro</option>
+                        {(metrosList || []).map((m) => (
+                          <option key={m} value={m}>
+                            {typeof formatMetro === 'function' ? formatMetro(m) : m}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -1447,13 +1340,12 @@ const metros = METROS || globalThis.metros || [];
                               }}
                               style={selectStyle}
                             >
-                             <option value="">Select a metro</option>
-{(Array.isArray(metrosList) ? metrosList : []).map((m) => (
-  <option key={m} value={m}>
-    {typeof formatMetro === 'function' ? formatMetro(m) : m}
-  </option>
-))}
-
+                              <option value="">Select a metro</option>
+                              {(Array.isArray(metrosList) ? metrosList : []).map((m) => (
+                                <option key={m} value={m}>
+                                  {typeof formatMetro === 'function' ? formatMetro(m) : m}
+                                </option>
+                              ))}
                             </select>
                           </div>
 
@@ -1657,7 +1549,7 @@ const metros = METROS || globalThis.metros || [];
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
     function buildMailto(c) {
-      const to = user.amEmail || 'info@youragency.com';
+      const to = user.amEmail || 'info@bhsg.com';
       const subj = `Talent Connector Candidate — ${c?.name || ''}`;
       const NL = '\n';
       const body = [
@@ -1691,7 +1583,6 @@ const metros = METROS || globalThis.metros || [];
         </Card>
       );
     }
-
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -1856,7 +1747,6 @@ const metros = METROS || globalThis.metros || [];
 
       return (
         <div style={{ width: 'min(1150px, 100%)' }}>
-          {/* Header with Back + Refresh */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
               Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
@@ -1878,7 +1768,6 @@ const metros = METROS || globalThis.metros || [];
             </div>
           </div>
 
-          {/* Insights Filters */}
           <Card style={{ marginTop: 12, position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
               <div>
@@ -1987,7 +1876,6 @@ const metros = METROS || globalThis.metros || [];
             </div>
           ) : null}
 
-          {/* Charts */}
           <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
           <BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
           <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
@@ -2050,18 +1938,14 @@ const metros = METROS || globalThis.metros || [];
                   </div>
 
                   <div style={{ minWidth: 0 }}>
-                      <Label>Metro Area</Label>
+                    <Label>Metro Area</Label>
                     <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
                       <option value="">Any</option>
-                     {(cities ?? []).map((c) => {
-  const raw = typeof c === 'string' ? c : (c?.value ?? c?.metro ?? c?.label ?? c?.name ?? '');
-  return (
-    <option key={raw} value={raw}>
-      {formatMetro(c)}
-    </option>
-  );
-})}
-
+                      {(cities ?? []).map((c) => (
+                        <option key={c} value={c}>
+                          {formatMetro(c)}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -2147,7 +2031,6 @@ const metros = METROS || globalThis.metros || [];
                     </select>
                   </div>
 
-                  {/* Contract-only + Hourly Billable Range */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
@@ -2181,7 +2064,6 @@ const metros = METROS || globalThis.metros || [];
                     ) : null}
                   </div>
 
-                  {/* Show off-market toggle */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
@@ -2282,7 +2164,7 @@ const metros = METROS || globalThis.metros || [];
                           </div>
                         ) : null}
 
-                        {/* Red banner if on assignment (only when not off-market) */}
+                        {/* On assignment banner */}
                         {!c.off_market && c.on_assignment ? (
                           <div
                             style={{
@@ -2325,7 +2207,6 @@ const metros = METROS || globalThis.metros || [];
                             {formatMDY(c.date_entered || c.created_at)}
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end', flexDirection: isMobile ? 'column' : 'row' }}>
-                            {/* CHANGED: Additional information -> light blue (#93C5FD) */}
                             <Button
                               onClick={() => setExpandedId((id) => (id === c.id ? null : c.id))}
                               style={{
@@ -2801,7 +2682,6 @@ function AdminPanel({ isMobile }) {
     </>
   );
 }
-
 /* ---------- shared styles ---------- */
 const selectStyle = {
   width: '100%',
