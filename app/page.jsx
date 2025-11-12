@@ -1081,12 +1081,14 @@ export default function Page() {
                       border: '1px solid #E5E7EB',
                       padding: 12,
                       borderRadius: 8,
+                      color: '#111', // <-- added: makes text black
+                      opacity: 1           // ✅ added: override inherited transparency
                     }}
                   >
                     {aiText && (
                       <>
                         <b>AI Summary:</b>
-                        <p style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{aiText}</p>
+                        <p style={{ marginTop: 8, whiteSpace: 'pre-wrap', color: '#111' }}>{aiText}</p>
                       </>
                     )}
                     {aiErr && (
@@ -2296,6 +2298,7 @@ export default function Page() {
 
 /* ---------- Admin Panel ---------- */
 function AdminPanel({ isMobile }) {
+  
   const [list, setList] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -2493,6 +2496,22 @@ function AdminPanel({ isMobile }) {
 
   return (
     <>
+    
+    {/* --- Search Insights link --- */}
+      <div style={{ margin: '10px 0', textAlign: 'right' }}>
+        <a
+          href="/search-insights"
+          style={{
+            display: 'inline-block',
+            fontWeight: 700,
+            textDecoration: 'none',
+            color: '#2563EB'
+          }}
+        >
+          → View Search Insights
+        </a>
+      </div>
+
       {/* Invite */}
       <Card style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
