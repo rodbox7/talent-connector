@@ -789,7 +789,7 @@ export default function Page() {
           'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
         )
         .limit(2000);
-
+        
       if (error) throw error;
 
       const { min: salMin, max: salMax } = parseRange(salaryRange);
@@ -873,15 +873,9 @@ export default function Page() {
 try {
   await supabase.from('search_logs').insert([
     {
-      email: user?.email || null,
       metro: fCity || null,
-      state: fState || null,
       title: fTitle || null,
       type_of_law: fLaw || null,
-      years_range: yearsRange || null,
-      salary_range: salaryRange || null,
-      contract_only: contractOnly,
-      keyword: search || null,
       created_at: new Date().toISOString(),
     },
   ]);

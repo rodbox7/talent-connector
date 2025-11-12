@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { supabase } from '../../lib/supabaseClient';
 
+// expose supabase for console testing
+if (typeof window !== 'undefined') window.__sb = supabase;
+
+
 /* ---------- Utility: return top N only ---------- */
 function topCounts(items, key, limit = 5) {
   const counts = {};
@@ -87,21 +91,25 @@ export default function SearchInsights() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from('search_logs')
-        .select('title, type_of_law, metro')
-        .limit(10000);
-      if (error) {
-        console.error(error);
-        setRows([]);
-      } else {
-        const valid = (data || []).filter((r) => r.title || r.type_of_law || r.metro);
-        setRows(valid);
-      }
-      setLoading(false);
-    })();
-  }, []);
+  (async () => {
+    const { data, error } = await supabase
+      .from('v_search_logs_90d')                  // <= use this view
+      .select('title, type_of_law, metro, created_at')
+      .limit(10000);
+
+    console.log('Insights fetch:', { rows: data?.length ?? 0, error });
+
+    if (error) {
+      console.error('Supabase error:', error);
+      setRows([]);
+    } else {
+      const valid = (data || []).filter((r) => r.title || r.type_of_law || r.metro);
+      setRows(valid);
+    }
+    setLoading(false);
+  })();
+}, []);
+
 
   // compute top 5 only
   const insights = useMemo(() => {
