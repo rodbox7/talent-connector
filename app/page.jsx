@@ -869,6 +869,26 @@ export default function Page() {
       });
 
       setClientRows(sorted);
+// --- Log client search to search_logs ---
+try {
+  await supabase.from('search_logs').insert([
+    {
+      email: user?.email || null,
+      metro: fCity || null,
+      state: fState || null,
+      title: fTitle || null,
+      type_of_law: fLaw || null,
+      years_range: yearsRange || null,
+      salary_range: salaryRange || null,
+      contract_only: contractOnly,
+      keyword: search || null,
+      created_at: new Date().toISOString(),
+    },
+  ]);
+} catch (err) {
+  console.error('Failed to log search:', err);
+}
+
     } catch (e) {
       console.error(e);
       setClientErr('Failed to load candidates.');
