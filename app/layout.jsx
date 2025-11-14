@@ -3,9 +3,15 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata = {
-  title: 'Talent Connector',
-  description: 'Invitation-only portal',
+  title: "Talent Connector",
+  description: "Beacon Hill Legal — Talent Connector",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png" // iOS home-screen icon
+  },
+  manifest: "/manifest.json"
 };
+
 
 const NYC_URL =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg'; // CC BY 4.0
