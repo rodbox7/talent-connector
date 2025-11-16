@@ -1001,6 +1001,30 @@ try {
                 </Button>
               </div>
             </div>
+{/* <<< NEW BLOCK GOES RIGHT HERE >>> */}
+<div
+  style={{
+    marginTop: 12,
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#FFFFFF',
+  }}
+>
+  Need An Account?{' '}
+  <a
+    href="mailto:jdavid@bhsg.com?subject=Access%20Request-BHLTalent%20Connector"
+    style={{
+      color: '#FFFFFF',
+      textDecoration: 'underline',
+      fontWeight: 600,
+      cursor: 'pointer',
+    }}
+  >
+    Click Here To Request Access
+  </a>
+</div>
+{/* <<< END OF NEW BLOCK >>> */}
+
 
             {err ? (
               <div style={{ color: '#F87171', fontSize: 12, marginTop: 10 }}>{err}</div>
@@ -2107,19 +2131,41 @@ try {
                     </select>
                   </div>
                 </div>
-                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                  <Button onClick={fetchClientRows}>Apply filters</Button>
-                  <Button
-                    onClick={clearClientFilters}
-                    style={{ background: '#111827', border: '1px solid #1F2937' }}
-                  >
-                    Clear filters
-                  </Button>
-                  {clientErr ? (
-                    <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
-                  ) : null}
-                </div>
-              </Card>
+               <div
+  style={{
+    marginTop: 12,
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  }}
+>
+  <Button onClick={fetchClientRows}>Apply filters</Button>
+  <Button
+    onClick={clearClientFilters}
+    style={{ background: '#111827', border: '1px solid #1F2937' }}
+  >
+    Clear filters
+  </Button>
+
+  {/* NEW disclaimer text to the right of Clear filters */}
+  <div
+    style={{
+      color: '#FFFFFF',
+      fontSize: 10,
+      whiteSpace: 'nowrap',
+      fontStyle: 'italic'
+    }}
+  >
+    Rates And Availability Are Subject To Change
+  </div>
+
+  {clientErr ? (
+    <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
+  ) : null}
+</div>
+</Card>
+
 
               <Card style={{ marginTop: 12 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
