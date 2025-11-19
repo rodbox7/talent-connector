@@ -2403,42 +2403,55 @@ function AdminPanel({ isMobile }) {
   }
 
   async function invite() {
-    setFlash('');
-    setErr('');
-    try {
-      const em = (email || '').trim().toLowerCase();
-      if (!em || !tempPw) {
-        setErr('Email and temp password are required.');
-        return;
-      }
-      const res = await fetch('/api/admin/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: em,
-          role,
-          org: org.trim() || null,
-          amEmail: (amEmail || '').trim() || null,
-          password: tempPw,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setErr(json?.error || 'Invite failed');
-        return;
-      }
-      setEmail('');
-      setRole('client');
-      setOrg('');
-      setAmEmail('');
-      setTempPw('');
-      toast(`Invited ${em} as ${role}`);
-      await loadProfiles();
-    } catch (e) {
-      console.error(e);
-      setErr('Server error inviting user.');
+  setFlash('');
+  setErr('');
+  try {
+    const em = (email || '').trim().toLowerCase();
+    if (!em || !tempPw) {
+      setErr('Email and temp password are required.');
+      return;
     }
+
+    const res = await fetch('/api/admin/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: em,
+        role,
+        org: org.trim() || null,
+        amEmail: (amEmail || '').trim() || null,
+        password: tempPw,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      setErr(json?.error || 'Invite failed');
+      return;
+    }
+
+    // ✅ Instantly add the new user to the table
+    if (json.profile) {
+      setList((prev) => [json.profile, ...prev]);
+    } else {
+      // fallback if the API didn’t send back a profile row
+      await loadProfiles();
+    }
+
+    // Reset form
+    setEmail('');
+    setRole('client');
+    setOrg('');
+    setAmEmail('');
+    setTempPw('');
+
+    toast(`Invited ${em} as ${role}`);
+  } catch (e) {
+    console.error(e);
+    setErr('Server error inviting user.');
   }
+}
+
 
   function startEdit(row) {
     setEditingId(row.id);

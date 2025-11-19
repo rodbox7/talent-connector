@@ -3,18 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req) {
   try {
-    const { email, role, organization, salesContact } = await req.json();
+    const { email, role, org, amEmail } = await req.json();
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    // Check if user already exists in auth
-    const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
-    let authUser = userList.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    // 1️⃣ Check if user already exists in Supabase Auth
+    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
+    let authUser = list.users.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase()
+    );
 
-    // If not found, invite them
+    // 2️⃣ If not, create/invite
     if (!authUser) {
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         data: { role }
@@ -23,24 +25,32 @@ export async function POST(req) {
       authUser = data.user;
     }
 
-    // Upsert into profiles table
-    const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
-      uuid: authUser.id,          // Link to auth user
-      email,
-      role,
-      org: organization || null,
-      account_manager_email: salesContact || null
-    }, { onConflict: 'uuid' });
+    // 3️⃣ Upsert into profiles table using the "id" column
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .upsert(
+        {
+          id: authUser.id,  // <-- correct linkage column
+          email,
+          role,
+          org: org || null,
+          account_manager_email: amEmail || null
+        },
+        { onConflict: 'id' }
+      )
+      .select()
+      .single();
 
-    if (upsertError) throw upsertError;
+    if (profileErr) throw profileErr;
 
+    // 4️⃣ Return profile so the UI can update immediately
     return NextResponse.json({
-      message: 'User created and linked successfully',
-      authId: authUser.id
+      ok: true,
+      profile
     });
 
   } catch (err) {
     console.error('Invite user error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
