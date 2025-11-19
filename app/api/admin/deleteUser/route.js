@@ -1,16 +1,31 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
-export async function DELETE(req) {
+export async function POST(req) {
   try {
-    const { id } = await req.json();
+    const { id } = await req.json(); // this is the auth user id
 
-    const { error } = await supabase.auth.admin.deleteUser(id);
-    if (error) throw error;
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
 
-    return NextResponse.json({ message: 'User deleted successfully' });
+    // 1️⃣ Delete from Supabase Auth
+    const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(id);
+    if (authErr) throw authErr;
+
+    // 2️⃣ Delete from profiles table
+    const { error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+
+    if (profileErr) throw profileErr;
+
+    return NextResponse.json({ ok: true, removed: id });
+
   } catch (err) {
     console.error('Delete user error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
