@@ -2542,15 +2542,19 @@ function AdminPanel({ isMobile }) {
     try {
       if (!confirm(`Delete user ${row.email}? This cannot be undone.`)) return;
       setBusy(row.id, true);
-      const res = await fetch('/api/admin/delete-user', {
+      const res = await fetch('/api/admin/deleteUser', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: row.id }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
-      toast(`Deleted ${row.email}`);
-      await loadProfiles();
+if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
+
+toast(`Deleted ${row.email}`);
+
+// 🔥 Instantly remove from UI (no reload needed)
+setList(prev => prev.filter(u => u.id !== row.id));
+
     } catch (e) {
       console.error(e);
       setErr(e?.message || 'Delete failed.');
