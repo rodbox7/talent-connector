@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req) {
   try {
     const { email, role } = await req.json();
 
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+    // Use service role client — required for admin actions
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
+    // Create user without domain restrictions
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { role },
     });
 
