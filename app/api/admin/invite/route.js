@@ -10,27 +10,32 @@ export async function POST(req) {
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    // 1️⃣ Check if user already exists in Supabase Auth
+    // 1️⃣ Check if user already exists
     const { data: list } = await supabaseAdmin.auth.admin.listUsers();
     let authUser = list.users.find(
       (u) => u.email.toLowerCase() === email.toLowerCase()
     );
 
-    // 2️⃣ If not, create/invite
+    // 2️⃣ If not, invite them via email (verification required)
     if (!authUser) {
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: { role }
+        data: {
+          role,
+          org,
+          account_manager_email: amEmail
+        }
       });
+
       if (error) throw error;
       authUser = data.user;
     }
 
-    // 3️⃣ Upsert into profiles table using the "id" column
+    // 3️⃣ Upsert into profiles table using the user ID
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
       .upsert(
         {
-          id: authUser.id,  // <-- correct linkage column
+          id: authUser.id,
           email,
           role,
           org: org || null,
@@ -43,10 +48,11 @@ export async function POST(req) {
 
     if (profileErr) throw profileErr;
 
-    // 4️⃣ Return profile so the UI can update immediately
+    // 4️⃣ Return success response
     return NextResponse.json({
       ok: true,
-      profile
+      profile,
+      user: authUser
     });
 
   } catch (err) {

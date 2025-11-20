@@ -2379,36 +2379,40 @@ function AdminPanel({ isMobile }) {
     loadProfiles();
   }, []);
   async function loadProfiles() {
-    setLoading(true);
-    setErr('');
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id,email,role,org,account_manager_email,created_at')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      setList(data || []);
-    } catch (e) {
-      console.error(e);
-      setErr('Error loading profiles.');
-    }
-    setLoading(false);
+  setLoading(true);
+  setErr('');
+
+  try {
+    const res = await fetch('/api/admin/users');
+    const json = await res.json();
+
+    if (!json.ok) throw new Error(json.error || 'Failed loading users');
+
+    setList(json.users || []);
+  } catch (e) {
+    console.error(e);
+    setErr('Error loading users.');
   }
 
-  function toast(okMsg = '', errMsg = '') {
-    if (okMsg) setFlash(okMsg);
-    if (errMsg) setErr(errMsg);
-    if (okMsg || errMsg) setTimeout(() => { setFlash(''); setErr(''); }, 2500);
-  }
+  setLoading(false);
+}
 
-  async function invite() {
+  
+
+ function toast(okMsg = '', errMsg = '') {
+  if (okMsg) setFlash(okMsg);
+  if (errMsg) setErr(errMsg);
+  if (okMsg || errMsg) setTimeout(() => { setFlash(''); setErr(''); }, 2500);
+}
+
+async function invite() {
   setFlash('');
   setErr('');
+
   try {
     const em = (email || '').trim().toLowerCase();
-    if (!em || !tempPw) {
-      setErr('Email and temp password are required.');
+    if (!em) {
+      setErr('Email is required.');
       return;
     }
 
@@ -2418,9 +2422,8 @@ function AdminPanel({ isMobile }) {
       body: JSON.stringify({
         email: em,
         role,
-        org: org.trim() || null,
+        org: (org || '').trim() || null,
         amEmail: (amEmail || '').trim() || null,
-        password: tempPw,
       }),
     });
 
@@ -2430,20 +2433,14 @@ function AdminPanel({ isMobile }) {
       return;
     }
 
-    // ✅ Instantly add the new user to the table
-    if (json.profile) {
-      setList((prev) => [json.profile, ...prev]);
-    } else {
-      // fallback if the API didn’t send back a profile row
-      await loadProfiles();
-    }
+    // Reload full list so status + details are up to date
+    await loadProfiles();
 
     // Reset form
     setEmail('');
     setRole('client');
     setOrg('');
     setAmEmail('');
-    setTempPw('');
 
     toast(`Invited ${em} as ${role}`);
   } catch (e) {
@@ -2451,6 +2448,7 @@ function AdminPanel({ isMobile }) {
     setErr('Server error inviting user.');
   }
 }
+
 
 
   function startEdit(row) {
@@ -2668,6 +2666,7 @@ setList(prev => prev.filter(u => u.id !== row.id));
               <thead>
                 <tr style={{ textAlign: 'left', color: '#9CA3AF', fontSize: isMobile ? 13 : 12 }}>
                   <th style={thStyle}>Email</th>
+                   <th style={thStyle}>Status</th>
                   <th style={thStyle}>Role</th>
                   <th style={thStyle}>Org</th>
                   <th style={thStyle}>Sales contact</th>
@@ -2680,23 +2679,56 @@ setList(prev => prev.filter(u => u.id !== row.id));
                   const busy = !!rowBusy[r.id];
                   const isEditing = editingId === r.id;
                   return (
-                    <tr key={r.id}>
-                      <td style={tdStyle}>{r.email}</td>
-                      <td style={tdStyle}>
-                        {isEditing ? (
-                          <select
-                            value={editDraft.role}
-                            onChange={(e) => setEditDraft((s) => ({ ...s, role: e.target.value }))}
-                            style={selectStyle}
-                          >
-                            <option value="client">Client</option>
-                            <option value="recruiter">Recruiter</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        ) : (
-                          r.role
-                        )}
-                      </td>
+                   <tr key={r.id}>
+  <td style={tdStyle}>{r.email}</td>
+
+  {/* 🆕 STATUS CELL */}
+  <td style={tdStyle}>
+    {r.email_confirmed_at ? (
+      <span
+        style={{
+          padding: '4px 10px',
+          borderRadius: 9999,
+          background: '#d1fae5',
+          color: '#065f46',
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+        Verified
+      </span>
+    ) : (
+      <span
+        style={{
+          padding: '4px 10px',
+          borderRadius: 9999,
+          background: '#fef3c7',
+          color: '#92400e',
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+        Pending
+      </span>
+    )}
+  </td>
+
+  <td style={tdStyle}>
+    {isEditing ? (
+      <select
+        value={editDraft.role}
+        onChange={(e) => setEditDraft((s) => ({ ...s, role: e.target.value }))}
+        style={selectStyle}
+      >
+        <option value="client">Client</option>
+        <option value="recruiter">Recruiter</option>
+        <option value="admin">Admin</option>
+      </select>
+    ) : (
+      r.role
+    )}
+  </td>
+
                       <td style={tdStyle}>
                         {isEditing ? (
                           <Input
