@@ -325,46 +325,111 @@ export default function Page() {
   const [err, setErr] = React.useState('');
   const [user, setUser] = React.useState(null);
 
-  async function login() {
-    try {
-      setErr('');
-      if (!email || !pwd) {
-        setErr('Enter email & password.');
-        return;
-      }
-      const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: pwd,
-      });
-      if (authErr) throw authErr;
+   async function login() {
+  try {
+    setErr('');
+    if (!email || !pwd) {
+      setErr('Enter email & password.');
+      return;
+    }
 
-      const { data: prof, error: profErr } = await supabase
+    // 1️⃣ Auth sign-in
+    const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password: pwd,
+    });
+    if (authErr) throw authErr;
+
+    const authUser = auth?.user;
+    if (!authUser) {
+      setErr('Login failed: no user returned from auth.');
+      return;
+    }
+
+    // 2️⃣ Try to load profile (may be missing for older users)
+    let { data: prof, error: profErr } = await supabase
+      .from('profiles')
+      .select('id,email,role,org,account_manager_email')
+      .eq('id', authUser.id)
+      .maybeSingle(); // returns null if no row
+
+    if (profErr) {
+      console.error('Error loading profile:', profErr);
+    }
+
+    // 3️⃣ If no profile row at all, create it using auth metadata
+    if (!prof) {
+      const meta = authUser.user_metadata || {};
+      const roleFromMeta = meta.role || mode; // fall back to the tab they used
+
+      const { data: inserted, error: insertErr } = await supabase
         .from('profiles')
+        .insert({
+          id: authUser.id,
+          email: authUser.email,
+          role: roleFromMeta,
+          org: meta.org || null,
+          account_manager_email: meta.account_manager_email || null,
+        })
         .select('id,email,role,org,account_manager_email')
-        .eq('id', auth.user.id)
         .single();
 
-      if (profErr || !prof) {
-        setErr('Login ok, but profile not found.');
-        return;
-      }
-      if (prof.role !== mode) {
-        setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
+      if (insertErr) {
+        console.error('Profile insert failed:', insertErr);
+        setErr('Login ok, but could not create profile.');
         return;
       }
 
-      setUser({
-        id: prof.id,
-        email: prof.email,
-        role: prof.role,
-        org: prof.org || null,
-        amEmail: prof.account_manager_email || null,
-      });
-    } catch (e) {
-      console.error(e);
-      setErr('Login failed.');
+      prof = inserted;
+    } else if (!prof.role || prof.role === '') {
+      // 4️⃣ Profile exists but is missing fields — patch it
+      const meta = authUser.user_metadata || {};
+
+      const { error: patchErr } = await supabase
+        .from('profiles')
+        .update({
+          role: prof.role || meta.role || 'client',
+          org: prof.org ?? meta.org ?? null,
+          account_manager_email:
+            prof.account_manager_email ?? meta.account_manager_email ?? null,
+        })
+        .eq('id', authUser.id);
+
+      if (patchErr) {
+        console.error('Failed to patch profile:', patchErr);
+      } else {
+        // refresh in-memory copy if we patched
+        prof = {
+          ...prof,
+          role: prof.role || meta.role || 'client',
+          org: prof.org ?? meta.org ?? null,
+          account_manager_email:
+            prof.account_manager_email ?? meta.account_manager_email ?? null,
+        };
+      }
     }
+
+    // 5️⃣ Enforce role vs tab selection
+    if (prof.role !== mode) {
+      setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
+      return;
+    }
+
+    // 6️⃣ Set logged-in user for the app
+    setUser({
+      id: prof.id,
+      email: prof.email,
+      role: prof.role,
+      org: prof.org || null,
+      amEmail: prof.account_manager_email || null,
+    });
+  } catch (e) {
+    console.error(e);
+    setErr('Login failed.');
   }
+}
+
+
   async function logout() {
     try { await supabase.auth.signOut(); } catch {}
     setUser(null);
@@ -2378,7 +2443,7 @@ function AdminPanel({ isMobile }) {
   React.useEffect(() => {
     loadProfiles();
   }, []);
-  async function loadProfiles() {
+ async function loadProfiles() {
   setLoading(true);
   setErr('');
 
@@ -2389,6 +2454,9 @@ function AdminPanel({ isMobile }) {
     if (!json.ok) throw new Error(json.error || 'Failed loading users');
 
     setList(json.users || []);
+
+    // 👇 QUICK FIX LOG #1 – what came back from API
+    console.log('LOADED USERS FROM API:', json.users);
   } catch (e) {
     console.error(e);
     setErr('Error loading users.');
@@ -2562,12 +2630,27 @@ setList(prev => prev.filter(u => u.id !== row.id));
   }
 
   const filtered = React.useMemo(() => {
-    const s = (q || '').trim().toLowerCase();
-    if (!s) return list;
-    return list.filter((r) =>
-      [r.email, r.org, r.account_manager_email].some((x) => (x || '').toLowerCase().includes(s))
-    );
-  }, [q, list]);
+  const s = (q || '').trim().toLowerCase();
+
+  if (!s) {
+    // 👇 QUICK FIX LOG #2 – list before filtering
+    console.log('NO SEARCH TERM, USING FULL LIST:', list);
+    return list;
+  }
+
+  const result = list.filter((r) =>
+    [r.email, r.org, r.account_manager_email].some((x) => (x || '').toLowerCase().includes(s))
+  );
+
+  // 👇 QUICK FIX LOG #3 – list after filtering
+  console.log('SEARCH TERM:', s, 'FILTERED RESULT:', result);
+
+  return result;
+}, [q, list]);
+
+// 👇 ADD THIS *RIGHT AFTER* THE useMemo, BEFORE `return (`
+console.log('FINAL DISPLAYED ROWS:', filtered);
+
 
   return (
     <>
@@ -2675,6 +2758,8 @@ setList(prev => prev.filter(u => u.id !== row.id));
                 </tr>
               </thead>
               <tbody>
+                
+
                 {filtered.map((r) => {
                   const busy = !!rowBusy[r.id];
                   const isEditing = editingId === r.id;

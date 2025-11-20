@@ -5,20 +5,26 @@ export async function POST(req) {
   try {
     const { email, role, org, amEmail } = await req.json();
 
+    if (!email) {
+      return NextResponse.json({ ok: false, error: 'Email required.' }, { status: 400 });
+    }
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    // 1️⃣ Check if user already exists
-    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-    let authUser = list.users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // 2️⃣ If not, invite them via email (verification required)
-    if (!authUser) {
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    // Check if user already exists (may not exist until they accept)
+    const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+    if (listErr) throw listErr;
+
+    const existing = list.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+
+    // If user doesn't exist yet, send invite
+    if (!existing) {
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalizedEmail, {
         data: {
           role,
           org,
@@ -27,36 +33,18 @@ export async function POST(req) {
       });
 
       if (error) throw error;
-      authUser = data.user;
     }
 
-    // 3️⃣ Upsert into profiles table using the user ID
-    const { data: profile, error: profileErr } = await supabaseAdmin
-      .from('profiles')
-      .upsert(
-        {
-          id: authUser.id,
-          email,
-          role,
-          org: org || null,
-          account_manager_email: amEmail || null
-        },
-        { onConflict: 'id' }
-      )
-      .select()
-      .single();
-
-    if (profileErr) throw profileErr;
-
-    // 4️⃣ Return success response
     return NextResponse.json({
       ok: true,
-      profile,
-      user: authUser
+      message: `Invite sent to ${normalizedEmail}`
     });
 
   } catch (err) {
-    console.error('Invite user error:', err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    console.error("🔥 INVITE ERROR:", err);
+    return NextResponse.json(
+      { ok: false, error: err.message || "Invite failed." },
+      { status: 500 }
+    );
   }
 }
