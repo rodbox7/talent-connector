@@ -2448,22 +2448,26 @@ function AdminPanel({ isMobile }) {
   setErr('');
 
   try {
-    const res = await fetch('/api/admin/users');
+    const res = await fetch("/api/admin/users", { cache: "no-store" });
     const json = await res.json();
 
-    if (!json.ok) throw new Error(json.error || 'Failed loading users');
+    console.log("ADMIN /api/admin/users RAW RESPONSE:", json);
+    console.log(
+      "ADMIN /api/admin/users EMAILS:",
+      (json.users || []).map((u) => u.email)
+    );
+
+    if (!json.ok) throw new Error(json.error || "Failed loading users");
 
     setList(json.users || []);
-
-    // 👇 QUICK FIX LOG #1 – what came back from API
-    console.log('LOADED USERS FROM API:', json.users);
   } catch (e) {
-    console.error(e);
-    setErr('Error loading users.');
+    console.error("Load profiles error:", e);
+    setErr(e.message || "Failed loading users");
+  } finally {
+    setLoading(false);
   }
-
-  setLoading(false);
 }
+
 
   
 
