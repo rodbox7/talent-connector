@@ -12,37 +12,57 @@ export async function POST(req) {
 
     const em = email.toLowerCase().trim();
 
-    // 1️⃣ Get existing Auth user (if any)
+    // 1️⃣ Get existing Auth user
     const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-    let authUser = list.users.find((u) => u.email.toLowerCase() === em);
+    let authUser = list.users.find(
+      (u) => u.email && u.email.toLowerCase() === em
+    );
 
-    // 2️⃣ CREATE INVITE IF THEY DO NOT EXIST
+    // 2️⃣ CREATE IF MISSING — RESEND IF FLAGGED
     if (!authUser) {
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(em, {
-        data: {
-          role,
-          org,
-          account_manager_email: amEmail || null,
-        },
-      });
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        em,
+        {
+          data: {
+            role,
+            org,
+            account_manager_email: amEmail || null,
+          },
+        }
+      );
       if (error) throw error;
       authUser = data.user;
-    }
 
-    // 3️⃣ UPDATE METADATA EVEN IF USER ALREADY EXISTS
-    const { error: updateMetaErr } = await supabaseAdmin.auth.admin.updateUserById(
-      authUser.id,
-      {
+   } else if (resend && !authUser.confirmed_at) {
+  const { error: resendErr } =
+    await supabaseAdmin.auth.admin.inviteUserByEmail(em, {
+      data: {
+        role,
+        org,
+        account_manager_email: amEmail || null,
+      },
+    });
+
+  if (resendErr) throw resendErr;
+  console.log("🔁 Resent invite to:", em);
+} else if (resend) {
+  console.log("⚠ User already confirmed — no invite sent");
+}
+
+
+    // 3️⃣ Update auth metadata regardless
+    const { error: updateMetaErr } =
+      await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
         user_metadata: {
           role,
           org,
           account_manager_email: amEmail || null,
         },
-      }
-    );
+      });
+
     if (updateMetaErr) throw updateMetaErr;
 
-    // 4️⃣ UPSERT INTO PROFILES TABLE IMMEDIATELY
+    // 4️⃣ Sync to profiles table
     const { error: upsertErr } = await supabaseAdmin
       .from("profiles")
       .upsert(
@@ -61,7 +81,10 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, user: authUser });
 
   } catch (err) {
-    console.error("Invite user error:", err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    console.error("🔥 Invite user error:", err);
+    return NextResponse.json(
+      { ok: false, error: err.message },
+      { status: 500 }
+    );
   }
 }
