@@ -13,9 +13,10 @@ export async function POST(req) {
     const em = email.toLowerCase().trim();
 
     // 👇 Build callback URL for emails
-    const redirectTo = `${
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    }/auth/callback`;
+   const redirectTo = `${
+  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+}/auth/callback?next=/setup`;
+
 
     // 1️⃣ Get existing Auth user (if any)
     const { data: list } = await supabaseAdmin.auth.admin.listUsers();

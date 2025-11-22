@@ -1,20 +1,21 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 
 export default function AuthCallback() {
   const router = useRouter();
+  const params = useSearchParams();
 
   useEffect(() => {
     async function run() {
-      const { data, error } = await supabase.auth.exchangeCodeForSession(
-        window.location.href
-      );
+      const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+
+      const next = params.get('next') || '/';
 
       if (!error && data?.session) {
-        router.replace('/setup');
+        router.replace(next);
         return;
       }
 
@@ -22,7 +23,7 @@ export default function AuthCallback() {
     }
 
     run();
-  }, [router]);
+  }, [router, params]);
 
   return <p>Finishing sign-in…</p>;
 }
