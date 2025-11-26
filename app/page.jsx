@@ -2423,7 +2423,6 @@ try {
 
 /* ---------- Admin Panel ---------- */
 function AdminPanel({ isMobile }) {
-  
   const [list, setList] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -2437,47 +2436,54 @@ function AdminPanel({ isMobile }) {
 
   const [q, setQ] = React.useState('');
   const [editingId, setEditingId] = React.useState(null);
-  const [editDraft, setEditDraft] = React.useState({ role: 'client', org: '', account_manager_email: '' });
+  const [editDraft, setEditDraft] = React.useState({
+    role: 'client',
+    org: '',
+    account_manager_email: '',
+  });
   const [rowBusy, setRowBusy] = React.useState({});
 
   React.useEffect(() => {
     loadProfiles();
   }, []);
- async function loadProfiles() {
-  setLoading(true);
-  setErr('');
 
-  try {
-    const res = await fetch("/api/admin/users", { cache: "no-store" });
-    const json = await res.json();
+  async function loadProfiles() {
+    setLoading(true);
+    setErr('');
 
-    console.log("ADMIN /api/admin/users RAW RESPONSE:", json);
-    console.log(
-      "ADMIN /api/admin/users EMAILS:",
-      (json.users || []).map((u) => u.email)
-    );
+    try {
+      const res = await fetch('/api/admin/users', { cache: 'no-store' });
+      const json = await res.json();
 
-    if (!json.ok) throw new Error(json.error || "Failed loading users");
+      console.log('ADMIN /api/admin/users RAW RESPONSE:', json);
+      console.log(
+        'ADMIN /api/admin/users EMAILS:',
+        (json.users || []).map((u) => u.email)
+      );
 
-    setList(json.users || []);
-  } catch (e) {
-    console.error("Load profiles error:", e);
-    setErr(e.message || "Failed loading users");
-  } finally {
-    setLoading(false);
+      if (!json.ok) throw new Error(json.error || 'Failed loading users');
+
+      setList(json.users || []);
+    } catch (e) {
+      console.error('Load profiles error:', e);
+      setErr(e.message || 'Failed loading users');
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
+  function toast(okMsg = '', errMsg = '') {
+    if (okMsg) setFlash(okMsg);
+    if (errMsg) setErr(errMsg);
+    if (okMsg || errMsg) {
+      setTimeout(() => {
+        setFlash('');
+        setErr('');
+      }, 2500);
+    }
+  }
 
-  
-
- function toast(okMsg = '', errMsg = '') {
-  if (okMsg) setFlash(okMsg);
-  if (errMsg) setErr(errMsg);
-  if (okMsg || errMsg) setTimeout(() => { setFlash(''); setErr(''); }, 2500);
-}
-
-async function invite() {
+    async function invite() {
   setFlash('');
   setErr('');
 
@@ -2500,12 +2506,24 @@ async function invite() {
     });
 
     const json = await res.json();
-    if (!res.ok || !json.ok) {
+
+    if (!json.ok) {
       setErr(json?.error || 'Invite failed');
       return;
     }
 
-    // Reload full list so status + details are up to date
+    // ⭐ Build a clean Talent Connector password setup link
+    const base =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
+
+    const onboardingUrl = `${base}/set-password?email=${encodeURIComponent(em)}`;
+
+    // Show this link in the green box
+    setTempPw(onboardingUrl);
+
+    // Refresh list
     await loadProfiles();
 
     // Reset form
@@ -2514,14 +2532,12 @@ async function invite() {
     setOrg('');
     setAmEmail('');
 
-    toast(`Invited ${em} as ${role}`);
+    toast(`Created ${em}. Send them the password setup link below.`);
   } catch (e) {
     console.error(e);
     setErr('Server error inviting user.');
   }
 }
-
-
 
   function startEdit(row) {
     setEditingId(row.id);
@@ -2531,10 +2547,12 @@ async function invite() {
       account_manager_email: row.account_manager_email || '',
     });
   }
+
   function cancelEdit() {
     setEditingId(null);
     setEditDraft({ role: 'client', org: '', account_manager_email: '' });
   }
+
   function setBusy(id, v) {
     setRowBusy((s) => ({ ...s, [id]: !!v }));
   }
@@ -2545,9 +2563,13 @@ async function invite() {
       const payload = {
         role: editDraft.role,
         org: (editDraft.org || '').trim() || null,
-        account_manager_email: (editDraft.account_manager_email || '').trim() || null,
+        account_manager_email:
+          (editDraft.account_manager_email || '').trim() || null,
       };
-      const { error } = await supabase.from('profiles').update(payload).eq('id', id);
+      const { error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', id);
       if (error) throw error;
       toast('Saved changes');
       await loadProfiles();
@@ -2588,9 +2610,14 @@ async function invite() {
 
   async function resetPassword(row) {
     try {
-      const newPw = prompt('Set a new temporary password for this user (min 8 chars):');
+      const newPw = prompt(
+        'Set a new temporary password for this user (min 8 chars):'
+      );
       if (!newPw) return;
-      if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
+      if (newPw.length < 8) {
+        alert('Password must be at least 8 characters.');
+        return;
+      }
       setBusy(row.id, true);
       const res = await fetch('/api/admin/reset-password', {
         method: 'POST',
@@ -2618,13 +2645,12 @@ async function invite() {
         body: JSON.stringify({ id: row.id }),
       });
       const json = await res.json();
-if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
+      if (!res.ok || !json.ok) throw new Error(json?.error || 'Delete failed.');
 
-toast(`Deleted ${row.email}`);
+      toast(`Deleted ${row.email}`);
 
-// 🔥 Instantly remove from UI (no reload needed)
-setList(prev => prev.filter(u => u.id !== row.id));
-
+      // Instantly remove from UI (no reload needed)
+      setList((prev) => prev.filter((u) => u.id !== row.id));
     } catch (e) {
       console.error(e);
       setErr(e?.message || 'Delete failed.');
@@ -2634,32 +2660,29 @@ setList(prev => prev.filter(u => u.id !== row.id));
   }
 
   const filtered = React.useMemo(() => {
-  const s = (q || '').trim().toLowerCase();
+    const s = (q || '').trim().toLowerCase();
 
-  if (!s) {
-    // 👇 QUICK FIX LOG #2 – list before filtering
-    console.log('NO SEARCH TERM, USING FULL LIST:', list);
-    return list;
-  }
+    if (!s) {
+      console.log('NO SEARCH TERM, USING FULL LIST:', list);
+      return list;
+    }
 
-  const result = list.filter((r) =>
-    [r.email, r.org, r.account_manager_email].some((x) => (x || '').toLowerCase().includes(s))
-  );
+    const result = list.filter((r) =>
+      [r.email, r.org, r.account_manager_email].some((x) =>
+        (x || '').toLowerCase().includes(s)
+      )
+    );
 
-  // 👇 QUICK FIX LOG #3 – list after filtering
-  console.log('SEARCH TERM:', s, 'FILTERED RESULT:', result);
+    console.log('SEARCH TERM:', s, 'FILTERED RESULT:', result);
 
-  return result;
-}, [q, list]);
+    return result;
+  }, [q, list]);
 
-// 👇 ADD THIS *RIGHT AFTER* THE useMemo, BEFORE `return (`
-console.log('FINAL DISPLAYED ROWS:', filtered);
-
+  console.log('FINAL DISPLAYED ROWS:', filtered);
 
   return (
     <>
-    
-    {/* --- Search Insights link --- */}
+      {/* --- Search Insights link --- */}
       <div style={{ margin: '10px 0', textAlign: 'right' }}>
         <a
           href="/search-insights"
@@ -2667,7 +2690,7 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
             display: 'inline-block',
             fontWeight: 700,
             textDecoration: 'none',
-            color: '#2563EB'
+            color: '#2563EB',
           }}
         >
           → View Search Insights
@@ -2677,7 +2700,13 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
       {/* Invite */}
       <Card style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: 12,
+          }}
+        >
           <div>
             <Label>Email</Label>
             <Input
@@ -2689,7 +2718,11 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
           </div>
           <div>
             <Label>Role</Label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} style={selectStyle}>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              style={selectStyle}
+            >
               <option value="client">Client</option>
               <option value="recruiter">Recruiter</option>
               <option value="admin">Admin</option>
@@ -2708,38 +2741,118 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
               onChange={(e) => setAmEmail(e.target.value)}
             />
           </div>
-          <div>
-            <Label>Temp password</Label>
-            <Input
-              type="password"
-              placeholder="set a password"
-              value={tempPw}
-              onChange={(e) => setTempPw(e.target.value)}
-            />
-          </div>
         </div>
-        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
-          <Button onClick={invite} style={{ width: isMobile ? '100%' : undefined }}>Add user</Button>
+
+        <div
+          style={{
+            marginTop: 10,
+            display: 'flex',
+            gap: 8,
+            flexDirection: isMobile ? 'column' : 'row',
+          }}
+        >
+          <Button
+            onClick={invite}
+            style={{ width: isMobile ? '100%' : undefined }}
+          >
+            Add user
+          </Button>
           {err ? (
-            <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{err}</div>
+            <div
+              style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}
+            >
+              {err}
+            </div>
           ) : (
-            <div style={{ color: '#93E2B7', fontSize: 12, paddingTop: 8 }}>{flash}</div>
+            <div
+              style={{ color: '#93E2B7', fontSize: 12, paddingTop: 8 }}
+            >
+              {flash}
+            </div>
           )}
         </div>
       </Card>
 
+      {/* Password Setup Link Display */}
+      {tempPw ? (
+        <div
+          style={{
+            marginTop: 16,
+            padding: 12,
+            borderRadius: 8,
+            background: '#065F46',
+            color: 'white',
+            fontSize: 14,
+            lineHeight: 1.4,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            Send this password setup link to the new user:
+          </div>
+
+          <div
+            style={{
+              wordBreak: 'break-all',
+              background: '#064E3B',
+              padding: 10,
+              borderRadius: 6,
+              fontSize: 13,
+            }}
+          >
+            {tempPw}
+          </div>
+
+          <button
+            onClick={() => navigator.clipboard.writeText(tempPw)}
+            style={{
+              marginTop: 8,
+              padding: '6px 12px',
+              background: '#10B981',
+              borderRadius: 6,
+              border: 'none',
+              color: 'white',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Copy link
+          </button>
+        </div>
+      ) : null}
+
       {/* Directory */}
       <Card style={{ marginTop: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
           <div style={{ fontWeight: 800 }}>Directory</div>
-          <div style={{ display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              flexDirection: isMobile ? 'column' : 'row',
+              width: isMobile ? '100%' : 'auto',
+            }}
+          >
             <Input
               placeholder="Search email / org / sales contact"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{ width: isMobile ? '100%' : 300 }}
             />
-            <Button onClick={loadProfiles} style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
+            <Button
+              onClick={loadProfiles}
+              style={{
+                background: '#0EA5E9',
+                border: '1px solid #1F2937',
+                width: isMobile ? '100%' : undefined,
+              }}
+            >
               Refresh
             </Button>
           </div>
@@ -2749,99 +2862,149 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
           <div style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? 14 : 13 }}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: isMobile ? 14 : 13,
+              }}
+            >
               <thead>
-                <tr style={{ textAlign: 'left', color: '#9CA3AF', fontSize: isMobile ? 13 : 12 }}>
+                <tr
+                  style={{
+                    textAlign: 'left',
+                    color: '#9CA3AF',
+                    fontSize: isMobile ? 13 : 12,
+                  }}
+                >
                   <th style={thStyle}>Email</th>
-                   <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Status</th>
                   <th style={thStyle}>Role</th>
                   <th style={thStyle}>Org</th>
                   <th style={thStyle}>Sales contact</th>
                   <th style={thStyle}>Created</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                  <th
+                    style={{ ...thStyle, textAlign: 'right' }}
+                  >
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                
-
                 {filtered.map((r) => {
                   const busy = !!rowBusy[r.id];
                   const isEditing = editingId === r.id;
                   return (
-                   <tr key={r.id}>
-  <td style={tdStyle}>{r.email}</td>
+                    <tr key={r.id}>
+                      <td style={tdStyle}>{r.email}</td>
 
-  {/* 🆕 STATUS CELL */}
-  <td style={tdStyle}>
-    {r.email_confirmed_at ? (
-      <span
-        style={{
-          padding: '4px 10px',
-          borderRadius: 9999,
-          background: '#d1fae5',
-          color: '#065f46',
-          fontSize: 12,
-          fontWeight: 600,
-        }}
-      >
-        Verified
-      </span>
-    ) : (
-      <span
-        style={{
-          padding: '4px 10px',
-          borderRadius: 9999,
-          background: '#fef3c7',
-          color: '#92400e',
-          fontSize: 12,
-          fontWeight: 600,
-        }}
-      >
-        Pending
-      </span>
-    )}
-  </td>
+                      {/* Status */}
+                      <td style={tdStyle}>
+                        {r.email_confirmed_at ? (
+                          <span
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 9999,
+                              background: '#d1fae5',
+                              color: '#065f46',
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Verified
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 9999,
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Pending
+                          </span>
+                        )}
+                      </td>
 
-  <td style={tdStyle}>
-    {isEditing ? (
-      <select
-        value={editDraft.role}
-        onChange={(e) => setEditDraft((s) => ({ ...s, role: e.target.value }))}
-        style={selectStyle}
-      >
-        <option value="client">Client</option>
-        <option value="recruiter">Recruiter</option>
-        <option value="admin">Admin</option>
-      </select>
-    ) : (
-      r.role
-    )}
-  </td>
+                      <td style={tdStyle}>
+                        {isEditing ? (
+                          <select
+                            value={editDraft.role}
+                            onChange={(e) =>
+                              setEditDraft((s) => ({
+                                ...s,
+                                role: e.target.value,
+                              }))
+                            }
+                            style={selectStyle}
+                          >
+                            <option value="client">Client</option>
+                            <option value="recruiter">Recruiter</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : (
+                          r.role
+                        )}
+                      </td>
 
                       <td style={tdStyle}>
                         {isEditing ? (
                           <Input
                             value={editDraft.org}
-                            onChange={(e) => setEditDraft((s) => ({ ...s, org: e.target.value }))}
+                            onChange={(e) =>
+                              setEditDraft((s) => ({
+                                ...s,
+                                org: e.target.value,
+                              }))
+                            }
                           />
-                        ) : (r.org || '—')}
+                        ) : (
+                          r.org || '—'
+                        )}
                       </td>
+
                       <td style={tdStyle}>
                         {isEditing ? (
                           <Input
                             type="email"
                             value={editDraft.account_manager_email}
-                            onChange={(e) => setEditDraft((s) => ({ ...s, account_manager_email: e.target.value }))}
+                            onChange={(e) =>
+                              setEditDraft((s) => ({
+                                ...s,
+                                account_manager_email: e.target.value,
+                              }))
+                            }
                           />
-                        ) : (r.account_manager_email || '—')}
+                        ) : (
+                          r.account_manager_email || '—'
+                        )}
                       </td>
-                      <td style={tdStyle}>{new Date(r.created_at).toLocaleString()}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+
+                      <td style={tdStyle}>
+                        {new Date(r.created_at).toLocaleString()}
+                      </td>
+
+                      <td
+                        style={{ ...tdStyle, textAlign: 'right' }}
+                      >
                         {!isEditing ? (
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              justifyContent: 'flex-end',
+                              flexWrap: 'wrap',
+                            }}
+                          >
                             <Button
                               onClick={() => startEdit(r)}
-                              style={{ background: '#111827', border: '1px solid #1F2937' }}
+                              style={{
+                                background: '#111827',
+                                border: '1px solid #1F2937',
+                              }}
                               disabled={busy}
                             >
                               Edit
@@ -2862,18 +3025,36 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
                             </Button>
                             <Button
                               onClick={() => deleteUser(r)}
-                              style={{ background: '#B91C1C', border: '1px solid #7F1D1D' }}
+                              style={{
+                                background: '#B91C1C',
+                                border: '1px solid #7F1D1D',
+                              }}
                               disabled={busy}
                             >
                               Delete
                             </Button>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            <Button onClick={() => saveEdit(r.id)} disabled={busy}>Save</Button>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 8,
+                              justifyContent: 'flex-end',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <Button
+                              onClick={() => saveEdit(r.id)}
+                              disabled={busy}
+                            >
+                              Save
+                            </Button>
                             <Button
                               onClick={cancelEdit}
-                              style={{ background: '#111827', border: '1px solid #1F2937' }}
+                              style={{
+                                background: '#111827',
+                                border: '1px solid #1F2937',
+                              }}
                               disabled={busy}
                             >
                               Cancel
@@ -2886,7 +3067,10 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
                 })}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ ...tdStyle, color: '#9CA3AF' }}>
+                    <td
+                      colSpan={7}
+                      style={{ ...tdStyle, color: '#9CA3AF' }}
+                    >
                       No users found.
                     </td>
                   </tr>
@@ -2899,6 +3083,7 @@ console.log('FINAL DISPLAYED ROWS:', filtered);
     </>
   );
 }
+
 /* ---------- shared styles ---------- */
 const selectStyle = {
   width: '100%',
@@ -2908,7 +3093,7 @@ const selectStyle = {
   background: '#0F172A',
   color: '#E5E7EB',
   outline: 'none',
-  fontSize: 16,           // iOS zoom prevention
+  fontSize: 16,
   lineHeight: '22px',
   WebkitAppearance: 'none',
   MozAppearance: 'none',
@@ -2917,5 +3102,12 @@ const selectStyle = {
   zIndex: 11,
 };
 
-const thStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
-const tdStyle = { padding: '8px', borderBottom: '1px solid #1F2937' };
+const thStyle = {
+  padding: '8px',
+  borderBottom: '1px solid #1F2937',
+};
+
+const tdStyle = {
+  padding: '8px',
+  borderBottom: '1px solid #1F2937',
+};

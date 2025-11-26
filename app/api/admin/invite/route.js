@@ -1,86 +1,76 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+// app/api/admin/invite/route.js
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req) {
   try {
-    const { email, role, org, amEmail, resend } = await req.json();
+    const { email, role, org, amEmail } = await req.json();
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const em = email.toLowerCase().trim();
-
-    // 👇 Build callback URL for emails
-   const redirectTo = `${
-  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-}/auth/callback?next=/setup`;
-
-
-    // 1️⃣ Get existing Auth user (if any)
-    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-    let authUser = list.users.find((u) => u.email.toLowerCase() === em);
-
-    // 2️⃣ CREATE INVITE IF THEY DO NOT EXIST, OR RESEND IF THEY DO
-    if (!authUser) {
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-        em,
-        {
-          redirectTo,
-          data: {
-            role,
-            org,
-            account_manager_email: amEmail || null,
-          },
-        }
+    const em = (email || '').trim().toLowerCase();
+    if (!em) {
+      return NextResponse.json(
+        { ok: false, error: 'Email is required.' },
+        { status: 400 }
       );
-      if (error) throw error;
-      authUser = data.user;
-    } else if (resend) {
-      const { error: resendErr } =
-        await supabaseAdmin.auth.admin.inviteUserByEmail(em, {
-          redirectTo,
-          data: {
-            role,
-            org,
+    }
+
+    // 1️⃣ Ensure user exists in auth.users
+    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
+    let authUser = (list?.users || []).find(
+      (u) => (u.email || '').toLowerCase() === em
+    );
+
+    if (!authUser) {
+      const { data: created, error: createErr } =
+        await supabaseAdmin.auth.admin.createUser({
+          email: em,
+          email_confirm: false,
+          user_metadata: {
+            role: role || 'client',
+            org: org || null,
             account_manager_email: amEmail || null,
           },
         });
-      if (resendErr) throw resendErr;
-      console.log("🔁 Resent invite to:", em);
+
+      if (createErr) throw createErr;
+      authUser = created.user;
     }
 
-    // 3️⃣ UPDATE METADATA EVEN IF USER ALREADY EXISTS
-    const { error: updateMetaErr } =
-      await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
-        user_metadata: {
-          role,
-          org,
-          account_manager_email: amEmail || null,
-        },
-      });
-    if (updateMetaErr) throw updateMetaErr;
+    if (!authUser) {
+      return NextResponse.json(
+        { ok: false, error: 'Unable to create/find auth user.' },
+        { status: 500 }
+      );
+    }
 
-    // 4️⃣ UPSERT INTO PROFILES TABLE IMMEDIATELY
-    const { error: upsertErr } = await supabaseAdmin
-      .from("profiles")
+    // 2️⃣ Upsert into profiles
+    const { error: profErr } = await supabaseAdmin
+      .from('profiles')
       .upsert(
         {
           id: authUser.id,
-          email: em,
-          role,
-          org,
+          email: authUser.email,
+          role: role || 'client',
+          org: org || null,
           account_manager_email: amEmail || null,
         },
-        { onConflict: "id" }
+        { onConflict: 'id' }
       );
 
-    if (upsertErr) throw upsertErr;
+    if (profErr) throw profErr;
 
-    return NextResponse.json({ ok: true, user: authUser });
-  } catch (err) {
-    console.error("Invite user error:", err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    // 3️⃣ Done – Admin UI will build its own /set-password link
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('ADMIN /invite error:', e);
+    return NextResponse.json(
+      { ok: false, error: e?.message || 'Server error.' },
+      { status: 500 }
+    );
   }
 }
