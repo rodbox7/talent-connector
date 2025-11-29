@@ -2583,30 +2583,65 @@ function AdminPanel({ isMobile }) {
   }
 
   async function resendInvite(row) {
-    try {
-      setBusy(row.id, true);
-      const res = await fetch('/api/admin/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: row.email,
-          role: row.role,
-          org: row.org || null,
-          amEmail: row.account_manager_email || null,
-          password: null,
-          resend: true,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || 'Resend failed.');
-      toast(`Resent invite to ${row.email}`);
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || 'Resend failed.');
-    } finally {
-      setBusy(row.id, false);
-    }
+  try {
+    setBusy(row.id, true);
+    setErr('');
+    setFlash('');
+
+    // Build the same password setup link used elsewhere
+    const base =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
+
+    const emailLower = (row.email || '').trim().toLowerCase();
+    const onboardingUrl = `${base}/set-password?email=${encodeURIComponent(
+      emailLower
+    )}`;
+
+    // Plain-text, black-text only email (client’s mail app handles fonts/colors)
+    const subject = encodeURIComponent(
+      'Beacon Hill Legal-Talent Connector access'
+    );
+
+    const bodyText = `
+Hello,
+
+Beacon Hill Legal has set you up with access to Talent Connector, our on-demand way to review pre-vetted legal talent.
+
+Use the link below to set your password and sign in:
+
+${onboardingUrl}
+
+With Talent Connector you can:
+- Search legal professionals by practice area, location, and experience
+- View profiles of candidates vetted by Beacon Hill Legal recruiters
+- Quickly identify candidates you would like to discuss with your Beacon Hill contact
+
+This link is unique to your email address. For security, please do not forward it.
+
+If you have any trouble signing in or would like a brief walkthrough, reply to this email and our team will help.
+
+Best regards,
+Beacon Hill Legal
+`.trim();
+
+    const mailto = `mailto:${encodeURIComponent(
+      emailLower
+    )}?subject=${subject}&body=${encodeURIComponent(bodyText)}`;
+
+    // Open the user's email client with the draft
+    window.location.href = mailto;
+
+    toast(`Opened email draft for ${row.email}`);
+  } catch (e) {
+    console.error(e);
+    setErr(e?.message || 'Could not open email draft.');
+  } finally {
+    setBusy(row.id, false);
   }
+}
+
 
   async function resetPassword(row) {
     try {
