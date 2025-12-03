@@ -20,8 +20,8 @@ const METROS = [
   'Seattle, WA','St. Louis, MO','Tampa–St. Petersburg, FL','Tucson, AZ','Washington, DC'
 ];
 
-// Temporary global alias so any old `metros` references in child components won't crash
-if (typeof globalThis !== 'undefined') globalThis.metros = METROS;
+
+
 
 // US states (2-letter)
 const STATES = [
@@ -55,6 +55,12 @@ function getMetroRaw(m) {
   return (m?.value ?? m?.metro ?? m?.label ?? m?.name ?? '').toString();
 }
 
+/* ---------- Disable metro reformatting ---------- */
+function formatMetro(m) {
+  return getMetroRaw(m);  // Show metros exactly as written in METROS[]
+}
+
+
 
 /* ---------- Title/Practice options (base lists) ---------- */
 const TITLE_OPTIONS = [
@@ -63,6 +69,25 @@ const TITLE_OPTIONS = [
 const LAW_OPTIONS = [
   "40's Act",'Administrative','Administrative Manager','Antitrust','Appellate','Asbestos','Associate','Attorney','Banking','Bankruptcy','Commercial Litigation','Commercial Real Estate','Compliance','Conflicts','Conflicts Analyst','Construction','Contracts','Corporate','Criminal','Data Privacy/Cybersecurity','Docketing','Document Review','Employee Benefits/Executive Comp/ERISA','Energy','Entertainment','Environmental','Family','FCPA','FDA','Finance','Financial Services','FinTech','Foreclosure','Foreign Filing','Foreign Language Review','Franchise','General Counsel','Government Contracts','Government Contracts Attorney','Healthcare','HSR','Immigration','In House Associate','Insurance Coverage','Insurance Defense','Insurance Litigation','Insurance Regulatory','International Arbitration','International Trade','Labor & Employment','Law Clerk','Law Student','Leasing','Legal JD','Legal Malpractice','Legal Marketing','Legal Support','Life Sciences','Litigation','Litigation Technology','Medical Malpractice','Mergers and Acquisitions','MRS Project Manager','Mutual Fund','Nurse','Oil & Gas','Paralegal','Partner','Patent Agent','Patent Counsel','Patent Litigation','Patent Prosecution','Personal Injury','Project Finance','Project Manager','Public Finance','Real Estate Finance','Regulatory','Residential Real Estate','Restructuring','Securities','Securities Litigation','Syndication','Tax','Technology','Technology Transactions','Toxic Tort','Trade Attorney','Trademark','Trust & Estate',"Worker's Compensation",'White Collar Litigation',
 ];
+
+const LANGUAGE_OPTIONS = [
+  'English',
+  'Spanish',
+  'French',
+  'German',
+  'Italian',
+  'Portuguese',
+  'Chinese (Mandarin)',
+  'Chinese (Cantonese)',
+  'Japanese',
+  'Korean',
+  'Russian',
+  'Arabic',
+  'Hindi',
+  'Hebrew',
+  'Other',
+];
+
 
 /* ---------- Small UI helpers ---------- */
 const Card = ({ children, style }) => (
@@ -260,6 +285,17 @@ function matchesCSV(csv, needle) {
     .map((s) => s.trim().toLowerCase())
     .some((s) => s.includes(String(needle).trim().toLowerCase()));
 }
+
+// ⬇️ STEP 2: new helper goes here
+function matchesLangCSV(csv, needle) {
+  if (!needle) return true;
+  return String(csv || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .some((s) => s === String(needle).trim().toLowerCase());
+}
+// ⬆️ END OF NEW HELPER
+
 function presetRange(preset) {
   const toYMD = (d) => {
     const yyyy = d.getFullYear();
@@ -267,16 +303,19 @@ function presetRange(preset) {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
+
   const today = new Date();
   const end = toYMD(today);
   const startOfYear = new Date(today.getFullYear(), 0, 1);
   const q = Math.floor(today.getMonth() / 3);
   const startOfQuarter = new Date(today.getFullYear(), q * 3, 1);
+
   const backDays = (n) => {
     const d = new Date(today);
     d.setDate(d.getDate() - n);
     return toYMD(d);
   };
+
   switch (preset) {
     case 'LAST_30':  return { start: backDays(30),  end };
     case 'LAST_60':  return { start: backDays(60),  end };
@@ -288,6 +327,8 @@ function presetRange(preset) {
     default:         return { start: '', end: '' };
   }
 }
+
+
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = React.useState(false);
   React.useEffect(() => {
@@ -517,6 +558,7 @@ export default function Page() {
   const [name, setName] = React.useState('');
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
+  const [languages, setLanguages] = React.useState([]);
   const [city, setCity] = React.useState('');
   const [state, setState] = React.useState('');
   const [years, setYears] = React.useState('');
@@ -542,22 +584,27 @@ export default function Page() {
   function startEdit(row) {
     setEditingId(row.id);
     setEditForm({
-      name: row.name || '',
-      titles_csv: row.titles_csv || '',
-      law_csv: row.law_csv || '',
-      city: row.city || '',
-      state: row.state || '',
-      years: row.years ?? '',
-      recent_role_years: row.recent_role_years ?? '',
-      salary: row.salary ?? '',
-      contract: !!row.contract,
-      hourly: row.hourly ?? '',
-      date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
-      notes: row.notes || '',
-      on_assignment: !!row.on_assignment,
-      est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
-      off_market: !!row.off_market,
-    });
+  name: row.name || '',
+  titles_csv: row.titles_csv || '',
+  law_csv: row.law_csv || '',
+
+  // ⭐ NEW
+  languages_csv: row.languages_csv || '',
+
+  city: row.city || '',
+  state: row.state || '',
+  years: row.years ?? '',
+  recent_role_years: row.recent_role_years ?? '',
+  salary: row.salary ?? '',
+  contract: !!row.contract,
+  hourly: row.hourly ?? '',
+  date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
+  notes: row.notes || '',
+  on_assignment: !!row.on_assignment,
+  est_available_date: row.est_available_date ? String(row.est_available_date).slice(0,10) : '',
+  off_market: !!row.off_market,
+});
+
   }
   function cancelEdit() {
     setEditingId(null);
@@ -575,27 +622,29 @@ export default function Page() {
         return;
       }
       const payload = {
-        name: String(editForm.name || '').trim(),
-        titles_csv: String(editForm.titles_csv || '').trim(),
-        law_csv: String(editForm.law_csv || '').trim(),
-        city: toTitleCaseCity(String(editForm.city || '').trim()),
-        state: normState(String(editForm.state || '').trim()),
-        years: editForm.years === '' ? null : Number(editForm.years),
-        recent_role_years:
-          editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
-        salary: editForm.salary === '' ? null : Number(editForm.salary),
-        contract: !!editForm.contract,
-        hourly: !editForm.contract
-          ? null
-          : editForm.hourly === ''
-          ? null
-          : Number(editForm.hourly),
-        date_entered: editForm.date_entered || null,
-        notes: String(editForm.notes || '').trim() || null,
-        on_assignment: !!editForm.on_assignment,
-        est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
-        off_market: !!editForm.off_market,
-      };
+  name: String(editForm.name || '').trim(),
+  titles_csv: String(editForm.titles_csv || '').trim(),
+  law_csv: String(editForm.law_csv || '').trim(),
+  languages_csv: String(editForm.languages_csv || '').trim(), // ✅ NEW
+  city: toTitleCaseCity(String(editForm.city || '').trim()),
+  state: normState(String(editForm.state || '').trim()),
+  years: editForm.years === '' ? null : Number(editForm.years),
+  recent_role_years:
+    editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
+  salary: editForm.salary === '' ? null : Number(editForm.salary),
+  contract: !!editForm.contract,
+  hourly: !editForm.contract
+    ? null
+    : editForm.hourly === ''
+    ? null
+    : Number(editForm.hourly),
+  date_entered: editForm.date_entered || null,
+  notes: String(editForm.notes || '').trim() || null,
+  on_assignment: !!editForm.on_assignment,
+  est_available_date: editForm.on_assignment ? (editForm.est_available_date || null) : null,
+  off_market: !!editForm.off_market,
+};
+
 
       const { error } = await supabase.from('candidates').update(payload).eq('id', editingId);
       if (error) throw error;
@@ -618,25 +667,39 @@ export default function Page() {
     }
   }
   async function refreshMyRecent() {
-    if (!user || user.role !== 'recruiter') return;
-    setLoadingList(true);
+  if (!user || user.role !== 'recruiter') return;
+  setLoadingList(true);
 
+  const isSuper = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
+
+  try {
     let query = supabase
       .from('candidates')
       .select(
         'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,created_by'
       )
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .order('created_at', { ascending: false });
 
-    if (!((user.email || '').toLowerCase() === 'jdavid@bhsg.com')) {
+    // Regular recruiters: only their own candidates
+    if (!isSuper) {
       query = query.eq('created_by', user.id);
     }
 
+    // Superuser: large limit so you effectively see "all"
+    query = query.limit(isSuper ? 5000 : 50);
+
     const { data, error } = await query;
-    if (!error && data) setMyRecent(data);
+    if (error) throw error;
+
+    if (data) setMyRecent(data);
+  } catch (e) {
+    console.error(e);
+    // optional: surface an error message if you want
+  } finally {
     setLoadingList(false);
   }
+}
+
   React.useEffect(() => {
     if (user?.role === 'recruiter') {
       refreshMyRecent();
@@ -655,20 +718,25 @@ export default function Page() {
         return;
       }
       const payload = {
-        name: name.trim(),
-        titles_csv: titles.trim(),
-        law_csv: law.trim(),
-        city: toTitleCaseCity(city.trim()),
-        state: normState(state.trim()),
-        years: numOrNull(years),
-        recent_role_years: numOrNull(recentYears),
-        salary: numOrNull(salary),
-        contract: !!contract,
-        hourly: contract ? numOrNull(hourly) : null,
-        date_entered: dateEntered || null,
-        notes: notes.trim() || null,
-        created_by: user.id,
-      };
+  name: name.trim(),
+  titles_csv: titles.trim(),
+  law_csv: law.trim(),
+
+  // ⭐ NEW
+  languages_csv: (languages || []).join(','),
+
+  city: toTitleCaseCity(city.trim()),
+  state: normState(state.trim()),
+  years: numOrNull(years),
+  recent_role_years: numOrNull(recentYears),
+  salary: numOrNull(salary),
+  contract: !!contract,
+  hourly: contract ? numOrNull(hourly) : null,
+  date_entered: dateEntered || null,
+  notes: notes.trim() || null,
+  created_by: user.id,
+};
+
       const { error } = await supabase.from('candidates').insert(payload);
       if (error) throw error;
 
@@ -723,6 +791,11 @@ export default function Page() {
   const [fState, setFState] = React.useState('');
   const [fTitle, setFTitle] = React.useState('');
   const [fLaw, setFLaw] = React.useState('');
+  const [fLang, setFLang] = React.useState('');
+
+
+  // NEW — language filter (client UI)
+
 
   const [clientRows, setClientRows] = React.useState([]);
   const [clientLoading, setClientLoading] = React.useState(false);
@@ -734,6 +807,7 @@ export default function Page() {
 
   const [iTitle, setITitle] = React.useState('');
   const [iLaw, setILaw] = React.useState('');
+  const [iLang, setILang] = React.useState('');
   const [iCity, setICity] = React.useState('');
   const [iState, setIState] = React.useState('');
   const [iYearsRange, setIYearsRange] = React.useState('');
@@ -848,12 +922,13 @@ export default function Page() {
       setClientLoading(true);
       setExpandedId(null);
 
-      const { data, error } = await supabase
-        .from('candidates')
-        .select(
-          'id,name,titles_csv,law_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
-        )
-        .limit(2000);
+    const { data, error } = await supabase
+  .from('candidates')
+  .select(
+    'id,name,titles_csv,law_csv,languages_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+  )
+  .limit(2000);
+
         
       if (error) throw error;
 
@@ -874,6 +949,8 @@ export default function Page() {
         if (fState && String(r.state || '') !== fState) return false;
         if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
         if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
+        if (fLang && !matchesLangCSV(r.languages_csv, fLang)) return false;
+
 
         if (salMin != null || salMax != null) {
           const s = Number(r.salary);
@@ -961,6 +1038,7 @@ try {
     setFState('');
     setFTitle('');
     setFLaw('');
+    setFLang('');
     setSalaryRange('');
     setYearsRange('');
     setContractOnly(false);
@@ -1226,6 +1304,38 @@ try {
                       />
                     </div>
 
+                    {/* LANGUAGES — NEW FIELD */}
+<div style={{ gridColumn: '1 / -1' }}>
+  <Label>Languages</Label>
+  <select
+    multiple
+    value={languages}
+    onChange={(e) => {
+      const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+      setLanguages(selected);
+    }}
+    style={{
+      width: '100%',
+      padding: '12px 14px',
+      borderRadius: 10,
+      border: '1px solid #1F2937',
+      background: '#0F172A',
+      color: '#E5E7EB',
+      minHeight: 110
+    }}
+  >
+    {LANGUAGE_OPTIONS.map((lang) => (
+      <option key={lang} value={lang}>
+        {lang}
+      </option>
+    ))}
+  </select>
+  <div style={{ color: '#64748B', fontSize: 12, marginTop: 4 }}>
+    Hold ⌘ (Mac) or Ctrl (Windows) to select multiple
+  </div>
+</div>
+
+
                     <div>
                       <Label>Title</Label>
                       <select value={titles} onChange={(e) => setTitles(e.target.value)} style={selectStyle}>
@@ -1260,26 +1370,33 @@ try {
                       </select>
                     </div>
 
-                    <div>
-                      <Label>Metro Area</Label>
-                      <select
-                        value={city ? `${city}${state ? `, ${state}` : ''}` : ''}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const [cName, st] = v.split(',').map(s => s.trim());
-                          setCity(cName || '');
-                          setState(st || '');
-                        }}
-                        style={selectStyle}
-                      >
-                        <option value="">Select a metro</option>
-                        {(metrosList || []).map((m) => (
-                          <option key={m} value={m}>
-                            {typeof formatMetro === 'function' ? formatMetro(m) : m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                 <div>
+  <Label>Metro Area</Label>
+  <select
+    value={city && state ? `${city}, ${state}` : ''}
+    onChange={(e) => {
+      const raw = e.target.value || '';
+      if (!raw) {
+        setCity('');
+        setState('');
+        return;
+      }
+
+      const [cName, st] = raw.split(',').map(x => x.trim());
+      setCity(cName);
+      setState(normState(st));
+    }}
+    style={selectStyle}
+  >
+    <option value="">Select a metro</option>
+    {METROS.map((m) => (
+      <option key={m} value={m}>
+        {m}
+      </option>
+    ))}
+  </select>
+</div>
+
 
                     <div>
                       <Label>Years of experience</Label>
@@ -1384,50 +1501,111 @@ try {
                         }}
                       >
                         <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-                            gap: 10,
-                          }}
-                        >
-                          {/* Description */}
-                          <div style={{ gridColumn: '1 / -1' }}>
-                            <Label>Description</Label>
-                            <Input
-                              value={editForm.name || ''}
-                              onChange={(e) => changeEditField('name', e.target.value)}
-                            />
-                          </div>
+  style={{
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+    gap: 10,
+  }}
+>
+  {/* Description */}
+  <div style={{ gridColumn: '1 / -1' }}>
+    <Label>Description</Label>
+    <Input
+      value={editForm.name || ''}
+      onChange={(e) => changeEditField('name', e.target.value)}
+    />
+  </div>
 
-                          {/* Title */}
-                          <div>
-                            <Label>Title</Label>
-                            <select
-                              value={editForm.titles_csv || ''}
-                              onChange={(e) => changeEditField('titles_csv', e.target.value)}
-                              style={selectStyle}
-                            >
-                              <option value="">Select title</option>
-                              {TITLE_OPTIONS.map((t) => (
-                                <option key={t} value={t}>{t}</option>
-                              ))}
-                            </select>
-                          </div>
+  {/* Title */}
+  <div>
+    <Label>Title</Label>
+    <select
+      value={editForm.titles_csv || ''}
+      onChange={(e) => changeEditField('titles_csv', e.target.value)}
+      style={selectStyle}
+    >
+      <option value="">Select title</option>
+      {TITLE_OPTIONS.map((t) => (
+        <option key={t} value={t}>{t}</option>
+      ))}
+    </select>
+  </div>
 
-                          {/* Type of Law */}
-                          <div>
-                            <Label>Type of Law</Label>
-                            <select
-                              value={editForm.law_csv || ''}
-                              onChange={(e) => changeEditField('law_csv', e.target.value)}
-                              style={selectStyle}
-                            >
-                              <option value="">Select type of law</option>
-                              {LAW_OPTIONS.map((l) => (
-                                <option key={l} value={l}>{l}</option>
-                              ))}
-                            </select>
-                          </div>
+  {/* Type of Law */}
+  <div>
+    <Label>Type of Law</Label>
+    <select
+      value={editForm.law_csv || ''}
+      onChange={(e) => changeEditField('law_csv', e.target.value)}
+      style={selectStyle}
+    >
+      <option value="">Select type of law</option>
+      {LAW_OPTIONS.map((l) => (
+        <option key={l} value={l}>{l}</option>
+      ))}
+    </select>
+  </div>
+
+  {/* Languages */}
+  <div>
+    <Label>Languages</Label>
+    <div
+      style={{
+        border: '1px solid #1F2937',
+        borderRadius: 10,
+        padding: 8,
+        maxHeight: 140,
+        overflowY: 'auto',
+        background: '#020617',
+      }}
+    >
+      {LANGUAGE_OPTIONS.map((lang) => {
+        const selected = String(editForm.languages_csv || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        const isChecked = selected
+          .map((s) => s.toLowerCase())
+          .includes(lang.toLowerCase());
+
+        return (
+          <label
+            key={lang}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              marginBottom: 4,
+              fontSize: 13,
+              color: '#E5E7EB',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={(e) => {
+                const current = new Set(selected);
+                if (e.target.checked) {
+                  current.add(lang);
+                } else {
+                  current.delete(lang);
+                }
+                changeEditField(
+                  'languages_csv',
+                  Array.from(current).join(', ')
+                );
+              }}
+            />
+            <span>{lang}</span>
+          </label>
+        );
+      })}
+    </div>
+  </div>
+
+
+                         
 
                           {/* Metro (writes city & state) */}
                           <div>
@@ -1725,6 +1903,7 @@ try {
         const pass = (r) => {
           if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
           if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
+          if (iLang && !matchesLangCSV(r.languages_csv, iLang)) return false;
           if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
           if (iState && String(r.state || '').trim() !== iState.trim()) return false;
           if (iContractOnly && !r.contract) return false;
@@ -1889,6 +2068,20 @@ try {
                   {lawOptions.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
+              <div>
+  <Label>Language</Label>
+  <select
+    value={iLang}
+    onChange={(e) => setILang(e.target.value)}
+    style={selectStyle}
+  >
+    <option value="">Any</option>
+    {LANGUAGE_OPTIONS.map((lang) => (
+      <option key={lang} value={lang}>{lang}</option>
+    ))}
+  </select>
+</div>
+
               <div>
                 <Label>State</Label>
                 <select value={iState} onChange={(e)=>setIState(e.target.value)} style={selectStyle}>
@@ -2088,6 +2281,22 @@ try {
                       ))}
                     </select>
                   </div>
+
+                  {/* NEW — Language filter */}
+<div>
+  <Label>Language</Label>
+  <select
+    value={fLang}
+    onChange={(e) => setFLang(e.target.value)}
+    style={selectStyle}
+  >
+    <option value="">Any</option>
+    {LANGUAGE_OPTIONS.map((lang) => (
+      <option key={lang} value={lang}>{lang}</option>
+    ))}
+  </select>
+</div>
+
 
                   <div>
                     <Label>Salary range</Label>
@@ -2448,29 +2657,36 @@ function AdminPanel({ isMobile }) {
   }, []);
 
   async function loadProfiles() {
-    setLoading(true);
-    setErr('');
+  setLoading(true);
+  setErr('');
 
-    try {
-      const res = await fetch('/api/admin/users', { cache: 'no-store' });
-      const json = await res.json();
+  try {
+    const res = await fetch('/api/admin/users', { cache: 'no-store' });
+    const json = await res.json();
 
-      console.log('ADMIN /api/admin/users RAW RESPONSE:', json);
-      console.log(
-        'ADMIN /api/admin/users EMAILS:',
-        (json.users || []).map((u) => u.email)
-      );
+    console.log('ADMIN /api/admin/users RAW RESPONSE:', json);
+    console.log(
+      'ADMIN /api/admin/users EMAILS:',
+      (json.users || []).map((u) => u.email)
+    );
 
-      if (!json.ok) throw new Error(json.error || 'Failed loading users');
+    if (!json.ok) throw new Error(json.error || 'Failed loading users');
 
-      setList(json.users || []);
-    } catch (e) {
-      console.error('Load profiles error:', e);
-      setErr(e.message || 'Failed loading users');
-    } finally {
-      setLoading(false);
-    }
+    const users = (json.users || []).slice().sort((a, b) => {
+      const ta = new Date(a.created_at || 0).getTime();
+      const tb = new Date(b.created_at || 0).getTime();
+      return tb - ta; // newest first
+    });
+
+    setList(users);
+  } catch (e) {
+    console.error('Load profiles error:', e);
+    setErr(e.message || 'Failed loading users');
+  } finally {
+    setLoading(false);
   }
+}
+
 
   function toast(okMsg = '', errMsg = '') {
     if (okMsg) setFlash(okMsg);
