@@ -81,6 +81,7 @@ const LANGUAGE_OPTIONS = [
   'Chinese (Cantonese)',
   'Japanese',
   'Korean',
+  'Vietnamese',
   'Russian',
   'Arabic',
   'Hindi',
