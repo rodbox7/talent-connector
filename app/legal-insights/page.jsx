@@ -2,6 +2,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -15,6 +16,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+
 
 ChartJS.register(
   CategoryScale,
@@ -188,9 +190,12 @@ const chartBaseOptions = {
 };
 
 export default function LegalInsightsPage() {
+  const router = useRouter();
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const [insights, setInsights] = React.useState(null);
+  
 
   React.useEffect(() => {
     let isMounted = true;
@@ -422,31 +427,64 @@ export default function LegalInsightsPage() {
     <div style={outerWrap}>
       <div style={container}>
         {/* HEADER */}
-        <div style={headerWrap}>
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                color: '#60A5FA',
-                letterSpacing: '0.22em',
-                textTransform: 'uppercase',
-                marginBottom: 4,
-              }}
-            >
-              Talent Connector · Client Insights
-            </div>
-            <h1 style={titleStyle}>Legal Industry Employment Deep Dive</h1>
-          </div>
-          <p style={subtitleStyle}>
-            A compact, BLS-informed snapshot of how the U.S. legal industry is hiring across markets,
-            titles, and compensation. Designed for in-house legal, law firms, and litigation leaders.
-          </p>
-          <div style={chipRow}>
-            <div style={chip}>Source: U.S. Bureau of Labor Statistics</div>
-            <div style={chip}>Focus: Legal Services &amp; Legal Occupations</div>
-            {insights?.lastUpdated && <div style={chip}>Last updated: {insights.lastUpdated}</div>}
-          </div>
-        </div>
+<div style={headerWrap}>
+  <div>
+    <div
+      style={{
+        fontSize: 11,
+        color: '#60A5FA',
+        letterSpacing: '0.22em',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+      }}
+    >
+      Talent Connector · Client Insights
+    </div>
+    <h1 style={titleStyle}>Legal Industry Employment Deep Dive</h1>
+  </div>
+
+  <p style={subtitleStyle}>
+    A compact, BLS-informed snapshot of how the U.S. legal industry is hiring across markets,
+    titles, and compensation. Designed for in-house legal, law firms, and litigation leaders.
+  </p>
+
+  <div style={chipRow}>
+    <div style={chip}>Source: U.S. Bureau of Labor Statistics</div>
+    <div style={chip}>Focus: Legal Services &amp; Legal Occupations</div>
+    {insights?.lastUpdated && (
+      <div style={chip}>Last updated: {insights.lastUpdated}</div>
+    )}
+  </div>
+
+  {/* LINK TO LEGAL TALENT PULSE */}
+  <div style={{ marginTop: 12 }}>
+    <button
+      type="button"
+      onClick={() => router.push('/pulse')}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '10px 16px',
+        borderRadius: 999,
+        border: '1px solid rgba(59,130,246,0.9)',
+        background:
+          'linear-gradient(135deg, rgba(30,58,138,0.8), rgba(37,99,235,0.8))',
+        color: '#F9FAFB',
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        cursor: 'pointer',
+        boxShadow: '0 8px 24px rgba(30,58,138,0.45)',
+      }}
+    >
+      <span style={{ fontSize: 14 }}>→</span>
+      <span>View Legal Talent Pulse</span>
+    </button>
+  </div>
+</div>
+
 
                         {/* BACK TO TALENT CONNECTOR (bright and uses history back) */}
         <div style={{ marginBottom: 16 }}>
