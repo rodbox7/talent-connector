@@ -287,7 +287,7 @@ function matchesCSV(csv, needle) {
     .some((s) => s.includes(String(needle).trim().toLowerCase()));
 }
 
-// ⬇️ STEP 2: new helper goes here
+// ⬇️ LANGUAGES HELPER
 function matchesLangCSV(csv, needle) {
   if (!needle) return true;
   return String(csv || '')
@@ -295,7 +295,18 @@ function matchesLangCSV(csv, needle) {
     .map((s) => s.trim().toLowerCase())
     .some((s) => s === String(needle).trim().toLowerCase());
 }
+
+// ⬇️ LICENSED STATES HELPER — NEW
+function matchesStatesCSV(csv, needle) {
+  if (!needle) return true;
+  const n = String(needle).trim().toUpperCase();
+  return String(csv || '')
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .some((s) => s === n);
+}
 // ⬆️ END OF NEW HELPER
+
 
 function presetRange(preset) {
   const toYMD = (d) => {
@@ -560,6 +571,7 @@ export default function Page() {
   const [titles, setTitles] = React.useState('');
   const [law, setLaw] = React.useState('');
   const [languages, setLanguages] = React.useState([]);
+  const [licensedStates, setLicensedStates] = React.useState([]);  // ⭐ NEW
   const [city, setCity] = React.useState('');
   const [state, setState] = React.useState('');
   const [years, setYears] = React.useState('');
@@ -591,6 +603,8 @@ export default function Page() {
 
   // ⭐ NEW
   languages_csv: row.languages_csv || '',
+  licensed_states_csv: row.licensed_states_csv || '',   // ⭐ NEW
+
 
   city: row.city || '',
   state: row.state || '',
@@ -627,6 +641,7 @@ export default function Page() {
   titles_csv: String(editForm.titles_csv || '').trim(),
   law_csv: String(editForm.law_csv || '').trim(),
   languages_csv: String(editForm.languages_csv || '').trim(), // ✅ NEW
+  licensed_states_csv: String(editForm.licensed_states_csv || '').trim(), // ⭐ NEW
   city: toTitleCaseCity(String(editForm.city || '').trim()),
   state: normState(String(editForm.state || '').trim()),
   years: editForm.years === '' ? null : Number(editForm.years),
@@ -675,11 +690,12 @@ export default function Page() {
 
   try {
     let query = supabase
-      .from('candidates')
-      .select(
-        'id,name,titles_csv,law_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,created_by'
-      )
-      .order('created_at', { ascending: false });
+  .from('candidates')
+  .select(
+    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,created_by'
+  )
+  .order('created_at', { ascending: false });
+
 
     // Regular recruiters: only their own candidates
     if (!isSuper) {
@@ -725,6 +741,7 @@ export default function Page() {
 
   // ⭐ NEW
   languages_csv: (languages || []).join(','),
+  licensed_states_csv: (licensedStates || []).join(','),   // ⭐ NEW
 
   city: toTitleCaseCity(city.trim()),
   state: normState(state.trim()),
@@ -809,6 +826,7 @@ export default function Page() {
   const [iTitle, setITitle] = React.useState('');
   const [iLaw, setILaw] = React.useState('');
   const [iLang, setILang] = React.useState('');
+  const [iLicensedState, setILicensedState] = React.useState('');  // ⭐ NEW
   const [iCity, setICity] = React.useState('');
   const [iState, setIState] = React.useState('');
   const [iYearsRange, setIYearsRange] = React.useState('');
@@ -923,12 +941,13 @@ export default function Page() {
       setClientLoading(true);
       setExpandedId(null);
 
-    const { data, error } = await supabase
+   const { data, error } = await supabase
   .from('candidates')
   .select(
-    'id,name,titles_csv,law_csv,languages_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
   )
   .limit(2000);
+
 
         
       if (error) throw error;
@@ -951,6 +970,9 @@ export default function Page() {
         if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
         if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
         if (fLang && !matchesLangCSV(r.languages_csv, fLang)) return false;
+        if (iLicensedState && !matchesStatesCSV(r.licensed_states_csv, iLicensedState)) return false;
+
+        
 
 
         if (salMin != null || salMax != null) {
@@ -1336,6 +1358,38 @@ try {
   </div>
 </div>
 
+{/* LICENSED STATES — NEW FIELD */}
+<div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
+  <Label>Licensed State(s)</Label>
+  <select
+    multiple
+    value={licensedStates}
+    onChange={(e) => {
+      const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+      setLicensedStates(selected);
+    }}
+    style={{
+      width: '100%',
+      padding: '12px 14px',
+      borderRadius: 10,
+      border: '1px solid #1F2937',
+      background: '#0F172A',
+      color: '#E5E7EB',
+      minHeight: 110
+    }}
+  >
+    {STATES.map((st) => (
+      <option key={st} value={st}>
+        {st}
+      </option>
+    ))}
+  </select>
+  <div style={{ color: '#64748B', fontSize: 12, marginTop: 4 }}>
+    Hold ⌘ (Mac) or Ctrl (Windows) to select multiple
+  </div>
+</div>
+
+
 
                     <div>
                       <Label>Title</Label>
@@ -1604,6 +1658,63 @@ try {
       })}
     </div>
   </div>
+
+ {/* LICENSED STATES — EDIT FIELD */}
+<div style={{ marginTop: 16 }}>
+  <Label>Licensed State(s)</Label>
+
+  <div
+    style={{
+      border: '1px solid #1F2937',
+      borderRadius: 10,
+      padding: 8,
+      maxHeight: 140,
+      overflowY: 'auto',
+      background: '#020617',
+    }}
+  >
+    {STATES.map((st) => {
+      const selected = String(editForm.licensed_states_csv || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const isChecked = selected
+        .map((s) => s.toUpperCase())
+        .includes(st.toUpperCase());
+
+      return (
+        <label
+          key={st}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginBottom: 4,
+            fontSize: 13,
+            color: '#E5E7EB',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={(e) => {
+              const current = new Set(selected);
+              if (e.target.checked) current.add(st);
+              else current.delete(st);
+
+              changeEditField(
+                'licensed_states_csv',
+                Array.from(current).join(', ')
+              );
+            }}
+          />
+          <span>{st}</span>
+        </label>
+      );
+    })}
+  </div>
+</div>
 
 
                          
@@ -1905,6 +2016,9 @@ try {
           if (iTitle && !matchesCSV(r.titles_csv, iTitle)) return false;
           if (iLaw && !matchesCSV(r.law_csv, iLaw)) return false;
           if (iLang && !matchesLangCSV(r.languages_csv, iLang)) return false;
+          // ⭐ NEW: Licensed State filter
+          if (iLicensedState && !matchesStatesCSV(r.licensed_states_csv, iLicensedState)) return false;
+
           if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
           if (iState && String(r.state || '').trim() !== iState.trim()) return false;
           if (iContractOnly && !r.contract) return false;
@@ -2082,6 +2196,24 @@ try {
     ))}
   </select>
 </div>
+
+{/* Licensed In */}
+<div>
+  <Label>Licensed In</Label>
+  <select
+    value={iLicensedState || ''}
+    onChange={(e) => setILicensedState(e.target.value)}
+    style={selectStyle}
+  >
+    <option value="">Any licensed state</option>
+    {STATES.map((st) => (
+      <option key={st} value={st}>
+        {st}
+      </option>
+    ))}
+  </select>
+</div>
+
 
               <div>
                 <Label>State</Label>
@@ -2297,6 +2429,24 @@ try {
     ))}
   </select>
 </div>
+
+{/* NEW — Licensed State filter */}
+<div>
+  <Label>Licensed In</Label>
+  <select
+    value={iLicensedState}
+    onChange={(e) => setILicensedState(e.target.value)}
+    style={selectStyle}
+  >
+    <option value="">Any licensed state</option>
+    {STATES.map((st) => (
+      <option key={st} value={st}>
+        {st}
+      </option>
+    ))}
+  </select>
+</div>
+
 
 
                   <div>
