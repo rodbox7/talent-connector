@@ -128,7 +128,8 @@ export default function SearchInsights() {
     (async () => {
       const { data, error } = await supabase
         .from('search_logs')
-        .select('*')
+        // ✅ include user_email explicitly (safe even if you later switch back to '*')
+        .select('id, user_email, title, type_of_law, metro, created_at')
         .order('created_at', { ascending: false })
         .limit(200);
 
@@ -341,6 +342,8 @@ export default function SearchInsights() {
             >
               <thead>
                 <tr>
+                  {/* ✅ NEW */}
+                  <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>User</th>
                   <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Title</th>
                   <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Type of Law</th>
                   <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Metro</th>
@@ -351,17 +354,22 @@ export default function SearchInsights() {
               <tbody>
                 {recentSearches.map((r) => (
                   <tr key={r.id}>
+                    {/* ✅ NEW */}
+                    <td style={{ padding: 10 }}>{r.user_email || '—'}</td>
                     <td style={{ padding: 10 }}>{r.title || '—'}</td>
                     <td style={{ padding: 10 }}>{r.type_of_law || '—'}</td>
                     <td style={{ padding: 10 }}>{r.metro || '—'}</td>
-                    <td style={{ padding: 10 }}>
-                      {new Date(r.created_at).toLocaleString()}
-                    </td>
+                    <td style={{ padding: 10 }}>{new Date(r.created_at).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {/* optional tiny note so you don’t freak out seeing blanks for old logs */}
+          <p style={{ color: '#6B7280', fontSize: 12, marginTop: 10 }}>
+            Note: Older searches may show “—” for User until new searches are run with user tracking enabled.
+          </p>
         </div>
 
         {/* FOOTER */}
