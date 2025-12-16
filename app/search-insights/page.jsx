@@ -2,11 +2,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+} from 'chart.js';
+
 import { supabase } from '../../lib/supabaseClient';
+
+// Register chart.js extras
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTooltip, ChartLegend);
 
 // expose supabase for console testing
 if (typeof window !== 'undefined') window.__sb = supabase;
-
 
 /* ---------- Utility: return top N only ---------- */
 function topCounts(items, key, limit = 5) {
@@ -24,13 +37,13 @@ function topCounts(items, key, limit = 5) {
 
 const COLORS = ['#2563EB', '#7C3AED', '#0EA5E9', '#10B981', '#F59E0B'];
 
-/* ---------- Chart Component (forces Top 5 only) ---------- */
+/* ---------- Chart Component (Top 5 only) ---------- */
 function ChartCard({ title, data }) {
   const limited = Array.isArray(data) ? data.slice(0, 5) : [];
-// compute only the total of the shown slices (top 5)
-const total = (data || [])
-  .slice(0, 5)
-  .reduce((sum, d) => sum + (d.value || 0), 0);
+
+  const total = (data || [])
+    .slice(0, 5)
+    .reduce((sum, d) => sum + (d.value || 0), 0);
 
   if (!limited.length) return null;
 
@@ -78,40 +91,58 @@ const total = (data || [])
         </ResponsiveContainer>
       </div>
       <p style={{ color: '#4B5563', fontSize: 14, marginTop: 8 }}>
-  Showing Top 5 — Total: {total.toLocaleString()} searches
-</p>
-
+        Showing Top 5 — Total: {total.toLocaleString()} searches
+      </p>
     </div>
   );
 }
 
-/* ---------- Main Page ---------- */
+/* ---------- MAIN PAGE ---------- */
 export default function SearchInsights() {
   const [rows, setRows] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRecent, setLoadingRecent] = useState(true);
 
+  /* --------- Load Top Insights (90 days) ---------- */
   useEffect(() => {
-  (async () => {
-    const { data, error } = await supabase
-      .from('v_search_logs_90d')                  // <= use this view
-      .select('title, type_of_law, metro, created_at')
-      .limit(10000);
+    (async () => {
+      const { data, error } = await supabase
+        .from('v_search_logs_90d')
+        .select('title, type_of_law, metro, created_at')
+        .limit(10000);
 
-    console.log('Insights fetch:', { rows: data?.length ?? 0, error });
+      if (error) {
+        console.error('Supabase error (top insights):', error);
+        setRows([]);
+      } else {
+        const valid = (data || []).filter((r) => r.title || r.type_of_law || r.metro);
+        setRows(valid);
+      }
+      setLoading(false);
+    })();
+  }, []);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      setRows([]);
-    } else {
-      const valid = (data || []).filter((r) => r.title || r.type_of_law || r.metro);
-      setRows(valid);
-    }
-    setLoading(false);
-  })();
-}, []);
+  /* --------- Load FULL Recent Search Activity (raw logs) ---------- */
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from('search_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
 
+      if (error) {
+        console.error('Supabase error (search logs):', error);
+        setRecentSearches([]);
+      } else {
+        setRecentSearches(data || []);
+      }
+      setLoadingRecent(false);
+    })();
+  }, []);
 
-  // compute top 5 only
+  // ---- Compute top 5 ----
   const insights = useMemo(() => {
     const byTitle = topCounts(rows, 'title', 5);
     const byLaw = topCounts(rows, 'type_of_law', 5);
@@ -129,13 +160,33 @@ export default function SearchInsights() {
     year: 'numeric',
   });
 
-  const summary = [
-    topMetro && `Search volume was highest in ${topMetro.name}`,
-    topLaw && `with ${topLaw.name.toLowerCase()} law showing notable activity`,
-    topTitle && `and ${topTitle.name.toLowerCase()} roles leading among client queries`,
-  ]
-    .filter(Boolean)
-    .join(', ') || 'Search activity data is being collected.';
+  const summary =
+    [
+      topMetro && `Search volume was highest in ${topMetro.name}`,
+      topLaw && `with ${topLaw.name.toLowerCase()} law showing notable activity`,
+      topTitle && `and ${topTitle.name.toLowerCase()} roles leading among client queries`,
+    ]
+      .filter(Boolean)
+      .join(', ') || 'Search activity data is being collected.';
+
+  /* ---------- Sparkline Chart for Recent Searches ---------- */
+  const sparkData = {
+    labels: recentSearches.map((r) =>
+      new Date(r.created_at).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    ),
+    datasets: [
+      {
+        label: 'Searches Over Time',
+        data: recentSearches.map((_, i) => i + 1),
+        borderColor: '#2563EB',
+        borderWidth: 2,
+        tension: 0.35,
+      },
+    ],
+  };
 
   return (
     <div
@@ -157,7 +208,7 @@ export default function SearchInsights() {
           boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
         }}
       >
-        {/* Header */}
+        {/* HEADER */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#111827' }}>
             Beacon Hill Legal – Search Insights
@@ -166,11 +217,9 @@ export default function SearchInsights() {
             ← Back to Search
           </Link>
         </div>
-        <p style={{ marginTop: 4, marginBottom: 28, color: '#6B7280' }}>
-          Weekly Summary – {weekOf}
-        </p>
+        <p style={{ marginTop: 4, marginBottom: 28, color: '#6B7280' }}>Weekly Summary – {weekOf}</p>
 
-        {/* Summary */}
+        {/* SUMMARY CARD */}
         <div
           style={{
             background: '#F9FAFB',
@@ -183,7 +232,7 @@ export default function SearchInsights() {
           <p style={{ margin: 0, color: '#1F2937', fontSize: 17, lineHeight: 1.6 }}>{summary}</p>
         </div>
 
-        {/* Highlights */}
+        {/* HIGHLIGHTS */}
         <div
           style={{
             display: 'grid',
@@ -241,7 +290,7 @@ export default function SearchInsights() {
           </div>
         </div>
 
-        {/* Donut Charts */}
+        {/* DONUT CHARTS */}
         <div
           style={{
             display: 'grid',
@@ -254,6 +303,68 @@ export default function SearchInsights() {
           <ChartCard title="Top Metro Areas" data={insights.byMetro} />
         </div>
 
+        {/* ============================================
+            RECENT SEARCH ACTIVITY (NEW SECTION)
+        ============================================ */}
+        <div style={{ marginTop: 60 }}>
+          <h2 style={{ fontSize: 26, fontWeight: 700, color: '#111827', marginBottom: 20 }}>
+            Recent Search Activity
+          </h2>
+
+          {/* Sparkline Chart */}
+          <div
+            style={{
+              background: 'white',
+              padding: 24,
+              borderRadius: 16,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+              marginBottom: 30,
+            }}
+          >
+            <h3 style={{ margin: 0, marginBottom: 12, color: '#1F2937', fontSize: 16 }}>
+              Search Timeline
+            </h3>
+            <div style={{ width: '100%', height: 180 }}>
+              <Line data={sparkData} />
+            </div>
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: 14,
+                color: '#111827',
+              }}
+            >
+              <thead>
+                <tr>
+                  <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Title</th>
+                  <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Type of Law</th>
+                  <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Metro</th>
+                  <th style={{ padding: 10, borderBottom: '1px solid #E5E7EB' }}>Time</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {recentSearches.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ padding: 10 }}>{r.title || '—'}</td>
+                    <td style={{ padding: 10 }}>{r.type_of_law || '—'}</td>
+                    <td style={{ padding: 10 }}>{r.metro || '—'}</td>
+                    <td style={{ padding: 10 }}>
+                      {new Date(r.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* FOOTER */}
         <div
           style={{
             textAlign: 'center',
