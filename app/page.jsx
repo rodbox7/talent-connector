@@ -1233,14 +1233,33 @@ try {
         <div style={overlay}>
           <div style={{ width: 'min(1100px, 100%)' }}>
             <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 10,
-              }}
-            >
-              {/* AI Write-Up Generator */}
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  }}
+>
+  {/* TOP NAV (Recruiter) */}
+  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <a
+  href="/recruiter-insights"
+  style={{
+    color: '#93C5FD',
+    textDecoration: 'none',
+    fontSize: 12,
+    fontWeight: 700,
+    marginLeft: 16,
+    whiteSpace: 'nowrap',
+  }}
+>
+  Recruiter Insights
+</a>
+
+  </div>
+
+  {/* AI Write-Up Generator */}
+
               <div style={{ margin: '14px 0', flex: 1, marginRight: 12 }}>
                 <div style={{ margin: '10px 0' }}>
                   <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
