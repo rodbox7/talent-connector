@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 /* ---------- Constants ---------- */
@@ -360,8 +360,29 @@ function useIsMobile(breakpoint = 768) {
 export default function Page() {
   const isMobile = useIsMobile(768);
 
+  // ---- Auth user (required for search logging) ----
+  const [authUser, setAuthUser] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('auth.getUser failed:', error);
+        return;
+      }
+      if (alive) setAuthUser(data?.user || null);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Helper to format metro names correctly
   function formatMetro(m) {
+
     const raw = getMetroRaw(m).trim();
     if (!raw) return '';
     return raw.split(WORD_SEP).map(titleCasePart).join('-');
@@ -1041,12 +1062,14 @@ try {
       metro: fCity || null,
       title: fTitle || null,
       type_of_law: fLaw || null,
+      user_email: authUser?.email || null,
       created_at: new Date().toISOString(),
     },
   ]);
 } catch (err) {
-  console.error('Failed to log search:', err);
+  console.error('Search log insert failed:', err);
 }
+
 
     } catch (e) {
       console.error(e);
