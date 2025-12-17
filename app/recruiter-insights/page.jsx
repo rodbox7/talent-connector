@@ -106,18 +106,33 @@ export default function RecruiterInsightsPage() {
   const monthLabel = new Date().toLocaleString('default', { month: 'long' });
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
-          Recruiter Insights
-        </h1>
-        <span style={{ opacity: 0.75, fontSize: 13 }}>
-          Candidates entered • {rangeLabel}
-          {range === 'MTD' ? ` (${monthLabel})` : ''}
-        </span>
-      </div>
+  <div style={{ padding: 24 }}>
+    <a
+      href="/"
+      style={{
+        display: 'inline-block',
+        marginBottom: 10,
+        color: '#93C5FD',
+        fontSize: 13,
+        fontWeight: 700,
+        textDecoration: 'none',
+      }}
+    >
+      ← Back to Recruiter Home
+    </a>
 
-      {/* RANGE TOGGLE */}
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
+        Recruiter Insights
+      </h1>
+      <span style={{ opacity: 0.75, fontSize: 13 }}>
+        Candidates entered • {rangeLabel}
+        {range === 'MTD' ? ` (${monthLabel})` : ''}
+      </span>
+    </div>
+
+    {/* RANGE TOGGLE */}
+
       <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {[
           { key: 'MTD', label: 'Month to Date' },
