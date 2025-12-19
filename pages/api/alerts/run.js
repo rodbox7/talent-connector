@@ -48,18 +48,19 @@ module.exports = async function handler(req, res) {
     }
 
     // ✉️ SEND ONE TEST EMAIL (ONLY IF SOMETHING WAS PROCESSED)
-    if (processed > 0) {
-      await resend.emails.send({
-        from: 'Talent Connector <alerts@resend.dev>',
-        to: ['tarboxjohnd@gmail.com'], // change later if needed
-        subject: '✅ Talent Connector Alert Test',
-        html: `
-          <h2>Alert system is working</h2>
-          <p>${processed} saved search(es) detected new candidates.</p>
-          <p>This is a test email confirming the alert pipeline is live.</p>
-        `,
-      });
-    }
+if (processed > 0) {
+  await resend.emails.send({
+    from: 'onboarding@resend.dev',
+    to: ['tarboxjohnd@gmail.com'],
+    subject: '✅ Talent Connector Alert Test',
+    html: `
+      <h2>Alert system is working</h2>
+      <p>${processed} saved search(es) detected new candidates.</p>
+      <p>This is a test email confirming the alert pipeline is live.</p>
+    `,
+  });
+}
+
 
     return res.json({ ok: true, processed });
   } catch (err) {
