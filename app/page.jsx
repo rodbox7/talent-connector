@@ -399,6 +399,140 @@ export default function Page() {
   const [err, setErr] = React.useState('');
   const [user, setUser] = React.useState(null);
 
+
+  // ---- Saved Searches (client, read-only for now) ----
+const [savedSearches, setSavedSearches] = React.useState([]);
+const [savedSearchesLoading, setSavedSearchesLoading] = React.useState(false);
+const [savedSearchesError, setSavedSearchesError] = React.useState('');
+
+async function loadSavedSearches() {
+  try {
+    setSavedSearchesError('');
+    setSavedSearchesLoading(true);
+
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) return;
+
+    const res = await fetch('/api/saved-searches/list', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Failed to load saved searches');
+
+    setSavedSearches(json.searches || []);
+  } catch (e) {
+    setSavedSearchesError(e?.message || 'Failed to load saved searches');
+  } finally {
+    setSavedSearchesLoading(false);
+  }
+}
+async function saveCurrentSearch() {
+  try {
+    const name = prompt('Name this search');
+    if (!name) return;
+
+    const filters = {
+      search,
+      fCity,
+      fState,
+      fTitle,
+      fLaw,
+      fLang,
+      iLicensedState,
+      salaryRange,
+      yearsRange,
+      contractOnly,
+      hourlyBillRange,
+      showOffMarket,
+      sortBy,
+    };
+
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+
+    const res = await fetch('/api/saved-searches/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, filters }),
+    });
+
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Failed to save search');
+
+    await loadSavedSearches();
+    alert('Search saved');
+  } catch (e) {
+    alert(e?.message || 'Failed to save search');
+  }
+}
+
+function applySavedSearch(filters = {}) {
+  // Text / keyword
+  setSearch(filters.search || '');
+
+  // Location
+  setFCity(filters.fCity || '');
+  setFState(filters.fState || '');
+
+  // Practice / role
+  setFTitle(filters.fTitle || '');
+  setFLaw(filters.fLaw || '');
+  setFLang(filters.fLang || '');
+  setILicensedState(filters.iLicensedState || '');
+
+  // Compensation
+  setSalaryRange(filters.salaryRange || '');
+  setYearsRange(filters.yearsRange || '');
+  setHourlyBillRange(filters.hourlyBillRange || '');
+
+  // Flags
+  setContractOnly(!!filters.contractOnly);
+  setShowOffMarket(!!filters.showOffMarket);
+
+  // Sort
+  setSortBy(filters.sortBy || 'date_desc');
+
+  // Re-run the query
+  fetchClientRows();
+}
+async function setAlertsEnabled(searchId, enabled) {
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+
+    const res = await fetch('/api/saved-searches/toggle', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id: searchId, enabled }),
+    });
+
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Failed to update alerts');
+
+    await loadSavedSearches(); // refresh state
+  } catch (e) {
+    alert(e?.message || 'Failed to update alerts');
+  }
+}
+
+
+React.useEffect(() => {
+  if (user?.role === 'client') {
+    loadSavedSearches();
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [user?.role]);
+
    async function login() {
   try {
     setErr('');
@@ -1983,8 +2117,11 @@ try {
     );
   } // end recruiter branch
 
+
   /* ---------- Client UI ---------- */
   if (user.role === 'client') {
+
+
     function buildMailto(c) {
       const to = user.amEmail || 'info@bhsg.com';
       const subj = `Talent Connector Candidate — ${c?.name || ''}`;
@@ -2045,6 +2182,8 @@ try {
       }
       return rows;
     }
+
+   
 
     async function loadInsights() {
       try {
@@ -2615,6 +2754,14 @@ try {
     Clear filters
   </Button>
 
+  <Button
+  onClick={saveCurrentSearch}
+  style={{ background: '#0EA5E9', border: '1px solid #1F2937' }}
+>
+  Save this search
+</Button>
+
+
   {/* NEW disclaimer text to the right of Clear filters */}
   <div
     style={{
@@ -2631,6 +2778,83 @@ try {
     <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
   ) : null}
 </div>
+</Card>
+
+
+{/* ---------- Saved Searches (read-only) ---------- */}
+<Card style={{ marginTop: 12 }}>
+  <div style={{ fontWeight: 800, marginBottom: 8 }}>
+    Saved Searches
+  </div>
+
+  {savedSearchesLoading && (
+    <div style={{ fontSize: 12, opacity: 0.7 }}>
+      Loading…
+    </div>
+  )}
+
+  {savedSearchesError && (
+    <div style={{ fontSize: 12, color: '#F87171' }}>
+      {savedSearchesError}
+    </div>
+  )}
+
+  {!savedSearchesLoading && savedSearches.length === 0 && (
+    <div style={{ fontSize: 12, opacity: 0.6 }}>
+      No saved searches yet.
+    </div>
+  )}
+
+  <div style={{ display: 'grid', gap: 8 }}>
+  {savedSearches.map((s) => (
+    <div
+      key={s.id}
+      onClick={() => applySavedSearch(s.filters)}
+      style={{
+        padding: 10,
+        borderRadius: 10,
+        border: '1px solid #1F2937',
+        background: '#0B1220',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        cursor: 'pointer',
+      }}
+    >
+      {/* LEFT: name + status */}
+      <div>
+        <div style={{ fontWeight: 700 }}>{s.name}</div>
+        <div style={{ fontSize: 12, opacity: 0.6 }}>
+          Alerts: {s.alerts_enabled ? 'On' : 'Off'}
+        </div>
+      </div>
+
+      {/* RIGHT: toggle button */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation(); // ⛔ prevents applying search
+          setAlertsEnabled(s.id, !s.alerts_enabled);
+        }}
+        style={{
+          padding: '6px 10px',
+          borderRadius: 8,
+          border: '1px solid #1F2937',
+          background: s.alerts_enabled ? '#16A34A' : '#111827',
+          color: 'white',
+          fontWeight: 700,
+          fontSize: 12,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {s.alerts_enabled ? 'Turn Off' : 'Turn On'}
+      </button>
+    </div>
+  ))}
+</div>
+
 </Card>
 
 

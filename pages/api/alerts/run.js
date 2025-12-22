@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
+// ---------- Clients ----------
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -8,45 +9,168 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// ---------- Helpers ----------
+function hoursBetween(a, b) {
+  return Math.abs(a - b) / 36e5;
+}
+
+// ---------- API Handler ----------
 export default async function handler(req, res) {
-  const token = req.query.token;
-
-  if (!token || token !== process.env.ALERTS_CRON_TOKEN) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized' });
-  }
-
-  // 🔍 ENV CHECK (this is critical)
-  if (!process.env.RESEND_API_KEY) {
-    return res.status(500).json({
-      ok: false,
-      error: 'Missing RESEND_API_KEY in production',
-    });
-  }
-
   try {
-    // 🔔 HARD TEST EMAIL (no Supabase, no loops)
-    const result = await resend.emails.send({
-      from: 'onboarding@resend.dev',
-      to: ['tarboxjohnd@gmail.com'],
-      subject: 'Talent Connector – Resend Test',
-      html: '<p>This is a direct Resend test from production.</p>',
-    });
+    // 🔐 Security
+    const token = req.query.token;
+    if (!token || token !== process.env.ALERTS_CRON_TOKEN) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
 
-    console.log('RESEND RESULT:', result);
+    // 🔎 Get enabled saved searches
+    const { data: searches, error: searchError } = await supabase
+      .from('saved_searches')
+      .select(
+        'id, user_id, name, filters, last_checked_at, last_alert_sent_at'
+      )
+      .eq('alert_enabled', true);
+
+    if (searchError) throw searchError;
+
+    let processed = 0;
+    let emailsSent = 0;
+
+    for (const search of searches) {
+      const now = new Date();
+
+      // ⏱ Throttle alerts (12 hours)
+      if (
+        search.last_alert_sent_at &&
+        hoursBetween(now, new Date(search.last_alert_sent_at)) < 12
+      ) {
+        processed++;
+        continue;
+      }
+
+      const since =
+        search.last_checked_at || '1970-01-01T00:00:00.000Z';
+
+      // 🔎 Find new candidates
+      const { data: candidates } = await supabase
+        .from('v_candidates')
+        .select(
+          'id, first_name, last_name, title, city, state, created_at'
+        )
+        .gt('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!candidates || candidates.length === 0) {
+        // No matches — update check time only
+        await supabase
+          .from('saved_searches')
+          .update({ last_checked_at: now.toISOString() })
+          .eq('id', search.id);
+
+        processed++;
+        continue;
+      }
+
+      // 👤 Get user email
+      const { data: user } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', search.user_id)
+        .single();
+
+      if (!user?.email) {
+        processed++;
+        continue;
+      }
+
+      // 🧠 Build candidate preview (top 3)
+      const preview = candidates.slice(0, 3).map((c) => {
+        const first = c.first_name || '';
+        const lastInitial = c.last_name
+          ? `${c.last_name.charAt(0)}.`
+          : '';
+        const location =
+          [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
+
+        return `
+          <li style="margin-bottom: 6px;">
+            <strong>${first} ${lastInitial}</strong>
+            — ${c.title || 'Title N/A'}
+            — ${location}
+          </li>
+        `;
+      });
+
+      // ✉️ Send email
+      await resend.emails.send({
+        from: 'Talent Connector <alerts@bhltalentconnector.com>',
+        to: user.email,
+        subject: `${candidates.length} new candidates for "${search.name}"`,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+            <h2>New Talent Alert</h2>
+
+            <p>
+              <strong>${candidates.length}</strong> new candidates were added that match your saved search:
+            </p>
+
+            <p><strong>${search.name}</strong></p>
+
+            <ul style="padding-left: 18px;">
+              ${preview.join('')}
+            </ul>
+
+            <p>
+              <a
+                href="${process.env.NEXT_PUBLIC_SITE_URL}/search?saved=${search.id}"
+                style="
+                  display: inline-block;
+                  margin-top: 12px;
+                  padding: 10px 16px;
+                  background: #1f2937;
+                  color: #ffffff;
+                  text-decoration: none;
+                  border-radius: 6px;
+                  font-weight: 600;
+                "
+              >
+                View All Matches
+              </a>
+            </p>
+
+            <hr style="margin: 24px 0;" />
+
+            <small style="color: #6b7280;">
+              You’re receiving this email because alerts are enabled for this saved search.
+            </small>
+          </div>
+        `,
+      });
+
+      // 🕒 Update timestamps
+      await supabase
+        .from('saved_searches')
+        .update({
+          last_checked_at: now.toISOString(),
+          last_alert_sent_at: now.toISOString(),
+        })
+        .eq('id', search.id);
+
+      processed++;
+      emailsSent++;
+    }
 
     return res.json({
       ok: true,
-      resendResult: result,
+      processed,
+      emailsSent,
     });
   } catch (err) {
-    console.error('RESEND ERROR:', err);
-
+    console.error('ALERT RUN ERROR:', err);
     return res.status(500).json({
       ok: false,
-      message: err?.message,
-      name: err?.name,
-      stack: err?.stack,
-      raw: err,
+      error: err.message || 'Unknown error',
     });
   }
 }
