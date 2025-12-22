@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
-// ---------- Clients ----------
+/* ---------------- Clients ---------------- */
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -9,21 +10,28 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ---------- Helpers ----------
+/* ---------------- Helpers ---------------- */
+
 function hoursBetween(a, b) {
   return Math.abs(a - b) / 36e5;
 }
 
-// ---------- API Handler ----------
+/* ---------------- API Handler ---------------- */
+
 export default async function handler(req, res) {
   try {
-    // 🔐 Security
-    const token = req.query.token;
-    if (!token || token !== process.env.ALERTS_CRON_TOKEN) {
+    /* 🔐 AUTH — supports query token OR cron header */
+    const queryToken = req.query.token;
+    const headerToken = req.headers['x-cron-token'];
+
+    if (
+      (!queryToken || queryToken !== process.env.ALERTS_CRON_TOKEN) &&
+      (!headerToken || headerToken !== process.env.ALERTS_CRON_TOKEN)
+    ) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
 
-    // 🔎 Get enabled saved searches
+    /* 🔎 Get enabled saved searches */
     const { data: searches, error: searchError } = await supabase
       .from('saved_searches')
       .select(
@@ -39,7 +47,7 @@ export default async function handler(req, res) {
     for (const search of searches) {
       const now = new Date();
 
-      // ⏱ Throttle alerts (12 hours)
+      /* ⏱ Throttle alerts (12 hours) */
       if (
         search.last_alert_sent_at &&
         hoursBetween(now, new Date(search.last_alert_sent_at)) < 12
@@ -51,8 +59,8 @@ export default async function handler(req, res) {
       const since =
         search.last_checked_at || '1970-01-01T00:00:00.000Z';
 
-      // 🔎 Find new candidates
-      const { data: candidates } = await supabase
+      /* 🔎 Find new candidates */
+      const { data: candidates, error: candidateError } = await supabase
         .from('v_candidates')
         .select(
           'id, first_name, last_name, title, city, state, created_at'
@@ -61,8 +69,9 @@ export default async function handler(req, res) {
         .order('created_at', { ascending: false })
         .limit(5);
 
+      if (candidateError) throw candidateError;
+
       if (!candidates || candidates.length === 0) {
-        // No matches — update check time only
         await supabase
           .from('saved_searches')
           .update({ last_checked_at: now.toISOString() })
@@ -72,7 +81,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // 👤 Get user email
+      /* 👤 Get user email */
       const { data: user } = await supabase
         .from('users')
         .select('email')
@@ -84,7 +93,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // 🧠 Build candidate preview (top 3)
+      /* 🧠 Build preview */
       const preview = candidates.slice(0, 3).map((c) => {
         const first = c.first_name || '';
         const lastInitial = c.last_name
@@ -102,7 +111,7 @@ export default async function handler(req, res) {
         `;
       });
 
-      // ✉️ Send email
+      /* ✉️ Send email */
       await resend.emails.send({
         from: 'Talent Connector <alerts@bhltalentconnector.com>',
         to: user.email,
@@ -112,7 +121,7 @@ export default async function handler(req, res) {
             <h2>New Talent Alert</h2>
 
             <p>
-              <strong>${candidates.length}</strong> new candidates were added that match your saved search:
+              <strong>${candidates.length}</strong> new candidates match your saved search:
             </p>
 
             <p><strong>${search.name}</strong></p>
@@ -148,7 +157,7 @@ export default async function handler(req, res) {
         `,
       });
 
-      // 🕒 Update timestamps
+      /* 🕒 Update timestamps */
       await supabase
         .from('saved_searches')
         .update({
