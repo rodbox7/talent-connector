@@ -1,6 +1,16 @@
 // pages/api/saved-searches/toggle.js
 import { createClient } from '@supabase/supabase-js';
 
+export const config = { runtime: 'nodejs' };
+
+export default function handler(req, res) {
+  return res.status(200).json({
+    ok: true,
+    marker: 'PAGES_API_TOGGLE_HIT',
+  });
+}
+
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
