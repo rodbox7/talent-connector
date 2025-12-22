@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
+export const config = {
+  runtime: 'nodejs',
+};
+
+
 /* ---------------- Clients ---------------- */
 
 const supabase = createClient(
@@ -37,7 +42,7 @@ export default async function handler(req, res) {
       .select(
         'id, user_id, name, filters, last_checked_at, last_alert_sent_at'
       )
-      .eq('alert_enabled', true);
+      .eq('alerts_enabled', true);
 
     if (searchError) throw searchError;
 
