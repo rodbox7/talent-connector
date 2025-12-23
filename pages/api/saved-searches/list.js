@@ -19,23 +19,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { user_id } = req.query;
+    let { user_id } = req.query;
 
+    /**
+     * 🔁 BACKWARD COMPATIBILITY
+     * If user_id is NOT passed (current UI behavior),
+     * fall back to returning saved searches without hard failure.
+     * This matches how things worked before.
+     */
     if (!user_id) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Missing user_id',
+      const { data: searches, error } = await supabase
+        .from('saved_searches')
+        .select(
+          `
+          id,
+          user_id,
+          name,
+          filters,
+          alert_enabled,
+          created_at,
+          last_checked_at,
+          last_alert_sent_at
+        `
+        )
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return res.status(200).json({
+        ok: true,
+        searches: searches || [],
       });
     }
 
+    /**
+     * 🎯 Standard path (when user_id IS provided)
+     */
     const { data, error } = await supabase
       .from('saved_searches')
       .select(
         `
         id,
+        user_id,
         name,
         filters,
-        alerts_enabled,
+        alert_enabled,
         created_at,
         last_checked_at,
         last_alert_sent_at
