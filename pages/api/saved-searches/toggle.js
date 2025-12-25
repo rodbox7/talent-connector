@@ -1,3 +1,4 @@
+// pages/api/saved-searches/toggle.js
 import { createClient } from '@supabase/supabase-js';
 
 export const config = {
@@ -11,7 +12,10 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+    return res.status(405).json({
+      ok: false,
+      error: 'Method not allowed',
+    });
   }
 
   try {
@@ -24,13 +28,15 @@ export default async function handler(req, res) {
       });
     }
 
+    // ✅ IMPORTANT: use alerts_enabled (plural)
     const { data, error } = await supabase
       .from('saved_searches')
       .update({
-        alert_enabled: enabled, // ✅ singular, correct column
+        alerts_enabled: enabled,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select('id, alert_enabled')
+      .select('id, alerts_enabled')
       .single();
 
     if (error) throw error;
@@ -38,7 +44,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       id: data.id,
-      alert_enabled: data.alert_enabled,
+      alerts_enabled: data.alerts_enabled,
     });
   } catch (err) {
     console.error('TOGGLE ALERT ERROR:', err);

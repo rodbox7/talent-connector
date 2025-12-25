@@ -1,75 +1,43 @@
+// pages/api/saved-searches/list.js
 import { createClient } from '@supabase/supabase-js';
 
 export const config = {
   runtime: 'nodejs',
 };
 
-/* ---------------- Supabase Client ---------------- */
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-/* ---------------- API Handler ---------------- */
+function getBearer(req) {
+  const h = req.headers.authorization || '';
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1] : null;
+}
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' });
-  }
-
   try {
-    let { user_id } = req.query;
-
-    /**
-     * 🔁 BACKWARD COMPATIBILITY
-     * If user_id is NOT passed (current UI behavior),
-     * fall back to returning saved searches without hard failure.
-     * This matches how things worked before.
-     */
-    if (!user_id) {
-      const { data: searches, error } = await supabase
-        .from('saved_searches')
-        .select(
-          `
-          id,
-          user_id,
-          name,
-          filters,
-          alert_enabled,
-          created_at,
-          last_checked_at,
-          last_alert_sent_at
-        `
-        )
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      return res.status(200).json({
-        ok: true,
-        searches: searches || [],
-      });
+    if (req.method !== 'GET') {
+      return res.status(405).json({ ok: false, error: 'Method not allowed' });
     }
 
-    /**
-     * 🎯 Standard path (when user_id IS provided)
-     */
+    const token = getBearer(req);
+    if (!token) {
+      return res.status(401).json({ ok: false, error: 'Missing auth token' });
+    }
+
+    const { data: auth, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !auth?.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
+
     const { data, error } = await supabase
       .from('saved_searches')
       .select(
-        `
-        id,
-        user_id,
-        name,
-        filters,
-        alert_enabled,
-        created_at,
-        last_checked_at,
-        last_alert_sent_at
-      `
+        'id, name, filters, alerts_enabled, created_at, updated_at'
       )
-      .eq('user_id', user_id)
+      .eq('user_id', auth.user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -79,7 +47,7 @@ export default async function handler(req, res) {
       searches: data || [],
     });
   } catch (err) {
-    console.error('SAVED SEARCH LIST ERROR:', err);
+    console.error('LIST SAVED SEARCHES ERROR:', err);
     return res.status(500).json({
       ok: false,
       error: err.message || 'Unknown error',
