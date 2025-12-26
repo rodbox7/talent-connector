@@ -428,49 +428,6 @@ async function loadSavedSearches() {
     setSavedSearchesLoading(false);
   }
 }
-async function saveCurrentSearch() {
-  try {
-    const name = prompt('Name this search');
-    if (!name) return;
-
-    const filters = {
-      search,
-      fCity,
-      fState,
-      fTitle,
-      fLaw,
-      fLang,
-      iLicensedState,
-      salaryRange,
-      yearsRange,
-      contractOnly,
-      hourlyBillRange,
-      showOffMarket,
-      sortBy,
-    };
-
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess?.session?.access_token;
-    if (!token) throw new Error('Not authenticated');
-
-    const res = await fetch('/api/saved-searches/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ name, filters }),
-    });
-
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Failed to save search');
-
-    await loadSavedSearches();
-    alert('Search saved');
-  } catch (e) {
-    alert(e?.message || 'Failed to save search');
-  }
-}
 
 function applySavedSearch(filters = {}) {
   // Text / keyword
@@ -524,6 +481,79 @@ async function setAlertsEnabled(searchId, enabled) {
     alert(e?.message || 'Failed to update alerts');
   }
 }
+
+async function saveCurrentSearch() {
+  try {
+    const name = prompt('Name this search');
+    if (!name) return;
+
+    const filters = {
+      search,
+      fCity,
+      fState,
+      fTitle,
+      fLaw,
+      fLang,
+      iLicensedState,
+      salaryRange,
+      yearsRange,
+      contractOnly,
+      hourlyBillRange,
+      showOffMarket,
+      sortBy,
+    };
+
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+
+    const res = await fetch('/api/saved-searches/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name, filters }),
+    });
+
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Failed to save search');
+
+    await loadSavedSearches();
+    alert('Search saved');
+  } catch (e) {
+    alert(e?.message || 'Failed to save search');
+  }
+}
+
+
+async function deleteSavedSearch(id) {
+  try {
+    if (!confirm('Delete this saved search?')) return;
+
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+
+    const res = await fetch('/api/saved-searches/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Failed to delete search');
+
+    await loadSavedSearches();
+  } catch (e) {
+    alert(e?.message || 'Failed to delete saved search');
+  }
+}
+
+
 
 
 React.useEffect(() => {
@@ -2806,7 +2836,7 @@ try {
   )}
 
   <div style={{ display: 'grid', gap: 8 }}>
-  {savedSearches.map((s) => (
+   {savedSearches.map((s) => (
     <div
       key={s.id}
       onClick={() => applySavedSearch(s.filters)}
@@ -2822,7 +2852,7 @@ try {
         cursor: 'pointer',
       }}
     >
-      {/* LEFT: name + status */}
+      {/* LEFT */}
       <div>
         <div style={{ fontWeight: 700 }}>{s.name}</div>
         <div style={{ fontSize: 12, opacity: 0.6 }}>
@@ -2830,32 +2860,57 @@ try {
         </div>
       </div>
 
-      {/* RIGHT: toggle button */}
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation(); // ⛔ prevents applying search
-          setAlertsEnabled(s.id, !s.alerts_enabled);
-        }}
-        style={{
-          padding: '6px 10px',
-          borderRadius: 8,
-          border: '1px solid #1F2937',
-          background: s.alerts_enabled ? '#16A34A' : '#111827',
-          color: 'white',
-          fontWeight: 700,
-          fontSize: 12,
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {s.alerts_enabled ? 'Turn Off' : 'Turn On'}
-      </button>
+      {/* RIGHT */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setAlertsEnabled(s.id, !s.alerts_enabled);
+          }}
+          style={{
+            padding: '6px 10px',
+            borderRadius: 8,
+            border: '1px solid #1F2937',
+            background: s.alerts_enabled ? '#16A34A' : '#111827',
+            color: 'white',
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {s.alerts_enabled ? 'Turn Off' : 'Turn On'}
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteSavedSearch(s.id);
+          }}
+          style={{
+            padding: '6px 10px',
+            borderRadius: 8,
+            border: '1px solid #7F1D1D',
+            background: '#7F1D1D',
+            color: 'white',
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Delete
+        </button>
+      </div>
     </div>
   ))}
 </div>
-
 </Card>
+
+
+
 
 
              <Card style={{ marginTop: 12 }}>
