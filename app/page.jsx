@@ -1221,18 +1221,22 @@ React.useEffect(() => {
       setClientRows(sorted);
 // --- Log client search to search_logs ---
 try {
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr) console.warn('getUser error:', userErr);
+
   await supabase.from('search_logs').insert([
     {
       metro: fCity || null,
       title: fTitle || null,
       type_of_law: fLaw || null,
-      user_email: authUser?.email || null,
+      user_email: user?.email || null,
       created_at: new Date().toISOString(),
     },
   ]);
 } catch (err) {
   console.error('Search log insert failed:', err);
 }
+
 
 
     } catch (e) {
