@@ -75,17 +75,24 @@ function ChartCard({ title, data }) {
               ))}
             </Pie>
             <Legend
-              verticalAlign="bottom"
-              align="center"
-              iconType="circle"
-              iconSize={8}
-              wrapperStyle={{ fontSize: 12, color: '#374151' }}
-              formatter={(value, entry) => {
-                const v = entry?.payload?.value ?? 0;
-                const pct = total ? Math.round((v / total) * 100) : 0;
-                return `${value} (${v}, ${pct}%)`;
-              }}
-            />
+  verticalAlign="bottom"
+  align="center"
+  iconType="circle"
+  iconSize={8}
+  wrapperStyle={{ fontSize: 12, color: '#374151' }}
+  payload={limited.map((item, i) => ({
+    value: item.name,
+    type: 'circle',
+    color: COLORS[i % COLORS.length],
+    payload: item,
+  }))}
+  formatter={(value, entry) => {
+    const v = entry?.payload?.value ?? 0;
+    const pct = total ? Math.round((v / total) * 100) : 0;
+    return `${value} (${v}, ${pct}%)`;
+  }}
+/>
+
             <Tooltip formatter={(v) => [`${v}`, 'Searches']} />
           </PieChart>
         </ResponsiveContainer>
@@ -170,24 +177,39 @@ export default function SearchInsights() {
       .filter(Boolean)
       .join(', ') || 'Search activity data is being collected.';
 
-  /* ---------- Sparkline Chart for Recent Searches ---------- */
-  const sparkData = {
-    labels: recentSearches.map((r) =>
-      new Date(r.created_at).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    ),
-    datasets: [
-      {
-        label: 'Searches Over Time',
-        data: recentSearches.map((_, i) => i + 1),
-        borderColor: '#2563EB',
-        borderWidth: 2,
-        tension: 0.35,
-      },
-    ],
-  };
+ /* ---------- Daily Search Activity ---------- */
+const searchesByDay = useMemo(() => {
+  const counts = {};
+
+  recentSearches.forEach((r) => {
+    const d = new Date(r.created_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+      d.getDate()
+    ).padStart(2, '0')}`;
+
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  return Object.entries(counts)
+    .map(([day, count]) => ({ day, count }))
+    .sort((a, b) => a.day.localeCompare(b.day));
+}, [recentSearches]);
+
+const dailyChartData = {
+  labels: searchesByDay.map((d) =>
+    new Date(d.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  ),
+  datasets: [
+    {
+      label: 'Searches per Day',
+      data: searchesByDay.map((d) => d.count),
+      borderWidth: 3,
+      tension: 0.3,
+      fill: true,
+    },
+  ],
+};
+
 
   return (
     <div
@@ -325,8 +347,21 @@ export default function SearchInsights() {
             <h3 style={{ margin: 0, marginBottom: 12, color: '#1F2937', fontSize: 16 }}>
               Search Timeline
             </h3>
-            <div style={{ width: '100%', height: 180 }}>
-              <Line data={sparkData} />
+            <div style={{ width: '100%', height: 320 }}>
+             <Line
+  data={dailyChartData}
+  options={{
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      y: { beginAtZero: true },
+    },
+  }}
+/>
+
             </div>
           </div>
 
