@@ -2592,11 +2592,12 @@ try {
                     <Label>Metro Area</Label>
                     <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
                       <option value="">Any</option>
-                      {(cities ?? []).map((c) => (
-                        <option key={c} value={c}>
-                          {formatMetro(c)}
-                        </option>
-                      ))}
+                     {METROS.map((m) => (
+  <option key={m} value={m}>
+    {m}
+  </option>
+))}
+
                     </select>
                   </div>
 
