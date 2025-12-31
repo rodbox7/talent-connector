@@ -2384,13 +2384,18 @@ try {
 
           <Card style={{ marginTop: 12, position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap: 12 }}>
-              <div>
-                <Label>Title</Label>
-                <select value={iTitle} onChange={(e)=>setITitle(e.target.value)} style={selectStyle}>
-                  <option value="">Any</option>
-                  {titleOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
+             <div>
+  <Label>Title</Label>
+  <select value={iTitle} onChange={(e) => setITitle(e.target.value)} style={selectStyle}>
+    <option value="">Any</option>
+    {['Administrative', 'Legal Support', 'Paralegal', 'Attorney'].map((t) => (
+      <option key={t} value={t}>
+        {t}
+      </option>
+    ))}
+  </select>
+</div>
+
               <div>
                 <Label>Type of Law</Label>
                 <select value={iLaw} onChange={(e)=>setILaw(e.target.value)} style={selectStyle}>
@@ -2611,11 +2616,12 @@ try {
                     <Label>Title</Label>
                     <select value={fTitle} onChange={(e) => setFTitle(e.target.value)} style={selectStyle}>
                       <option value="">Any</option>
-                      {titleOptions.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
+                      {['Administrative', 'Legal Support', 'Paralegal', 'Attorney'].map((t) => (
+  <option key={t} value={t}>
+    {t}
+  </option>
+))}
+
                     </select>
                   </div>
                   <div>
