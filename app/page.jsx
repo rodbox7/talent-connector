@@ -1409,7 +1409,6 @@ try {
     margin: '0 auto',
   }}
 >
- }}>
             <div
   style={{
     display: 'flex',
@@ -3129,8 +3128,7 @@ try {
     width: '100%',
     maxWidth: isMobile ? '100%' : '1100px',
     margin: '0 auto',
-  }}
->
+
 
           <div
             style={{
