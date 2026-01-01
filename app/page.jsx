@@ -1265,7 +1265,8 @@ try {
   const pageWrap = {
     minHeight: '100vh',
     width: '100%',
-    backgroundImage: `url(${NYC})`,
+    backgroundImage: isMobile ? 'none' : `url(${NYC})`,
+    backgroundColor: isMobile ? '#fff' : 'transparent',
     backgroundPosition: isMobile ? 'center top' : 'center',
     backgroundSize: 'cover',
     backgroundAttachment: isMobile ? 'scroll' : 'fixed',
