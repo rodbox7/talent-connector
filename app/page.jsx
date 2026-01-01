@@ -1283,16 +1283,18 @@ try {
     padding: isMobile ? '20px 16px' : '40px 16px',
   };
   const overlay = {
-    minHeight: '100vh',
-    width: '100%',
-    backdropFilter: 'blur(1px)',
-    background:
-      'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    padding: isMobile ? '20px 16px' : '40px 16px',
-  };
+  minHeight: '100vh',
+  width: '100%',
+  backdropFilter: isMobile ? 'none' : 'blur(1px)',
+  background: isMobile
+    ? 'transparent'
+    : 'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'center',
+  padding: isMobile ? '20px 16px' : '40px 16px',
+};
+
 
   if (!user) {
     return (
