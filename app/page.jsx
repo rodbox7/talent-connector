@@ -1402,7 +1402,14 @@ try {
     return (
       <div style={pageWrap}>
         <div style={overlay}>
-          <div style={{ width: 'min(1100px, 100%)' }}>
+          <div
+  style={{
+    width: '100%',
+    maxWidth: isMobile ? '100%' : '1100px',
+    margin: '0 auto',
+  }}
+>
+ }}>
             <div
   style={{
     display: 'flex',
@@ -3117,7 +3124,14 @@ try {
   return (
     <div style={pageWrap}>
       <div style={overlay}>
-        <div style={{ width: 'min(1100px, 100%)' }}>
+        <div
+  style={{
+    width: '100%',
+    maxWidth: isMobile ? '100%' : '1100px',
+    margin: '0 auto',
+  }}
+>
+
           <div
             style={{
               display: 'flex',
