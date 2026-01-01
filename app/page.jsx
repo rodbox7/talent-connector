@@ -3123,16 +3123,17 @@ try {
   return (
     <div style={pageWrap}>
       <div style={overlay}>
-        <div
+       <div
   style={{
     width: '100%',
     maxWidth: isMobile ? '100%' : '1100px',
     margin: '0 auto',
+  }}
+>
+  <div
+    style={{
+      display: 'flex',
 
-
-          <div
-            style={{
-              display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               marginBottom: 10,
