@@ -1280,7 +1280,7 @@ try {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: isMobile ? '20px 16px' : '40px 16px',
+    padding: isMobile ? '16px' : '40px 16px',
   };
   const overlay = {
   minHeight: '100vh',
@@ -1300,7 +1300,14 @@ try {
     return (
       <div style={pageWrap}>
         <div style={overlayCentered}>
-          <Card style={{ width: 520, padding: 24 }}>
+         <Card
+  style={{
+    width: isMobile ? '100%' : 520,
+    maxWidth: 520,
+    padding: isMobile ? '16px' : 24,
+  }}
+>
+
             <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
               Talent Connector – Powered by Beacon Hill Legal
             </div>
