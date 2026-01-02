@@ -1306,13 +1306,24 @@ try {
         <div style={overlayCentered}>
          <Card
   style={{
-    width: isMobile ? '100%' : 520,
-    maxWidth: 520,
-    padding: isMobile ? '16px' : 24,
+    width: '100%',
+    maxWidth: isMobile ? '100%' : 520,
+    padding: isMobile ? '14px' : 24,
+    borderRadius: isMobile ? 12 : 16,
   }}
 >
 
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, letterSpacing: 0.3 }}>
+
+           <div
+  style={{
+    fontSize: isMobile ? 16 : 18,
+    fontWeight: 800,
+    marginBottom: isMobile ? 8 : 10,
+    letterSpacing: 0.3,
+    lineHeight: 1.2,
+  }}
+>
+
               Talent Connector – Powered by Beacon Hill Legal
             </div>
             <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 12 }}>
