@@ -1263,14 +1263,18 @@ try {
 
   /* ---------- Logged-out ---------- */
   const pageWrap = {
-    minHeight: '100vh',
-    width: '100%',
-    backgroundImage: isMobile ? 'none' : `url(${NYC})`,
-    backgroundColor: isMobile ? '#fff' : 'transparent',
-    backgroundPosition: isMobile ? 'center top' : 'center',
-    backgroundSize: 'cover',
-    backgroundAttachment: isMobile ? 'scroll' : 'fixed',
-  };
+  minHeight: '100vh',
+  width: '100%',
+  backgroundImage: isMobile ? 'none' : `url(${NYC})`,
+  backgroundColor: isMobile ? '#fff' : 'transparent',
+  backgroundPosition: isMobile ? 'center top' : 'center',
+  backgroundSize: 'cover',
+  backgroundAttachment: isMobile ? 'scroll' : 'fixed',
+
+  // Critical for mobile
+  overflowX: 'hidden',
+};
+
   const overlayCentered = {
     minHeight: '100vh',
     width: '100%',
