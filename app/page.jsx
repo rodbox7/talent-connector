@@ -1276,16 +1276,22 @@ try {
 };
 
   const overlayCentered = {
-    minHeight: '100vh',
-    width: '100%',
-    backdropFilter: 'blur(1px)',
-    background:
-      'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: isMobile ? '16px' : '40px 16px',
-  };
+  minHeight: '100vh',
+  width: '100%',
+  backdropFilter: isMobile ? 'none' : 'blur(1px)',
+  background: isMobile
+    ? '#fff'
+    : 'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
+  display: 'flex',
+
+  // Key change: stop "modal centering" on mobile
+  alignItems: isMobile ? 'flex-start' : 'center',
+
+  justifyContent: 'center',
+  padding: isMobile ? '12px' : '40px 16px',
+  boxSizing: 'border-box',
+};
+
   const overlay = {
   minHeight: '100vh',
   width: '100%',
