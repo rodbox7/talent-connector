@@ -1365,23 +1365,45 @@ try {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ width: '100%', maxWidth: 400 }}>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div style={{ width: '100%', maxWidth: 400, marginTop: 10 }}>
-                <Label>Password</Label>
-                <Input
-                  type="password"
-                  placeholder="your password"
-                  value={pwd}
-                  onChange={(e) => setPwd(e.target.value)}
-                />
+              <div
+  style={{
+    width: '100%',
+    maxWidth: isMobile ? '100%' : 400,
+  }}
+>
+
+               <div style={{ width: '100%', maxWidth: isMobile ? '100%' : 400 }}>
+  <Label>Email</Label>
+  <Input
+    type="email"
+    placeholder="name@company.com"
+    value={email}
+    onChange={(e) => setEmail(e.target.value)}
+    style={{
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+    }}
+  />
+</div>
+
+
+               <div style={{ width: '100%', maxWidth: isMobile ? '100%' : 400, marginTop: 10 }}>
+  <Label>Password</Label>
+  <Input
+    type="password"
+    placeholder="your password"
+    value={pwd}
+    onChange={(e) => setPwd(e.target.value)}
+    style={{
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+    }}
+  />
+</div>
+
+
               </div>
               <div style={{ marginTop: 14, width: '100%' }}>
                 <Button onClick={login} style={{ width: '100%', display: 'block' }}>
