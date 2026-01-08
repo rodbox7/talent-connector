@@ -18,7 +18,8 @@ export default function RecruiterInsightsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
-  const [range, setRange] = useState('MTD'); // MTD | YTD | ALL
+  const [range, setRange] = useState('WTD'); // WTD | MTD | YTD | ALL
+
 
   useEffect(() => {
     loadData();
@@ -135,10 +136,12 @@ export default function RecruiterInsightsPage() {
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {[
-          { key: 'MTD', label: 'Month to Date' },
-          { key: 'YTD', label: 'Year to Date' },
-          { key: 'ALL', label: 'All Time' },
-        ].map((btn) => (
+  { key: 'WTD', label: 'This Week' },
+  { key: 'MTD', label: 'Month to Date' },
+  { key: 'YTD', label: 'Year to Date' },
+  { key: 'ALL', label: 'All Time' },
+].map((btn) => (
+
           <button
             key={btn.key}
             onClick={() => setRange(btn.key)}
