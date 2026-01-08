@@ -995,10 +995,7 @@ React.useEffect(() => {
   const [fTitle, setFTitle] = React.useState('');
   const [fLaw, setFLaw] = React.useState('');
   const [fLang, setFLang] = React.useState('');
-
-
-  // NEW — language filter (client UI)
-
+  const [fLicensedState, setFLicensedState] = React.useState('');
 
   const [clientRows, setClientRows] = React.useState([]);
   const [clientLoading, setClientLoading] = React.useState(false);
@@ -1012,7 +1009,7 @@ React.useEffect(() => {
   const [iLaw, setILaw] = React.useState('');
   const [iLang, setILang] = React.useState('');
   const [iLicensedState, setILicensedState] = React.useState('');  // ⭐ NEW
-  const [iCity, setICity] = React.useState('');
+  const [iMetro, setIMetro] = React.useState('');
   const [iState, setIState] = React.useState('');
   const [iYearsRange, setIYearsRange] = React.useState('');
   const [iContractOnly, setIContractOnly] = React.useState(false);
@@ -1155,7 +1152,8 @@ React.useEffect(() => {
         if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
         if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
         if (fLang && !matchesLangCSV(r.languages_csv, fLang)) return false;
-        if (iLicensedState && !matchesStatesCSV(r.licensed_states_csv, iLicensedState)) return false;
+        if (fLicensedState && !matchesStatesCSV(r.licensed_states_csv, fLicensedState)) return false;
+
 
         
 
@@ -2292,8 +2290,12 @@ try {
           if (iLang && !matchesLangCSV(r.languages_csv, iLang)) return false;
           // ⭐ NEW: Licensed State filter
           if (iLicensedState && !matchesStatesCSV(r.licensed_states_csv, iLicensedState)) return false;
+          if (iMetro) {
+          const rowMetro = [r.city, r.state].filter(Boolean).join(', ').toLowerCase();
+          if (rowMetro !== iMetro.toLowerCase()) return false;
 
-          if (iCity && String(r.city || '').trim() !== iCity.trim()) return false;
+}
+
           if (iState && String(r.state || '').trim() !== iState.trim()) return false;
           if (iContractOnly && !r.contract) return false;
 
@@ -2334,15 +2336,17 @@ try {
           title_one: r[_csvKey('titles_csv')],
         }));
 
-        const withCityState = rows.map((r) => ({
-          ...r,
-          city_full: [r.city, r.state].filter(Boolean).join(', '),
-        }));
+       const withMetro = rows.map((r) => ({
+  ...r,
+  metro: [r.city, r.state].filter(Boolean).join(', '),
+}));
+
 
         const byTitleSalary = groupAvg(titleRows, 'title_one', 'salary');
         const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
-        const byCitySalary = groupAvg(withCityState, 'city_full', 'salary');
-        const byCityHourly = groupAvg(withCityState, 'city_full', 'hourly_billable');
+        const byCitySalary = groupAvg(withMetro, 'metro', 'salary');
+        const byCityHourly = groupAvg(withMetro, 'metro', 'hourly_billable');
+
 
         const buckets = [
           { label: '0-2 yrs',  check: (y) => y >= 0 && y <= 2 },
@@ -2480,8 +2484,8 @@ try {
 <div>
   <Label>Licensed In</Label>
   <select
-    value={iLicensedState || ''}
-    onChange={(e) => setILicensedState(e.target.value)}
+   value={fLicensedState || ''}
+onChange={(e) => setFLicensedState(e.target.value)}
     style={selectStyle}
   >
     <option value="">Any licensed state</option>
@@ -2501,13 +2505,22 @@ try {
                   {STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              <div>
-                <Label>City</Label>
-                <select value={iCity} onChange={(e)=>setICity(e.target.value)} style={selectStyle}>
-                  <option value="">Any</option>
-                  {cities.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
+             <div>
+  <Label>Metro Area</Label>
+  <select
+    value={iMetro}
+    onChange={(e) => setIMetro(e.target.value)}
+    style={selectStyle}
+  >
+    <option value="">Any</option>
+    {METROS.map((m) => (
+      <option key={m} value={m}>
+        {m}
+      </option>
+    ))}
+  </select>
+</div>
+
               <div>
                 <Label>Years of experience</Label>
                 <select value={iYearsRange} onChange={(e)=>setIYearsRange(e.target.value)} style={selectStyle}>
@@ -2542,18 +2555,20 @@ try {
             </div>
             <div style={{ marginTop: 12, display: 'flex', gap: 8, flexDirection: isMobile ? 'column' : 'row' }}>
               <Button onClick={loadInsights} style={{ background:'#0EA5E9', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}>Apply</Button>
-              <Button
-                onClick={() => {
-                  setITitle('');
-                  setILaw('');
-                  setIState('');
-                  setICity('');
-                  setIYearsRange('');
-                  setIContractOnly(false);
-                  setIPreset('LAST_180');
-                }}
-                style={{ background:'#111827', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-              >
+            <Button
+  onClick={() => {
+    setITitle('');
+    setILaw('');
+    setIState('');
+    setIMetro('');
+    setILicensedState('');
+    setIYearsRange('');
+    setIContractOnly(false);
+    setIPreset('LAST_180');
+  }}
+  style={{ background:'#111827', border:'1px solid #1F2937', width: isMobile ? '100%' : undefined }}
+>
+
                 Clear
               </Button>
             </div>
@@ -2562,25 +2577,59 @@ try {
           {/* KPI row */}
           {insights?.kpi ? (
             <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0,1fr))', gap:12, marginTop:12, position: 'relative', zIndex: 1 }}>
-              <Kpi label="Avg Salary" value={insights.kpi.salary.avg ? `$${insights.kpi.salary.avg.toLocaleString()}` : '—'} sub={`Median $${insights.kpi.salary.median?.toLocaleString?.() || '—'}`} />
+              <Kpi
+  label="Median Salary"
+  value={insights.kpi.salary.median ? `$${insights.kpi.salary.median.toLocaleString()}` : '—'}
+  sub={insights.kpi.salary.avg ? `Avg $${insights.kpi.salary.avg.toLocaleString()}` : undefined}
+/>
+
               <Kpi
                 label="Typical Salary Range"
                 value={(insights.kpi.salary.p25 && insights.kpi.salary.p75) ? `$${insights.kpi.salary.p25.toLocaleString()}–$${insights.kpi.salary.p75.toLocaleString()}` : '—'}
               />
-              <Kpi label="Avg Billable Hourly" value={insights.kpi.hourly.avg ? `$${insights.kpi.hourly.avg.toLocaleString()}/hr` : '—'} sub={iContractOnly ? 'Contract filter on' : 'Contract roles only'} />
+
+              <Kpi
+  label="Typical Billable Hourly Range"
+  value={
+    (insights.kpi.hourly.p25 && insights.kpi.hourly.p75)
+      ? `$${insights.kpi.hourly.p25.toLocaleString()}/hr–$${insights.kpi.hourly.p75.toLocaleString()}/hr`
+      : '—'
+  }
+/>
+
+
+
+              <Kpi
+  label="Median Billable Hourly"
+  value={insights.kpi.hourly.median ? `$${insights.kpi.hourly.median.toLocaleString()}/hr` : '—'}
+  sub={
+    insights.kpi.hourly.avg
+      ? `Avg $${insights.kpi.hourly.avg.toLocaleString()}/hr`
+      : (iContractOnly ? 'Contract filter on' : 'Contract roles only')
+  }
+/>
+
+<Kpi
+  label="Sample Size"
+  value={insights.sampleN}
+  sub="Matching professionals"
+/>
+
+
               <Kpi label="Sample Size" value={insights.sampleN} />
               <Kpi
                 label="Filter"
                 value={
-                  [
-                    iTitle,
-                    iLaw,
-                    [iCity, iState].filter(Boolean).join(', '),
-                    (iStartDate || iEndDate)
-                      ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
-                      : null,
-                    iContractOnly ? 'Contract only' : null,
-                  ].filter(Boolean).join(' • ') || 'All'
+                 [
+  iTitle,
+  iLaw,
+  [iMetro, iState].filter(Boolean).join(', '),
+  (iStartDate || iEndDate)
+    ? `${formatMDY(iStartDate) || '…'} → ${formatMDY(iEndDate) || '…'}`
+    : null,
+  iContractOnly ? 'Contract only' : null,
+].filter(Boolean).join(' • ') || 'All'
+
                 }
               />
             </div>
@@ -2588,8 +2637,8 @@ try {
 
           <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
           <BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
-          <BarChart title="Avg Salary by City" rows={insights.byCitySalary} money />
-          <BarChart title="Avg Hourly (Billable) by City" rows={insights.byCityHourly} money />
+          <BarChart title="Avg Salary by Metro Area" rows={insights.byCitySalary} money />
+          <BarChart title="Avg Hourly (Billable) by Metro Area" rows={insights.byCityHourly} money />
           <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
         </div>
       );
@@ -2715,9 +2764,10 @@ try {
 <div>
   <Label>Licensed In</Label>
   <select
-    value={iLicensedState}
-    onChange={(e) => setILicensedState(e.target.value)}
-    style={selectStyle}
+    value={iLicensedState || ''}
+onChange={(e) => setILicensedState(e.target.value)}
+style={selectStyle}
+
   >
     <option value="">Any licensed state</option>
     {STATES.map((st) => (
