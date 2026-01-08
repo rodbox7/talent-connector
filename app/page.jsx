@@ -1045,10 +1045,12 @@ React.useEffect(() => {
   // Loader for client-facing options and searchable list population
   const loadClientCandidates = React.useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('city,state,titles_csv,law_csv')
-        .limit(5000);
+     const { data, error } = await supabase
+  .from('candidates')
+  .select('titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
+  .limit(5000);
+
+
 
       if (error) throw error;
 
@@ -2280,7 +2282,7 @@ try {
       try {
         const { data, error } = await supabase
           .from('candidates')
-          .select('titles_csv,law_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
+         .select('titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
           .limit(5000);
         if (error) throw error;
 
@@ -2336,6 +2338,18 @@ try {
           title_one: r[_csvKey('titles_csv')],
         }));
 
+        const licensedStateRows = explodeCSVToRows(rows, 'licensed_states_csv').map((r) => ({
+  ...r,
+  licensed_state: r[_csvKey('licensed_states_csv')],
+}));
+
+const languageRows = explodeCSVToRows(rows, 'languages_csv').map((r) => ({
+  ...r,
+  language: r[_csvKey('languages_csv')],
+}));
+
+
+
        const withMetro = rows.map((r) => ({
   ...r,
   metro: [r.city, r.state].filter(Boolean).join(', '),
@@ -2346,6 +2360,11 @@ try {
         const byTitleHourly = groupAvg(titleRows, 'title_one', 'hourly_billable');
         const byCitySalary = groupAvg(withMetro, 'metro', 'salary');
         const byCityHourly = groupAvg(withMetro, 'metro', 'hourly_billable');
+        const byLicensedStateSalary = groupAvg(licensedStateRows, 'licensed_state', 'salary');
+        const byLanguageSalary = groupAvg(languageRows, 'language', 'salary');
+        const byLanguageHourly = groupAvg(languageRows, 'language', 'hourly_billable');
+
+
 
 
         const buckets = [
@@ -2373,14 +2392,19 @@ try {
         }
 
         setInsights({
-          kpi: { salary: salStats, hourly: hourlyStats },
-          byTitleSalary,
-          byTitleHourly,
-          byCitySalary,
-          byCityHourly,
-          byYearsSalary: yearsAgg,
-          sampleN: rows.length,
-        });
+  kpi: { salary: salStats, hourly: hourlyStats },
+  byTitleSalary,
+  byTitleHourly,
+  byCitySalary,
+  byCityHourly,
+  byYearsSalary: yearsAgg,
+  byLicensedStateSalary,
+  byLanguageSalary,
+  byLanguageHourly,
+  sampleN: rows.length,
+});
+
+
         setShowInsights(true);
       } catch (e) {
         console.error(e);
@@ -2388,17 +2412,24 @@ try {
       }
     }
 
-    function BarChart({ title, rows, money = true }) {
-      const max = Math.max(...rows.map((r) => r.avg), 1);
+   function BarChart({ title, rows, money = true }) {
+  const safeRows = (rows || []).filter((r) => r.n == null || r.n >= 3);
+  const sortedRows = [...safeRows].sort((a, b) => (b.avg || 0) - (a.avg || 0));
+  const max = Math.max(...sortedRows.map((r) => r.avg), 1);
+
+
       return (
         <Card style={{ marginTop: 12, position: 'relative', zIndex: 1 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            {rows.map((r) => (
-              <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
+            {sortedRows.map((r) => (
+  <div key={r.label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', gap: 10, alignItems: 'center' }}>
+
                 <div style={{ color: '#E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.label}
-                </div>
+  {r.label}
+  {r.n ? <span style={{ color: '#6B7280', fontSize: 11 }}> ({r.n})</span> : null}
+</div>
+
                 <div style={{ height: 12, background: '#111827', borderRadius: 999, overflow: 'hidden', border: '1px solid #1F2937' }}>
                   <div
                     style={{
@@ -2572,6 +2603,17 @@ onChange={(e) => setFLicensedState(e.target.value)}
                 Clear
               </Button>
             </div>
+            <div
+  style={{
+    marginTop: 10,
+    color: '#9CA3AF',
+    fontSize: 12,
+    lineHeight: 1.35,
+  }}
+>
+  Insights are compiled from the Talent Connector candidate database and update regularly as records are added and refreshed.
+</div>
+
           </Card>
 
           {/* KPI row */}
@@ -2636,10 +2678,17 @@ onChange={(e) => setFLicensedState(e.target.value)}
           ) : null}
 
           <BarChart title="Avg Salary by Title" rows={insights.byTitleSalary} money />
-          <BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
-          <BarChart title="Avg Salary by Metro Area" rows={insights.byCitySalary} money />
-          <BarChart title="Avg Hourly (Billable) by Metro Area" rows={insights.byCityHourly} money />
-          <BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+<BarChart title="Avg Hourly (Billable) by Title" rows={insights.byTitleHourly} money />
+
+<BarChart title="Median Salary by Licensed State" rows={insights.byLicensedStateSalary} money />
+
+<BarChart title="Avg Salary by Metro Area" rows={insights.byCitySalary} money />
+<BarChart title="Avg Hourly (Billable) by Metro Area" rows={insights.byCityHourly} money />
+<BarChart title="Avg Salary by Years of Experience" rows={insights.byYearsSalary} money />
+<BarChart title="Avg Salary by Language" rows={insights.byLanguageSalary} money />
+<BarChart title="Avg Hourly (Billable) by Language" rows={insights.byLanguageHourly} money />
+
+
         </div>
       );
     }
