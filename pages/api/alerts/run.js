@@ -89,8 +89,8 @@ if (!isVercelCron && !hasValidToken) {
       const { data: candidates, error: candidateError } = await supabase
         .from('v_candidates')
         .select(
-          'id, first_name, last_name, title, city, state, created_at'
-        )
+  'id, name, roles, practice_area, city, state, created_at'
+)
         .gt('created_at', since)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -121,20 +121,22 @@ if (!isVercelCron && !hasValidToken) {
 
       /* 🧠 Build preview */
       const preview = candidates.slice(0, 3).map((c) => {
-        const first = c.first_name || '';
-        const lastInitial = c.last_name
-          ? `${c.last_name.charAt(0)}.`
-          : '';
-        const location =
-          [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
+       const displayName = c.name || 'Candidate';
+const role =
+  c.roles ||
+  c.practice_area ||
+  'Role N/A';
 
-        return `
-          <li style="margin-bottom: 6px;">
-            <strong>${first} ${lastInitial}</strong>
-            — ${c.title || 'Title N/A'}
-            — ${location}
-          </li>
-        `;
+const location =
+  [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
+
+return `
+  <li style="margin-bottom: 6px;">
+    <strong>${displayName}</strong>
+    — ${role}
+    — ${location}
+  </li>
+`;
       });
 
       /* ✉️ Send email */
