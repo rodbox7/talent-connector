@@ -25,8 +25,8 @@ function hoursBetween(a, b) {
 
 export default async function handler(req, res) {
   try {
-   /* 🔐 AUTH — allow Vercel Cron OR secret token */
-const isVercelCron = req.headers['x-vercel-cron'] === '1';
+ /* 🔐 AUTH — allow Vercel Cron OR secret token */
+const isVercelCron = Boolean(req.headers['x-vercel-cron']);
 
 const queryToken = req.query.token;
 const headerToken = req.headers['x-cron-token'];
@@ -38,6 +38,7 @@ const hasValidToken =
 if (!isVercelCron && !hasValidToken) {
   return res.status(401).json({ ok: false, error: 'Unauthorized' });
 }
+
 
     /* 🔎 Get enabled saved searches */
     const { data: searches, error: searchError } = await supabase
