@@ -1,9 +1,9 @@
 {
   "installCommand": "npm install --legacy-peer-deps",
   "crons": [
-   {
-  "crons": [
-    { "path": "/api/alerts/run?token=alerts_9c7a1d8c1d4y17g4p3w07854rt6787u90hg5476ugbjji99854gjljhljy", "schedule": "0 14 * * 1" }
+    {
+      "path": "/api/alerts/run",
+      "schedule": "0 14 * * 1"
+    }
   ]
 }
-
