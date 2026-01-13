@@ -60,9 +60,9 @@ if (!isVercelCron && !hasValidToken) {
     /* 🔎 Get enabled saved searches */
     const { data: searches, error: searchError } = await supabase
       .from('saved_searches')
-      .select(
-        'id, user_id, name, filters, last_checked_at, last_alert_sent_at'
-      )
+     .select(
+  'id, name, roles, practice_areas, city, state, created_at'
+)
       .eq('alerts_enabled', true);
 
     if (searchError) throw searchError;
@@ -89,7 +89,7 @@ if (!isVercelCron && !hasValidToken) {
       const { data: candidates, error: candidateError } = await supabase
         .from('v_candidates')
         .select(
-  'id, name, roles, practice_area, city, state, created_at'
+  'id, name, roles, practice_areas, city, state, created_at'
 )
         .gt('created_at', since)
         .order('created_at', { ascending: false })
@@ -124,7 +124,7 @@ if (!isVercelCron && !hasValidToken) {
        const displayName = c.name || 'Candidate';
 const role =
   c.roles ||
-  c.practice_area ||
+  c.practice_areas ||
   'Role N/A';
 
 const location =
