@@ -24,7 +24,15 @@ function hoursBetween(a, b) {
 /* ---------------- API Handler ---------------- */
 
 export default async function handler(req, res) {
+  console.log('🚨 ALERT CRON HIT', {
+    time: new Date().toISOString(),
+    headers: req.headers,
+    query: req.query,
+    path: req.url,
+  });
+
   try {
+
  /* 🔐 AUTH — allow Vercel Cron OR secret token */
 const isVercelCron = Boolean(req.headers['x-vercel-cron']);
 
