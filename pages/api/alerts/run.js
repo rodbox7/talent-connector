@@ -34,8 +34,12 @@ export default async function handler(req, res) {
   try {
 
  /* 🔐 AUTH — allow Vercel Cron OR secret token */
-const isVercelCron = Boolean(req.headers['x-vercel-cron']);
 
+// Vercel cron reliably identifies itself via user-agent
+const userAgent = req.headers['user-agent'] || '';
+const isVercelCron = userAgent.startsWith('vercel-cron');
+
+// Optional manual override (keep this)
 const queryToken = req.query.token;
 const headerToken = req.headers['x-cron-token'];
 
@@ -44,8 +48,13 @@ const hasValidToken =
   (headerToken && headerToken === process.env.ALERTS_CRON_TOKEN);
 
 if (!isVercelCron && !hasValidToken) {
+  console.log('❌ ALERT CRON UNAUTHORIZED', {
+    userAgent,
+    headers: req.headers,
+  });
   return res.status(401).json({ ok: false, error: 'Unauthorized' });
 }
+
 
 
     /* 🔎 Get enabled saved searches */
