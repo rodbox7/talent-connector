@@ -5,7 +5,6 @@ export const config = {
   runtime: 'nodejs',
 };
 
-
 /* ---------------- Clients ---------------- */
 
 const supabase = createClient(
@@ -32,37 +31,29 @@ export default async function handler(req, res) {
   });
 
   try {
+    /* 🔐 AUTH — allow Vercel Cron OR secret token */
 
- /* 🔐 AUTH — allow Vercel Cron OR secret token */
+    const userAgent = req.headers['user-agent'] || '';
+    const isVercelCron = userAgent.startsWith('vercel-cron');
 
-// Vercel cron reliably identifies itself via user-agent
-const userAgent = req.headers['user-agent'] || '';
-const isVercelCron = userAgent.startsWith('vercel-cron');
+    const queryToken = req.query.token;
+    const headerToken = req.headers['x-cron-token'];
 
-// Optional manual override (keep this)
-const queryToken = req.query.token;
-const headerToken = req.headers['x-cron-token'];
+    const hasValidToken =
+      (queryToken && queryToken === process.env.ALERTS_CRON_TOKEN) ||
+      (headerToken && headerToken === process.env.ALERTS_CRON_TOKEN);
 
-const hasValidToken =
-  (queryToken && queryToken === process.env.ALERTS_CRON_TOKEN) ||
-  (headerToken && headerToken === process.env.ALERTS_CRON_TOKEN);
+    if (!isVercelCron && !hasValidToken) {
+      console.log('❌ ALERT CRON UNAUTHORIZED', { userAgent });
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
 
-if (!isVercelCron && !hasValidToken) {
-  console.log('❌ ALERT CRON UNAUTHORIZED', {
-    userAgent,
-    headers: req.headers,
-  });
-  return res.status(401).json({ ok: false, error: 'Unauthorized' });
-}
-
-
-
-    /* 🔎 Get enabled saved searches */
+    /* 🔎 Get enabled saved searches (REAL COLUMNS ONLY) */
     const { data: searches, error: searchError } = await supabase
       .from('saved_searches')
-     .select(
-  'id, name, roles, practice_areas, city, state, created_at'
-)
+      .select(
+        'id, user_id, name, filters, last_checked_at, last_alert_sent_at'
+      )
       .eq('alerts_enabled', true);
 
     if (searchError) throw searchError;
@@ -85,12 +76,12 @@ if (!isVercelCron && !hasValidToken) {
       const since =
         search.last_checked_at || '1970-01-01T00:00:00.000Z';
 
-      /* 🔎 Find new candidates */
+      /* 🔎 Find new candidates (NO FILTERING YET) */
       const { data: candidates, error: candidateError } = await supabase
         .from('v_candidates')
         .select(
-  'id, name, roles, practice_areas, city, state, created_at'
-)
+          'id, name, roles, practice_areas, city, state, created_at'
+        )
         .gt('created_at', since)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -121,22 +112,22 @@ if (!isVercelCron && !hasValidToken) {
 
       /* 🧠 Build preview */
       const preview = candidates.slice(0, 3).map((c) => {
-       const displayName = c.name || 'Candidate';
-const role =
-  c.roles ||
-  c.practice_areas ||
-  'Role N/A';
+        const displayName = c.name || 'Candidate';
+        const role =
+          c.roles ||
+          c.practice_areas ||
+          'Role N/A';
 
-const location =
-  [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
+        const location =
+          [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
 
-return `
-  <li style="margin-bottom: 6px;">
-    <strong>${displayName}</strong>
-    — ${role}
-    — ${location}
-  </li>
-`;
+        return `
+          <li style="margin-bottom: 6px;">
+            <strong>${displayName}</strong>
+            — ${role}
+            — ${location}
+          </li>
+        `;
       });
 
       /* ✉️ Send email */
