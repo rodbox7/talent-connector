@@ -184,6 +184,45 @@ const Tag = ({ children, style }) => (
 );
 
 /* ---------- helpers ---------- */
+
+function highlightKeywords(text, keywords) {
+  if (!text || !keywords) return text;
+
+  const terms = keywords
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(t => t.length >= 3);
+
+  if (terms.length === 0) return text;
+
+  const escaped = terms.map(t =>
+    t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  );
+
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+
+  return text.split(regex).map((part, i) =>
+    regex.test(part) ? (
+      <span
+        key={i}
+       style={{
+  backgroundColor: '#FDE047',     // bright yellow
+  color: '#111827',               // dark text so it’s legible
+  padding: '1px 4px',
+  borderRadius: 4,
+  fontWeight: 800,
+}}
+
+      >
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+}
+
 function renderDate(val) {
   if (!val) return '—';
   if (typeof val === 'string') {
@@ -2444,7 +2483,8 @@ const languageRows = explodeCSVToRows(rows, 'languages_csv').map((r) => ({
                 </div>
               </div>
             ))}
-            {rows.length === 0 ? <div style={{ color: '#9CA3AF' }}>No data.</div> : null}
+            {sortedRows.length === 0 ? <div style={{ color: '#9CA3AF' }}>Not enough data.</div> : null}
+
           </div>
         </Card>
       );
@@ -3251,7 +3291,7 @@ style={selectStyle}
                               fontSize: 14,
                             }}
                           >
-                            {c.notes ? c.notes : <i>No additional notes.</i>}
+                            {c.notes ? highlightKeywords(c.notes, search) : <i>No additional notes.</i>}
                           </div>
                         )}
                       </div>
