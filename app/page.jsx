@@ -958,10 +958,28 @@ React.useEffect(() => {
         setAddMsg('Please select a state for this city.');
         return;
       }
+     // --- recruiter attribution (authoritative at submit time) ---
+const { data: authData, error: authError } = await supabase.auth.getUser();
+if (authError) console.error('auth.getUser failed:', authError);
+
+const recruiterEmail = authData?.user?.email ?? null;
+
+const recruiterName =
+  recruiterEmail === 'mgreene@bhsg.com'
+    ? 'Michelle Greene'
+    : recruiterEmail === 'jdavid@bhsg.com'
+    ? 'John Tarbox'
+    : recruiterEmail;
+
+
       const payload = {
   name: name.trim(),
   titles_csv: titles.trim(),
   law_csv: law.trim(),
+
+  // recruiter attribution
+  entered_by_email: recruiterEmail,
+  entered_by_name: recruiterName,
 
   // ⭐ NEW
   languages_csv: (languages || []).join(','),
