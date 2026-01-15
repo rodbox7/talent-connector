@@ -611,11 +611,17 @@ React.useEffect(() => {
     }
 
     // 1️⃣ Auth sign-in
-    const { data: auth, error: authErr } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password: pwd,
-    });
-    if (authErr) throw authErr;
+    const { data: auth, error: authErr } =
+  await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password: pwd,
+  });
+
+if (authErr) throw authErr;
+
+// 🔴 THIS IS CRITICAL
+await supabase.auth.refreshSession();
+
 
     const authUser = auth?.user;
     if (!authUser) {
@@ -686,11 +692,15 @@ React.useEffect(() => {
       }
     }
 
-    // 5️⃣ Enforce role vs tab selection
-    if (prof.role !== mode) {
-      setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
-      return;
-    }
+   // 5️⃣ Enforce role vs tab selection
+// Allow admins to use recruiter mode (super user), but keep other mismatches blocked.
+const allowAdminInRecruiter = prof.role === 'admin' && mode === 'recruiter';
+
+if (prof.role !== mode && !allowAdminInRecruiter) {
+  setErr(`This account is a ${prof.role}. Switch to the ${prof.role} tab.`);
+  return;
+}
+
 
     // 6️⃣ Set logged-in user for the app
     setUser({
@@ -866,8 +876,8 @@ React.useEffect(() => {
   law_csv: String(editForm.law_csv || '').trim(),
   languages_csv: String(editForm.languages_csv || '').trim(), // ✅ NEW
   licensed_states_csv: String(editForm.licensed_states_csv || '').trim(), // ⭐ NEW
-  city: toTitleCaseCity(String(editForm.city || '').trim()),
-  state: normState(String(editForm.state || '').trim()),
+  city: String(editForm.city || '').trim(),
+state: String(editForm.state || '').trim(),
   years: editForm.years === '' ? null : Number(editForm.years),
   recent_role_years:
     editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
@@ -941,11 +951,11 @@ React.useEffect(() => {
   }
 }
 
-  React.useEffect(() => {
-    if (user?.role === 'recruiter') {
-      refreshMyRecent();
-    }
-  }, [user?.id, user?.role]);
+ React.useEffect(() => {
+  if (user?.role === 'recruiter' || user?.role === 'admin') {
+    refreshMyRecent();
+  }
+}, [user?.id, user?.role]);
 
   async function addCandidate() {
     setAddMsg('');
@@ -1503,8 +1513,9 @@ try {
   }
 
   /* ---------- Recruiter UI ---------- */
-  if (user.role === 'recruiter') {
-    const isSuperRecruiter = (user.email || '').toLowerCase() === 'jdavid@bhsg.com';
+  if (mode === 'recruiter') {
+    const isSuperRecruiter = user.role === 'admin';
+
 
     return (
       <div style={pageWrap}>
