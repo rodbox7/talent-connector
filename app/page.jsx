@@ -968,18 +968,35 @@ state: String(editForm.state || '').trim(),
         setAddMsg('Please select a state for this city.');
         return;
       }
-     // --- recruiter attribution (authoritative at submit time) ---
+   // --- recruiter attribution (authoritative) ---
 const { data: authData, error: authError } = await supabase.auth.getUser();
 if (authError) console.error('auth.getUser failed:', authError);
 
+const recruiterId = authData?.user?.id ?? null;
 const recruiterEmail = authData?.user?.email ?? null;
 
-const recruiterName =
-  recruiterEmail === 'mgreene@bhsg.com'
-    ? 'Michelle Greene'
-    : recruiterEmail === 'jdavid@bhsg.com'
-    ? 'John Tarbox'
-    : recruiterEmail;
+let recruiterName = null;
+
+if (recruiterId) {
+  const { data: profile, error: profErr } = await supabase
+    .from('profiles')
+    .select('full_name,display_name,email')
+    .eq('id', recruiterId)
+    .maybeSingle();
+
+  if (profErr) console.error('profiles lookup failed:', profErr);
+
+ recruiterName =
+  profile?.full_name ||
+  profile?.display_name ||
+  profile?.email ||
+  recruiterEmail;
+
+} else {
+  recruiterName = recruiterEmail;
+
+}
+
 
 
       const payload = {
@@ -1112,10 +1129,15 @@ const recruiterName =
   // Loader for client-facing options and searchable list population
   const loadClientCandidates = React.useCallback(async () => {
     try {
-     const { data, error } = await supabase
+    const { data, error } = await supabase
   .from('candidates')
-  .select('titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,hourly,contract,date_entered,created_at')
+  .select(
+    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,hourly,contract,date_entered,created_at,notes,entered_by_name,entered_by_email,on_assignment,est_available_date,off_market'
+  )
   .limit(5000);
+
+  console.log('CLIENT CANDIDATE SAMPLE:', data?.[0]);
+
 
 
 
@@ -1192,12 +1214,14 @@ const recruiterName =
       setClientLoading(true);
       setExpandedId(null);
 
-   const { data, error } = await supabase
+ const { data, error } = await supabase
   .from('candidates')
   .select(
-    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market'
+    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,entered_by_name,entered_by_email'
   )
   .limit(2000);
+
+
 
 
         
@@ -3309,20 +3333,27 @@ style={selectStyle}
                           </div>
                         </div>
                         {expandedId === c.id && (
-                          <div
-                            style={{
-                              marginTop: 10,
-                              padding: 10,
-                              borderRadius: 10,
-                              border: '1px solid #1F2937',
-                              background: '#0F172A',
-                              color: '#CBD5E1',
-                              fontSize: 14,
-                            }}
-                          >
-                            {c.notes ? highlightKeywords(c.notes, search) : <i>No additional notes.</i>}
-                          </div>
-                        )}
+  <div
+    style={{
+      marginTop: 10,
+      padding: 10,
+      borderRadius: 10,
+      border: '1px solid #1F2937',
+      background: '#0F172A',
+      color: '#CBD5E1',
+      fontSize: 14,
+    }}
+  >
+    {(c.entered_by_name || c.entered_by_email) ? (
+      <div style={{ marginBottom: 8, fontSize: 12, color: '#9CA3AF' }}>
+        Interviewed by {c.entered_by_name || c.entered_by_email}
+      </div>
+    ) : null}
+
+    {c.notes ? highlightKeywords(c.notes, search) : <i>No additional notes.</i>}
+  </div>
+)}
+
                       </div>
                     ))}
                   </div>
