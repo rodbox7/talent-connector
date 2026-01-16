@@ -976,11 +976,13 @@ const recruiterId = authData?.user?.id ?? null;
 const recruiterEmail = authData?.user?.email ?? null;
 
 let recruiterName = null;
+let recruiterLinkedIn = null;
+
 
 if (recruiterId) {
   const { data: profile, error: profErr } = await supabase
     .from('profiles')
-    .select('full_name,display_name,email')
+    .select('full_name,display_name,email,linkedin_url')
     .eq('id', recruiterId)
     .maybeSingle();
 
@@ -992,9 +994,12 @@ if (recruiterId) {
   profile?.email ||
   recruiterEmail;
 
+  // ✅ ADD THIS LINE RIGHT HERE
+  recruiterLinkedIn = profile?.linkedin_url || null;
+
 } else {
   recruiterName = recruiterEmail;
-
+  recruiterLinkedIn = null;
 }
 
 
@@ -1007,6 +1012,8 @@ if (recruiterId) {
   // recruiter attribution
   entered_by_email: recruiterEmail,
   entered_by_name: recruiterName,
+  entered_by_linkedin_url: recruiterLinkedIn,
+
 
   // ⭐ NEW
   languages_csv: (languages || []).join(','),
@@ -1131,10 +1138,32 @@ if (recruiterId) {
     try {
     const { data, error } = await supabase
   .from('candidates')
-  .select(
-    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,hourly,contract,date_entered,created_at,notes,entered_by_name,entered_by_email,on_assignment,est_available_date,off_market'
-  )
-  .limit(5000);
+  .select(`
+  id,
+  name,
+  titles_csv,
+  law_csv,
+  languages_csv,
+  licensed_states_csv,
+  city,
+  state,
+  years,
+  salary,
+  hourly,
+  contract,
+  date_entered,
+  created_at,
+  notes,
+  entered_by_name,
+  entered_by_email,
+  on_assignment,
+  est_available_date,
+  off_market,
+  created_by,
+  recruiter:profiles!candidates_created_by_fkey ( linkedin_url )
+`)
+.limit(5000);
+
 
   console.log('CLIENT CANDIDATE SAMPLE:', data?.[0]);
 
@@ -1217,7 +1246,7 @@ if (recruiterId) {
  const { data, error } = await supabase
   .from('candidates')
   .select(
-    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,entered_by_name,entered_by_email'
+    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,entered_by_name,entered_by_email,entered_by_linkedin_url'
   )
   .limit(2000);
 
@@ -3344,11 +3373,31 @@ style={selectStyle}
       fontSize: 14,
     }}
   >
-    {(c.entered_by_name || c.entered_by_email) ? (
-      <div style={{ marginBottom: 8, fontSize: 12, color: '#9CA3AF' }}>
-        Interviewed by {c.entered_by_name || c.entered_by_email}
-      </div>
-    ) : null}
+  {(c.entered_by_name || c.entered_by_email) ? (
+  <div style={{ marginBottom: 8, fontSize: 12, color: '#9CA3AF' }}>
+    Interviewed by{' '}
+    {c.entered_by_linkedin_url ? (
+      <a
+        href={c.entered_by_linkedin_url}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          color: '#93C5FD',
+          textDecoration: 'underline',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+        }}
+      >
+        {c.entered_by_name || c.entered_by_email}
+      </a>
+    ) : (
+      <span>{c.entered_by_name || c.entered_by_email}</span>
+    )}
+  </div>
+) : null}
+
+
+
 
     {c.notes ? highlightKeywords(c.notes, search) : <i>No additional notes.</i>}
   </div>
