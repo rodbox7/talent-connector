@@ -480,7 +480,7 @@ function applySavedSearch(filters = {}) {
   setFTitle(filters.fTitle || '');
   setFLaw(filters.fLaw || '');
   setFLang(filters.fLang || '');
-  setILicensedState(filters.iLicensedState || '');
+  setFLicensedState(filters.fLicensedState || '');
 
   // Compensation
   setSalaryRange(filters.salaryRange || '');
@@ -533,7 +533,7 @@ async function saveCurrentSearch() {
       fTitle,
       fLaw,
       fLang,
-      iLicensedState,
+      fLicensedState,
       salaryRange,
       yearsRange,
       contractOnly,
@@ -2336,41 +2336,58 @@ try {
   if (user.role === 'client') {
 
 
-    function buildMailto(c) {
-      const to = user.amEmail || 'info@bhsg.com';
-      const subj = `Talent Connector Candidate — ${c?.name || ''}`;
-      const NL = '\n';
-      const body = [
-        'Hello,',
-        '',
-        "I'm interested in this candidate:",
-        `• Name: ${c?.name || ''}`,
-        `• Titles: ${c?.titles_csv || ''}`,
-        `• Type of law: ${c?.law_csv || ''}`,
-        `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
-        `• Years: ${c?.years ?? ''}`,
-        c?.contract && c?.hourly ? `• Contract: $${Math.round(c.hourly * 1.66)}/hr` : '',
-        c?.salary ? `• Salary: $${c.salary}` : '',
-        '',
-        `My email: ${user.email || ''}`,
-        '',
-        'Sent from Talent Connector',
-      ].filter(Boolean).join(NL);
+   function buildMailto(c) {
+  const to = user.amEmail || 'info@bhsg.com';
+  const subj = `Talent Connector Candidate — ${c?.name || ''}`;
+  const NL = '\n';
+  const body = [
+    'Hello,',
+    '',
+    "I'm interested in this candidate:",
+    `• Name: ${c?.name || ''}`,
+    `• Titles: ${c?.titles_csv || ''}`,
+    `• Type of law: ${c?.law_csv || ''}`,
+    `• Location: ${[c?.city, c?.state].filter(Boolean).join(', ')}`,
+    `• Years: ${c?.years ?? ''}`,
+    c?.contract && c?.hourly ? `• Contract: $${Math.round(c.hourly * 1.66)}/hr` : '',
+    c?.salary ? `• Salary: $${c.salary}` : '',
+    '',
+    `My email: ${user.email || ''}`,
+    '',
+    'Sent from Talent Connector',
+  ].filter(Boolean).join(NL);
 
-      return `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-    }
+  return `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+}
 
-    function Kpi({ label, value, sub }) {
-      return (
-        <Card style={{ padding: 16 }}>
-          <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            {value ?? '—'}
-          </div>
-          {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
-        </Card>
-      );
-    }
+/* ✅ ADD THIS RIGHT HERE */
+function clientMetaLine(c) {
+  const parts = [];
+
+  const y = Number(c?.years);
+  if (Number.isFinite(y) && y > 0) parts.push(`${y} yrs`);
+
+  const licensed = String(c?.licensed_states_csv || '').trim();
+  if (licensed) parts.push(`Licensed in: ${licensed}`);
+
+  const langs = String(c?.languages_csv || '').trim();
+  if (langs) parts.push(`Languages: ${langs}`);
+
+  return parts.join(' • ');
+}
+
+function Kpi({ label, value, sub }) {
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800 }}>
+        {value ?? '—'}
+      </div>
+      {sub ? <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
+    </Card>
+  );
+}
+
     function groupAvg(items, key, valueKey) {
       const acc = new Map();
       for (const it of items) {
@@ -2637,8 +2654,8 @@ const languageRows = explodeCSVToRows(rows, 'languages_csv').map((r) => ({
 <div>
   <Label>Licensed In</Label>
   <select
-   value={fLicensedState || ''}
-onChange={(e) => setFLicensedState(e.target.value)}
+   value={iLicensedState || ''}
+onChange={(e) => setILicensedState(e.target.value)}
     style={selectStyle}
   >
     <option value="">Any licensed state</option>
@@ -2935,10 +2952,9 @@ onChange={(e) => setFLicensedState(e.target.value)}
 <div>
   <Label>Licensed In</Label>
   <select
-    value={iLicensedState || ''}
-onChange={(e) => setILicensedState(e.target.value)}
-style={selectStyle}
-
+    value={fLicensedState || ''}
+onChange={(e) => setFLicensedState(e.target.value)}
+    style={selectStyle}
   >
     <option value="">Any licensed state</option>
     {STATES.map((st) => (
@@ -3315,12 +3331,20 @@ style={selectStyle}
                             alignItems: 'center',
                           }}
                         >
-                          <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
-                            {c.name}
-                            <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
-                              {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
-                            </div>
-                          </div>
+                         <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+  {c.name}
+
+  <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+    {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
+  </div>
+
+  {clientMetaLine(c) ? (
+    <div style={{ color: '#60A5FA', fontSize: 12, marginTop: 2 }}>
+      {clientMetaLine(c)}
+    </div>
+  ) : null}
+</div>
+
                           <div style={{ color: '#9CA3AF' }}>
                             {c.city || '—'}, {c.state || '—'}
                           </div>
