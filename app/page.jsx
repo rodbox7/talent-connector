@@ -8,17 +8,18 @@ const NYC =
 
 // ---------- METROS (single source of truth) ----------
 const METROS = [
-  'Atlanta, GA','Austin, TX','Baltimore, MD','Birmingham, AL','Boston, MA',
-  'Buffalo, NY','Charlotte, NC','Chicago, IL','Cincinnati, OH','Cleveland, OH',
+  'Atlanta, GA','Austin, TX','Baltimore, MD','Birmingham, AL','Boise, ID','Boston, MA',
+  'Buffalo, NY','Burlington, VT','Charlotte, NC','Chicago, IL','Cincinnati, OH','Cleveland, OH',
   'Columbus, OH','Dallas–Fort Worth, TX','Denver, CO','Detroit, MI','Hartford, CT',
   'Honolulu, HI','Houston, TX','Indianapolis, IN','Jacksonville, FL','Kansas City, MO',
   'Las Vegas, NV','Los Angeles, CA','Louisville, KY','Memphis, TN','Miami, FL',
   'Milwaukee, WI','Minneapolis–St. Paul, MN','Nashville, TN','New Orleans, LA','New York City, NY',
   'Oklahoma City, OK','Orlando, FL','Philadelphia, PA','Phoenix, AZ','Pittsburgh, PA',
-  'Portland, OR','Providence, RI','Raleigh–Durham, NC','Richmond, VA','Sacramento, CA',
+  'Portland, ME','Portland, OR','Providence, RI','Raleigh–Durham, NC','Richmond, VA','Sacramento, CA',
   'Salt Lake City, UT','San Antonio, TX','San Diego, CA','San Francisco–Oakland, CA','San Jose, CA',
   'Seattle, WA','St. Louis, MO','Tampa–St. Petersburg, FL','Tucson, AZ','Washington, DC'
 ];
+
 
 
 
@@ -71,23 +72,35 @@ const LAW_OPTIONS = [
 ];
 
 const LANGUAGE_OPTIONS = [
+  'Arabic',
+  'Chinese (Cantonese)',
+  'Chinese (Mandarin)',
+  'Czech',
+  'Danish',
+  'Dutch',
   'English',
-  'Spanish',
+  'Finnish',
+  'Flemish',
   'French',
   'German',
+  'Greek',
+  'Haitian Creole',
+  'Hebrew',
+  'Hindi',
+  'Indonesian',
   'Italian',
-  'Portuguese',
-  'Chinese (Mandarin)',
-  'Chinese (Cantonese)',
   'Japanese',
   'Korean',
-  'Vietnamese',
+  'Norwegian',
+  'Portuguese',
   'Russian',
-  'Arabic',
-  'Hindi',
-  'Hebrew',
-  'Other',
+  'Spanish',
+  'Swedish',
+  'Thai',
+  'Turkish',
+  'Vietnamese',
 ];
+
 
 
 /* ---------- Small UI helpers ---------- */
