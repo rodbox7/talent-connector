@@ -101,6 +101,14 @@ const LANGUAGE_OPTIONS = [
   'Vietnamese',
 ];
 
+const ASSIGNMENT_TIER_OPTIONS = [
+  { label: '—', value: '' },
+  { label: '5+ completed assignments', value: '5+' },
+  { label: '10+ completed assignments', value: '10+' },
+  { label: '15+ completed assignments', value: '15+' },
+];
+
+
 
 
 /* ---------- Small UI helpers ---------- */
@@ -197,6 +205,15 @@ const Tag = ({ children, style }) => (
 );
 
 /* ---------- helpers ---------- */
+
+function assignmentMedal(tier) {
+  const t = String(tier || '').trim();
+  if (t === '15+') return { icon: '🥇', label: '15+ completed assignments' };
+  if (t === '10+') return { icon: '🥈', label: '10+ completed assignments' };
+  if (t === '5+')  return { icon: '🥉', label: '5+ completed assignments' };
+  return null;
+}
+
 
 function highlightKeywords(text, keywords) {
   if (!text || !keywords) return text;
@@ -825,6 +842,7 @@ if (prof.role !== mode && !allowAdminInRecruiter) {
   const [recentYears, setRecentYears] = React.useState('');
   const [salary, setSalary] = React.useState('');
   const [contract, setContract] = React.useState(false);
+  const [completedAssignmentsTier, setCompletedAssignmentsTier] = React.useState('');
   const [hourly, setHourly] = React.useState('');
   const [dateEntered, setDateEntered] = React.useState(() => {
     const d = new Date();
@@ -860,6 +878,7 @@ if (prof.role !== mode && !allowAdminInRecruiter) {
   salary: row.salary ?? '',
   contract: !!row.contract,
   hourly: row.hourly ?? '',
+  completed_assignments_tier: row.completed_assignments_tier || '',
   date_entered: (row.date_entered ? String(row.date_entered).slice(0, 10) : new Date(row.created_at).toISOString().slice(0, 10)),
   notes: row.notes || '',
   on_assignment: !!row.on_assignment,
@@ -896,6 +915,9 @@ state: String(editForm.state || '').trim(),
     editForm.recent_role_years === '' ? null : Number(editForm.recent_role_years),
   salary: editForm.salary === '' ? null : Number(editForm.salary),
   contract: !!editForm.contract,
+  completed_assignments_tier: !!editForm.contract
+  ? (String(editForm.completed_assignments_tier || '').trim() || null)
+  : null,
   hourly: !editForm.contract
     ? null
     : editForm.hourly === ''
@@ -938,9 +960,10 @@ state: String(editForm.state || '').trim(),
   try {
     let query = supabase
   .from('candidates')
-  .select(
-    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,recent_role_years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,created_by'
-  )
+ .select(
+  'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,recent_role_years,salary,contract,completed_assignments_tier,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,created_by'
+)
+
   .order('created_at', { ascending: false });
 
 
@@ -1038,6 +1061,7 @@ if (recruiterId) {
   recent_role_years: numOrNull(recentYears),
   salary: numOrNull(salary),
   contract: !!contract,
+  completed_assignments_tier: contract ? (completedAssignmentsTier || null) : null,
   hourly: contract ? numOrNull(hourly) : null,
   date_entered: dateEntered || null,
   notes: notes.trim() || null,
@@ -1059,7 +1083,9 @@ if (recruiterId) {
       setRecentYears('');
       setSalary('');
       setContract(false);
+      setCompletedAssignmentsTier('');
       setHourly('');
+
       setNotes('');
       {
         const d = new Date();
@@ -1164,17 +1190,19 @@ if (recruiterId) {
   salary,
   hourly,
   contract,
+  completed_assignments_tier,
   date_entered,
   created_at,
   notes,
   entered_by_name,
   entered_by_email,
+  entered_by_linkedin_url,
   on_assignment,
   est_available_date,
   off_market,
-  created_by,
-  recruiter:profiles!candidates_created_by_fkey ( linkedin_url )
+  created_by
 `)
+
 .limit(5000);
 
 
@@ -1258,9 +1286,10 @@ if (recruiterId) {
 
  const { data, error } = await supabase
   .from('candidates')
-  .select(
-    'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,date_entered,created_at,notes,on_assignment,est_available_date,off_market,entered_by_name,entered_by_email,entered_by_linkedin_url'
-  )
+ .select(
+  'id,name,titles_csv,law_csv,languages_csv,licensed_states_csv,city,state,years,salary,contract,hourly,completed_assignments_tier,date_entered,created_at,notes,on_assignment,est_available_date,off_market,entered_by_name,entered_by_email,entered_by_linkedin_url'
+)
+
   .limit(2000);
 
 
@@ -1887,26 +1916,73 @@ try {
                       <Label>Date entered</Label>
                       <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <input
-                          type="checkbox"
-                          checked={contract}
-                          onChange={(e) => setContract(e.target.checked)}
-                        />
-                        <span style={{ color: '#E5E7EB', fontSize: 13 }}>Available for contract</span>
-                      </label>
-                      {contract ? (
-                        <div style={{ flex: 1 }}>
-                          <Input
-                            placeholder="Hourly rate (e.g., 80)"
-                            inputMode="numeric"
-                            value={hourly}
-                            onChange={(e) => setHourly(e.target.value)}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
+                   
+
+                    {/* ---------- Contract Section ---------- */}
+<div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
+  <label
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      cursor: 'pointer',
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={contract}
+      onChange={(e) => {
+        const checked = e.target.checked;
+        setContract(checked);
+        if (!checked) {
+          setHourly('');
+          setCompletedAssignmentsTier('');
+        }
+      }}
+      style={{ transform: 'scale(1.1)' }}
+    />
+    <span style={{ color: '#E5E7EB', fontSize: 14, fontWeight: 500 }}>
+      Available for contract
+    </span>
+  </label>
+
+  {contract && (
+    <div
+      style={{
+        marginTop: 10,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 14,
+      }}
+    >
+      <div>
+        <Label style={{ marginBottom: 4 }}>Hourly rate</Label>
+        <Input
+          placeholder="e.g., 80"
+          inputMode="numeric"
+          value={hourly}
+          onChange={(e) => setHourly(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <Label style={{ marginBottom: 4 }}>Completed assignments</Label>
+        <select
+          value={completedAssignmentsTier}
+          onChange={(e) => setCompletedAssignmentsTier(e.target.value)}
+          style={selectStyle}
+        >
+          {ASSIGNMENT_TIER_OPTIONS.map((o) => (
+            <option key={o.value || 'none-tier'} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )}
+</div>
+
                     <div style={{ gridColumn: '1 / -1' }}>
                       <Label>Candidate Notes</Label>
                       <TextArea
@@ -2206,6 +2282,27 @@ try {
                               />
                             ) : null}
                           </div>
+
+                          {/* Completed Assignments Tier */}
+{editForm.contract && (
+  <div style={{ marginTop: 8 }}>
+    <Label>Completed assignments</Label>
+    <select
+      value={editForm.completed_assignments_tier || ''}
+      onChange={(e) =>
+        changeEditField('completed_assignments_tier', e.target.value)
+      }
+      style={selectStyle}
+    >
+      {ASSIGNMENT_TIER_OPTIONS.map((o) => (
+        <option key={o.value || 'none'} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
+
 
                           {/* Off Market + On Assignment */}
                           <div
@@ -3344,10 +3441,37 @@ onChange={(e) => setFLicensedState(e.target.value)}
                             alignItems: 'center',
                           }}
                         >
-                         <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+                       <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
   {c.name}
 
-  <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 2 }}>
+  {/* ⭐ Medal */}
+  {(() => {
+    const m = assignmentMedal(c.completed_assignments_tier);
+    return m ? (
+      <div
+        title={m.label}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 4,
+          padding: '2px 8px',
+          borderRadius: 999,
+          background: '#0F172A',
+          border: '1px solid #1F2937',
+          fontSize: 12,
+          fontWeight: 700,
+          color: '#FACC15',
+          width: 'fit-content',
+        }}
+      >
+        <span style={{ fontSize: 14 }}>{m.icon}</span>
+        <span>{m.label}</span>
+      </div>
+    ) : null;
+  })()}
+
+  <div style={{ color: '#93C5FD', fontSize: 12, marginTop: 4 }}>
     {[c.titles_csv, c.law_csv].filter(Boolean).join(' • ') || '—'}
   </div>
 
@@ -3357,6 +3481,7 @@ onChange={(e) => setFLicensedState(e.target.value)}
     </div>
   ) : null}
 </div>
+
 
                           <div style={{ color: '#9CA3AF' }}>
                             {c.city || '—'}, {c.state || '—'}
