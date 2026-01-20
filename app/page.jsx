@@ -26,7 +26,7 @@ const METROS = [
 
 // US states (2-letter)
 const STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'AL','AK','AZ','AR','CA','CO','CT','DC','DE','FL','GA',
   'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
   'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
   'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
@@ -1121,16 +1121,25 @@ if (recruiterId) {
   const [lawOptions, setLawOptions] = React.useState(LAW_OPTIONS);
 
   const [fCity, setFCity] = React.useState('');
+  const [fMetros, setFMetros] = React.useState([]); // multi-metro
+  const [metroOpen, setMetroOpen] = React.useState(false); // ✅ STEP 1: dropdown open/close
+  const metroRef = React.useRef(null); // ✅ STEP 1: ref for outside-click detection
   const [fState, setFState] = React.useState('');
-  const [fTitle, setFTitle] = React.useState('');
-  const [fLaw, setFLaw] = React.useState('');
-  const [fLang, setFLang] = React.useState('');
-  const [fLicensedState, setFLicensedState] = React.useState('');
 
-  const [clientRows, setClientRows] = React.useState([]);
-  const [clientLoading, setClientLoading] = React.useState(false);
-  const [clientErr, setClientErr] = React.useState('');
-  const [expandedId, setExpandedId] = React.useState(null);
+ const [fTitle, setFTitle] = React.useState('');
+const [fLaw, setFLaw] = React.useState('');
+const [fLang, setFLang] = React.useState('');
+const [fLicensedState, setFLicensedState] = React.useState('');
+
+const [fLicensedStates, setFLicensedStates] = React.useState([]); // ✅ NEW
+const [licensedOpen, setLicensedOpen] = React.useState(false);    // ✅ NEW
+const licensedRef = React.useRef(null);                           // ✅ NEW
+
+const [clientRows, setClientRows] = React.useState([]);
+const [clientLoading, setClientLoading] = React.useState(false);
+const [clientErr, setClientErr] = React.useState('');
+const [expandedId, setExpandedId] = React.useState(null);
+
 
   const [showInsights, setShowInsights] = React.useState(false);
   const [insights, setInsights] = React.useState(null);
@@ -1161,16 +1170,48 @@ if (recruiterId) {
   }, []);
 
   // Count new today for clients
-  React.useEffect(() => {
-    if (user?.role !== 'client') return;
-    (async () => {
-      const { count } = await supabase
-        .from('candidates')
-        .select('id', { count: 'exact', head: true })
-        .gte('date_entered', todayStr);
-      setCCountToday(count || 0);
-    })();
-  }, [user, todayStr]);
+React.useEffect(() => {
+  if (user?.role !== 'client') return;
+  (async () => {
+    const { count } = await supabase
+      .from('candidates')
+      .select('id', { count: 'exact', head: true })
+      .gte('date_entered', todayStr);
+    setCCountToday(count || 0);
+  })();
+}, [user, todayStr]);
+
+// ✅ Close Metro dropdown only when clicking OUTSIDE the metro control
+React.useEffect(() => {
+  function onMouseDown(e) {
+    if (!metroOpen) return;
+    if (!metroRef.current) return;
+
+    if (!metroRef.current.contains(e.target)) {
+      setMetroOpen(false);
+    }
+  }
+
+  document.addEventListener('mousedown', onMouseDown);
+  return () => document.removeEventListener('mousedown', onMouseDown);
+}, [metroOpen]);
+
+// ✅ Close Licensed In dropdown only when clicking OUTSIDE the licensed control
+React.useEffect(() => {
+  function onMouseDown(e) {
+    if (!licensedOpen) return;
+    if (!licensedRef.current) return;
+
+    if (!licensedRef.current.contains(e.target)) {
+      setLicensedOpen(false);
+    }
+  }
+
+  document.addEventListener('mousedown', onMouseDown);
+  return () => document.removeEventListener('mousedown', onMouseDown);
+}, [licensedOpen]);
+
+
 
   // Loader for client-facing options and searchable list population
   const loadClientCandidates = React.useCallback(async () => {
@@ -1311,12 +1352,30 @@ if (recruiterId) {
           if (!blob.includes(term)) return false;
         }
         if (!showOffMarket && r.off_market) return false;
+
+       // ✅ Metro (multi-select OR logic)
+      // If fMetros has selections, use OR-matching against "City, ST"
+        if (Array.isArray(fMetros) && fMetros.length > 0) {
+        const candidateMetro = `${r.city || ''}${r.state ? `, ${r.state}` : ''}`;
+        if (!fMetros.includes(candidateMetro)) return false;
+        } else {
+        // Backwards-compatible single selection
         if (fCity && `${r.city || ''}${r.state ? `, ${r.state}` : ''}` !== fCity) return false;
+}
+
         if (fState && String(r.state || '') !== fState) return false;
         if (fTitle && !matchesCSV(r.titles_csv, fTitle)) return false;
         if (fLaw && !matchesCSV(r.law_csv, fLaw)) return false;
         if (fLang && !matchesLangCSV(r.languages_csv, fLang)) return false;
-        if (fLicensedState && !matchesStatesCSV(r.licensed_states_csv, fLicensedState)) return false;
+        // ✅ Licensed In (multi-select OR logic)
+if (Array.isArray(fLicensedStates) && fLicensedStates.length > 0) {
+  const ok = fLicensedStates.some((st) => matchesStatesCSV(r.licensed_states_csv, st));
+  if (!ok) return false;
+} else {
+  if (fLicensedState && !matchesStatesCSV(r.licensed_states_csv, fLicensedState)) return false;
+}
+
+
 
 
         
@@ -1409,19 +1468,26 @@ try {
     }
   }
   function clearClientFilters() {
-    setSearch('');
-    setFCity('');
-    setFState('');
-    setFTitle('');
-    setFLaw('');
-    setFLang('');
-    setSalaryRange('');
-    setYearsRange('');
-    setContractOnly(false);
-    setHourlyBillRange('');
-    setSortBy('date_desc');
-    fetchClientRows();
-  }
+  setSearch('');
+  setFCity('');
+  setFMetros([]); // clear multi-metro
+  setFState('');
+  setFTitle('');
+  setFLaw('');
+  setFLang('');
+  setFLicensedStates([]); // ✅ clear multi-licensed
+  setFLicensedState('');  // backward-compatible single
+  setLicensedOpen(false); // close dropdown
+  setSalaryRange('');
+  setYearsRange('');
+  setContractOnly(false);
+  setHourlyBillRange('');
+  setSortBy('date_desc');
+
+  fetchClientRows(); // ✅ keep this LAST
+}
+
+
 
   /* ---------- Logged-out ---------- */
   const pageWrap = {
@@ -2839,6 +2905,7 @@ onChange={(e) => setILicensedState(e.target.value)}
   onClick={() => {
     setITitle('');
     setILaw('');
+    setILang('');
     setIState('');
     setIMetro('');
     setILicensedState('');
@@ -2994,18 +3061,140 @@ onChange={(e) => setILicensedState(e.target.value)}
                     />
                   </div>
 
-                  <div style={{ minWidth: 0 }}>
-                    <Label>Metro Area</Label>
-                    <select value={fCity} onChange={(e) => setFCity(e.target.value)} style={selectStyle}>
-                      <option value="">Any</option>
-                     {METROS.map((m) => (
-  <option key={m} value={m}>
-    {m}
-  </option>
-))}
+                  <div style={{ minWidth: 0, position: 'relative' }}>
+  <Label>Metro Area</Label>
 
-                    </select>
-                  </div>
+  {/* Collapsed control */}
+  <button
+    type="button"
+    onClick={() => setMetroOpen((v) => !v)}
+    style={{
+      ...selectStyle,
+      width: '100%',
+      textAlign: 'left',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    }}
+  >
+    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {fMetros.length === 0
+        ? 'Any'
+        : fMetros.length === 1
+          ? fMetros[0]
+          : `${fMetros[0]} + ${fMetros.length - 1} more`}
+    </span>
+
+    <span style={{ color: '#9CA3AF', fontSize: 12 }}>
+      {metroOpen ? '▲' : '▼'}
+    </span>
+  </button>
+
+  {/* Dropdown panel */}
+  {metroOpen ? (
+    <div
+      style={{
+        position: 'absolute',
+        zIndex: 50,
+        top: '100%',
+        left: 0,
+        right: 0,
+        marginTop: 6,
+        background: '#0B1220',
+        border: '1px solid #1F2937',
+        borderRadius: 12,
+        padding: 10,
+        boxShadow: '0 20px 50px rgba(0,0,0,0.45)',
+      }}
+      onClick={(e) => e.stopPropagation()} // lets you click inside without closing
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ color: '#9CA3AF', fontSize: 12 }}>Select one or more</div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFMetros([]);
+            setFCity('');
+          }}
+          style={{
+            background: '#111827',
+            border: '1px solid #1F2937',
+            color: '#E5E7EB',
+            borderRadius: 10,
+            padding: '6px 10px',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          Clear
+        </button>
+      </div>
+
+     <div style={{ maxHeight: 220, overflow: 'auto', paddingRight: 4 }}>
+  {METROS.map((m) => {
+    const checked = fMetros.includes(m);
+
+    return (
+      <label
+        key={m}
+        onClick={(e) => e.stopPropagation()} // ✅ prevents dropdown from closing
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 8px',
+          borderRadius: 10,
+          cursor: 'pointer',
+          userSelect: 'none',
+          background: checked ? 'rgba(14,165,233,0.12)' : 'transparent',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onClick={(e) => e.stopPropagation()} // ✅ prevents dropdown from closing
+          onChange={(e) => {
+            setFCity('');
+            setFMetros((prev) => {
+              if (e.target.checked) return [...prev, m];
+              return prev.filter((x) => x !== m);
+            });
+          }}
+        />
+        <span style={{ color: '#E5E7EB', fontSize: 13 }}>{m}</span>
+      </label>
+    );
+  })}
+</div>
+
+
+      <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ color: '#9CA3AF', fontSize: 12 }}>Selected: {fMetros.length}</div>
+
+        <button
+          type="button"
+          onClick={() => setMetroOpen(false)}
+          style={{
+            background: '#0EA5E9',
+            border: '1px solid #1F2937',
+            color: '#041014',
+            borderRadius: 10,
+            padding: '6px 10px',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontWeight: 700,
+          }}
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  ) : null}
+</div>
+
 
                   <div style={{ minWidth: 0 }}>
                     <Label>State</Label>
@@ -3058,22 +3247,137 @@ onChange={(e) => setILicensedState(e.target.value)}
   </select>
 </div>
 
-{/* NEW — Licensed State filter */}
-<div>
+{/* Licensed In (multi-select) */}
+<div ref={licensedRef} style={{ minWidth: 0, position: 'relative' }}>
   <Label>Licensed In</Label>
-  <select
-    value={fLicensedState || ''}
-onChange={(e) => setFLicensedState(e.target.value)}
-    style={selectStyle}
+
+  <button
+    type="button"
+    onClick={() => setLicensedOpen((v) => !v)}
+    style={{
+      ...selectStyle,
+      width: '100%',
+      textAlign: 'left',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    }}
   >
-    <option value="">Any licensed state</option>
-    {STATES.map((st) => (
-      <option key={st} value={st}>
-        {st}
-      </option>
-    ))}
-  </select>
+    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {fLicensedStates.length === 0
+        ? 'Any licensed state'
+        : fLicensedStates.length === 1
+          ? fLicensedStates[0]
+          : `${fLicensedStates[0]} + ${fLicensedStates.length - 1} more`}
+    </span>
+
+    <span style={{ color: '#9CA3AF', fontSize: 12 }}>
+      {licensedOpen ? '▲' : '▼'}
+    </span>
+  </button>
+
+  {licensedOpen ? (
+    <div
+      style={{
+        position: 'absolute',
+        zIndex: 50,
+        top: '100%',
+        left: 0,
+        right: 0,
+        marginTop: 6,
+        background: '#0B1220',
+        border: '1px solid #1F2937',
+        borderRadius: 12,
+        padding: 10,
+        boxShadow: '0 20px 50px rgba(0,0,0,0.45)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ color: '#9CA3AF', fontSize: 12 }}>Select one or more</div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFLicensedStates([]);
+            setFLicensedState('');
+          }}
+          style={{
+            background: '#111827',
+            border: '1px solid #1F2937',
+            color: '#E5E7EB',
+            borderRadius: 10,
+            padding: '6px 10px',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          Clear
+        </button>
+      </div>
+
+      <div style={{ maxHeight: 220, overflow: 'auto', paddingRight: 4 }}>
+        {STATES.map((st) => {
+          const checked = fLicensedStates.includes(st);
+
+          return (
+            <label
+              key={st}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 8px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                userSelect: 'none',
+                background: checked ? 'rgba(14,165,233,0.12)' : 'transparent',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => {
+                  setFLicensedState('');
+                  setFLicensedStates((prev) => {
+                    if (e.target.checked) return [...prev, st];
+                    return prev.filter((x) => x !== st);
+                  });
+                }}
+              />
+              <span style={{ color: '#E5E7EB', fontSize: 13 }}>{st}</span>
+            </label>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ color: '#9CA3AF', fontSize: 12 }}>
+          Selected: {fLicensedStates.length}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setLicensedOpen(false)}
+          style={{
+            background: '#0EA5E9',
+            border: '1px solid #1F2937',
+            color: '#041014',
+            borderRadius: 10,
+            padding: '6px 10px',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontWeight: 700,
+          }}
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  ) : null}
 </div>
+
 
 
 
