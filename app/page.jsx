@@ -3045,7 +3045,14 @@ onChange={(e) => setILicensedState(e.target.value)}
                   width: '100%',
                 }}
               >
-                <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+                <div
+  style={{
+    fontWeight: 800,
+    letterSpacing: 0.3,
+    color: isMobile ? '#0EA5E9' : '#E5E7EB',
+  }}
+>
+
                   Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
                 </div>
@@ -3705,12 +3712,12 @@ onChange={(e) => setILicensedState(e.target.value)}
   padding: '10px 14px',
   borderRadius: 10,
   border: '1px solid #1F2937',
-  background: '#0B1220',
-  color: '#E5E7EB',
+  background: '#0EA5E9',
+  color: '#041014',
 
   fontSize: 14,
   lineHeight: '20px',
-  fontWeight: 700,
+  fontWeight: 800,
 
   textDecoration: 'none',
   textAlign: 'center',
@@ -3780,10 +3787,10 @@ onChange={(e) => setILicensedState(e.target.value)}
                               marginBottom: 8,
                               padding: '8px 10px',
                               borderRadius: 8,
-                              background: '#7F1D1D',
-                              border: '1px solid #B91C1C',
-                              color: 'white',
-                              fontWeight: 700,
+                              background: 'rgba(250, 204, 21, 0.14)',
+                             border: '1px solid rgba(250, 204, 21, 0.95)',
+                              color: '#FDE68A',
+                              fontWeight: 800,
                               fontSize: 13,
                             }}
                           >
@@ -3976,10 +3983,17 @@ onChange={(e) => setILicensedState(e.target.value)}
               marginBottom: 10,
             }}
           >
-            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
-              Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-              <span style={{ color: '#9CA3AF' }}>ADMIN workspace</span>
-            </div>
+            <div
+  style={{
+    fontWeight: 800,
+    letterSpacing: 0.3,
+    color: isMobile ? '#0EA5E9' : '#E5E7EB',
+  }}
+>
+  Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
+  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+</div>
+
             <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
               Log out
             </Button>
