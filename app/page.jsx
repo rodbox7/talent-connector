@@ -1726,9 +1726,11 @@ backgroundColor: user ? '#E9F3FC' : (isMobile ? '#fff' : 'transparent'),
 
   
 
-              <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+              <div style={{ fontWeight: 800, letterSpacing: 0.3, color: '#0EA5E9' }}>
+
                 Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-                <span style={{ color: '#9CA3AF' }}>RECRUITER workspace</span>
+                <span style={{ color: '#334155' }}>RECRUITER workspace</span>
+
               </div>
               <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', marginLeft: 12 }}>
                 Log out
@@ -2797,9 +2799,10 @@ const languageRows = explodeCSVToRows(rows, 'languages_csv').map((r) => ({
       return (
         <div style={{ width: 'min(1150px, 100%)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+            <div style={{ fontWeight: 800, letterSpacing: 0.3, color: '#0EA5E9' }}>
               Compensation Insights <span style={{ color: '#93C5FD' }}>—</span>{' '}
-              <span style={{ color: '#9CA3AF' }}>salary & hourly trends</span>
+              <span style={{ color: '#334155' }}>salary & hourly trends</span>
+
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
@@ -3055,9 +3058,10 @@ onChange={(e) => setILicensedState(e.target.value)}
   style={{
     fontWeight: 800,
     letterSpacing: 0.3,
-    color: isMobile ? '#0EA5E9' : '#E5E7EB',
+    color: '#0EA5E9',
   }}
 >
+
 
                   Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
                   <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
