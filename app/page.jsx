@@ -1714,93 +1714,7 @@ try {
 
   </div>
 
-  {/* AI Write-Up Generator */}
-
-              <div style={{ margin: '14px 0', flex: 1, marginRight: 12 }}>
-                <div style={{ margin: '10px 0' }}>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
-                    Candidate for AI Write-Up
-                  </label>
-                  <select
-                    value={selectedCandidate?.id || ''}
-                    onChange={(e) => {
-                      const chosen = aiCandidateList.find((x) => String(x.id) === e.target.value);
-                      setSelectedCandidate(chosen || null);
-                    }}
-                    style={{
-                      width: '100%',
-                      maxWidth: 420,
-                      padding: 8,
-                      borderRadius: 6,
-                      border: '1px solid #E5E7EB',
-                      background: 'white',
-                    }}
-                  >
-                    <option value="">— Select a candidate —</option>
-                    {aiCandidateList.map((c) => {
-                      const displayTitle = (c.titles_csv || '').trim();
-                      const displayLaw = (c.law_csv || '').trim();
-                      const displayLocation =
-                        c.city && c.state
-                          ? ` (${c.city}, ${c.state})`
-                          : c.city
-                          ? ` (${c.city})`
-                          : c.state
-                          ? ` (${c.state})`
-                          : '';
-                      const main = [c.name, displayTitle, displayLaw].filter(Boolean).join(' — ');
-                      return (
-                        <option key={c.id} value={String(c.id)}>
-                          {main}{displayLocation}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                <button
-                  onClick={handleGenerateWriteup}
-                  disabled={aiWriting}
-                  style={{
-                    background: aiWriting ? '#93C5FD' : '#2563EB',
-                    color: 'white',
-                    fontWeight: 700,
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '10px 16px',
-                    cursor: aiWriting ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                  }}
-                >
-                  {aiWriting ? 'Generating…' : 'Generate AI Write-Up'}
-                </button>
-
-                {(aiText || aiErr) && (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      background: '#F9FAFB',
-                      border: '1px solid #E5E7EB',
-                      padding: 12,
-                      borderRadius: 8,
-                      color: '#111', // <-- added: makes text black
-                      opacity: 1           // ✅ added: override inherited transparency
-                    }}
-                  >
-                    {aiText && (
-                      <>
-                        <b>AI Summary:</b>
-                        <p style={{ marginTop: 8, whiteSpace: 'pre-wrap', color: '#111' }}>{aiText}</p>
-                      </>
-                    )}
-                    {aiErr && (
-                      <p style={{ color: '#B91C1C', marginTop: 6 }}>
-                        Error: {aiErr}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+  
 
               <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
                 Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
@@ -1825,8 +1739,9 @@ try {
                       />
                     </div>
 
+                    
                     {/* LANGUAGES — NEW FIELD */}
-<div style={{ gridColumn: '1 / -1' }}>
+<div style={{ gridColumn: isMobile ? '1 / -1' : '1 / 3' }}>
   <Label>Languages</Label>
   <select
     multiple
@@ -1857,7 +1772,7 @@ try {
 </div>
 
 {/* LICENSED STATES — NEW FIELD */}
-<div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
+<div style={{ gridColumn: isMobile ? '1 / -1' : '3 / 4' }}>
   <Label>Licensed State(s)</Label>
   <select
     multiple
@@ -1951,37 +1866,49 @@ try {
 </div>
 
 
-                    <div>
+<div style={{ gridColumn: isMobile ? '1 / -1' : '2 / 3' }}>
                       <Label>Years of experience</Label>
                       <Input
-                        placeholder="Years"
-                        inputMode="numeric"
-                        value={years}
-                        onChange={(e) => setYears(e.target.value)}
-                      />
+  placeholder="Years"
+  inputMode="numeric"
+  value={years}
+  onChange={(e) => setYears(e.target.value)}
+  style={inputStyle}
+/>
+
                     </div>
-                    <div>
-                      <Label>Years in most recent job</Label>
-                      <Input
-                        placeholder="e.g., 3"
-                        inputMode="numeric"
-                        value={recentYears}
-                        onChange={(e) => setRecentYears(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Salary desired</Label>
-                      <Input
-                        placeholder="e.g., 120000"
-                        inputMode="numeric"
-                        value={salary}
-                        onChange={(e) => setSalary(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Date entered</Label>
-                      <Input type="date" value={dateEntered} onChange={(e) => setDateEntered(e.target.value)} />
-                    </div>
+                    <div style={{ gridColumn: isMobile ? '1 / -1' : '3 / 4' }}>
+  <Label>Years in most recent job</Label>
+  <Input
+    placeholder="e.g., 3"
+    inputMode="numeric"
+    value={recentYears}
+    onChange={(e) => setRecentYears(e.target.value)}
+    style={inputStyle}
+  />
+</div>
+
+                    <div style={{ gridColumn: isMobile ? '1 / -1' : '1 / 2' }}>
+  <Label>Salary desired</Label>
+  <Input
+    placeholder="e.g., 120000"
+    inputMode="numeric"
+    value={salary}
+    onChange={(e) => setSalary(e.target.value)}
+    style={inputStyle}
+  />
+</div>
+
+                    <div style={{ gridColumn: isMobile ? '1 / -1' : '2 / 3' }}>
+  <Label>Date entered</Label>
+  <Input
+    type="date"
+    value={dateEntered}
+    onChange={(e) => setDateEntered(e.target.value)}
+    style={inputStyle}
+  />
+</div>
+
                    
 
                     {/* ---------- Contract Section ---------- */}
@@ -2076,6 +2003,95 @@ try {
                 ) : null}
               </div>
             </Card>
+{/* AI Write-Up Generator */}
+
+              <Card style={{ marginTop: 14 }}>
+  <div style={{ fontWeight: 800, marginBottom: 12 }}>AI Write-Up</div>
+
+                <div style={{ margin: '10px 0' }}>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+                    Candidate for AI Write-Up
+                  </label>
+                  <select
+                    value={selectedCandidate?.id || ''}
+                    onChange={(e) => {
+                      const chosen = aiCandidateList.find((x) => String(x.id) === e.target.value);
+                      setSelectedCandidate(chosen || null);
+                    }}
+                    style={{
+                      width: '100%',
+                      maxWidth: 420,
+                      padding: 8,
+                      borderRadius: 6,
+                      border: '1px solid #E5E7EB',
+                      background: 'white',
+                    }}
+                  >
+                    <option value="">— Select a candidate —</option>
+                    {aiCandidateList.map((c) => {
+                      const displayTitle = (c.titles_csv || '').trim();
+                      const displayLaw = (c.law_csv || '').trim();
+                      const displayLocation =
+                        c.city && c.state
+                          ? ` (${c.city}, ${c.state})`
+                          : c.city
+                          ? ` (${c.city})`
+                          : c.state
+                          ? ` (${c.state})`
+                          : '';
+                      const main = [c.name, displayTitle, displayLaw].filter(Boolean).join(' — ');
+                      return (
+                        <option key={c.id} value={String(c.id)}>
+                          {main}{displayLocation}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleGenerateWriteup}
+                  disabled={aiWriting}
+                  style={{
+                    background: aiWriting ? '#93C5FD' : '#2563EB',
+                    color: 'white',
+                    fontWeight: 700,
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '10px 16px',
+                    cursor: aiWriting ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                  }}
+                >
+                  {aiWriting ? 'Generating…' : 'Generate AI Write-Up'}
+                </button>
+
+                {(aiText || aiErr) && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      background: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      padding: 12,
+                      borderRadius: 8,
+                      color: '#111', // <-- added: makes text black
+                      opacity: 1           // ✅ added: override inherited transparency
+                    }}
+                  >
+                    {aiText && (
+                      <>
+                        <b>AI Summary:</b>
+                        <p style={{ marginTop: 8, whiteSpace: 'pre-wrap', color: '#111' }}>{aiText}</p>
+                      </>
+                    )}
+                    {aiErr && (
+                      <p style={{ color: '#B91C1C', marginTop: 6 }}>
+                        Error: {aiErr}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </Card>
 
             <Card style={{ marginTop: 14 }}>
               <div style={{ fontWeight: 800, marginBottom: 12 }}>
@@ -4640,6 +4656,15 @@ const selectStyle = {
   position: 'relative',
   zIndex: 11,
 };
+
+const inputStyle = {
+  ...selectStyle,
+  WebkitAppearance: undefined,
+  MozAppearance: undefined,
+};
+
+
+
 
 const thStyle = {
   padding: '8px',
