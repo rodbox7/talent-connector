@@ -1493,8 +1493,9 @@ try {
   const pageWrap = {
   minHeight: '100vh',
   width: '100%',
-  backgroundImage: isMobile ? 'none' : `url(${NYC})`,
-  backgroundColor: isMobile ? '#fff' : 'transparent',
+  backgroundImage: (!user && !isMobile) ? `url(${NYC})` : 'none',
+backgroundColor: user ? '#0B1220' : (isMobile ? '#fff' : 'transparent'),
+
   backgroundPosition: isMobile ? 'center top' : 'center',
   backgroundSize: 'cover',
   backgroundAttachment: isMobile ? 'scroll' : 'fixed',
