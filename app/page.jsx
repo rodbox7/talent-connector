@@ -1523,6 +1523,10 @@ try {
   const overlay = {
   minHeight: '100vh',
   width: '100%',
+  maxWidth: '100%',
+  overflowX: 'hidden',
+  boxSizing: 'border-box',
+
   backdropFilter: isMobile ? 'none' : 'blur(1px)',
   background: isMobile
     ? 'transparent'
