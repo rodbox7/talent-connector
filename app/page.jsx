@@ -3767,7 +3767,15 @@ onChange={(e) => setILicensedState(e.target.value)}
 </Card>
 
 
-              <Card style={{ marginTop: 14 }}>
+             <Card
+  style={{
+    marginTop: 14,
+    maxWidth: '100%',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
+  }}
+>
+
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Results</div>
                 {clientRows.length === 0 ? (
                   <div style={{ color: '#9CA3AF', fontSize: 14 }}>
@@ -3777,9 +3785,18 @@ onChange={(e) => setILicensedState(e.target.value)}
                   <div style={{ display: 'grid', gap: 10 }}>
                     {clientRows.map((c) => (
                       <div
-                        key={c.id}
-                        style={{ border: '1px solid #1F2937', borderRadius: 12, padding: 12, background: '#0B1220' }}
-                      >
+  key={c.id}
+  style={{
+    border: '1px solid #1F2937',
+    borderRadius: 12,
+    padding: isMobile ? 10 : 12,
+    background: '#0B1220',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+  }}
+>
+
                         {/* Red banner for Off The Market */}
                         {c.off_market ? (
                           <div
@@ -3817,15 +3834,21 @@ onChange={(e) => setILicensedState(e.target.value)}
                         ) : null}
 
                         <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr 0.6fr 0.8fr auto',
-                            gap: 10,
-                            rowGap: isMobile ? 8 : 10,
-                            alignItems: 'center',
-                          }}
-                        >
-                       <div style={{ color: '#E5E7EB', fontWeight: 600 }}>
+  style={{
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr 0.6fr 0.8fr auto',
+    gap: isMobile ? 8 : 10,
+    rowGap: isMobile ? 6 : 10,
+    alignItems: isMobile ? 'start' : 'center',
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    minWidth: 0,
+  }}
+>
+
+                       <div style={{ color: '#E5E7EB', fontWeight: 600, minWidth: 0 }}>
+
   {c.name}
 
   {/* ⭐ Medal */}
