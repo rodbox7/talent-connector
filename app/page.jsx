@@ -1494,7 +1494,8 @@ try {
   minHeight: '100vh',
   width: '100%',
   backgroundImage: (!user && !isMobile) ? `url(${NYC})` : 'none',
-backgroundColor: user ? '#0B1220' : (isMobile ? '#fff' : 'transparent'),
+backgroundColor: user ? '#F1F5F9' : (isMobile ? '#fff' : 'transparent'),
+
 
   backgroundPosition: isMobile ? 'center top' : 'center',
   backgroundSize: 'cover',
