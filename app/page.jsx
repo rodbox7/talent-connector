@@ -3678,7 +3678,15 @@ onChange={(e) => setILicensedState(e.target.value)}
 
 
 
-             <Card style={{ marginTop: 12 }}>
+            <Card
+  style={{
+    marginTop: 12,
+    maxWidth: '100%',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
+  }}
+>
+
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div style={{ fontWeight: 800 }}>Need a hand?</div>
     <div style={{ color: '#CBD5E1', fontSize: 14, lineHeight: 1.4 }}>
@@ -3689,17 +3697,29 @@ onChange={(e) => setILicensedState(e.target.value)}
       target="_blank"
       rel="noopener noreferrer"
       style={{
-        display: 'inline-block',
-        padding: '10px 14px',
-        borderRadius: 10,
-        border: '1px solid #243041',
-        background: '#2563EB',
-        color: 'white',
-        fontWeight: 600,
-        textDecoration: 'none',
-        width: isMobile ? '100%' : 'fit-content',
-        textAlign: 'center',
-      }}
+  display: 'inline-block',
+  width: isMobile ? '100%' : 'fit-content',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid #1F2937',
+  background: '#0B1220',
+  color: '#E5E7EB',
+
+  fontSize: 14,
+  lineHeight: '20px',
+  fontWeight: 700,
+
+  textDecoration: 'none',
+  textAlign: 'center',
+
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+}}
+
     >
       Request our help with your search
     </a>
@@ -3708,22 +3728,31 @@ onChange={(e) => setILicensedState(e.target.value)}
     <a
       href="/legal-insights"
       style={{
-        display: 'inline-block',
-        marginTop: 8,
-        padding: '10px 14px',
-        borderRadius: 10,
-        border: '1px solid rgba(250, 204, 21, 0.95)',
-        background:
-          'linear-gradient(135deg, rgba(30,64,175,0.96), rgba(8,47,73,0.98))',
-        color: '#F9FAFB',
-        fontSize: 12,
-        fontWeight: 800,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
-        textDecoration: 'none',
-        textAlign: 'center',
-        width: isMobile ? '100%' : 'fit-content',
-      }}
+  display: 'inline-block',
+  marginTop: 8,
+
+  width: isMobile ? '100%' : 'fit-content',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid #1F2937',
+  background: '#0B1220',
+  color: '#E5E7EB',
+
+  fontSize: 14,
+  lineHeight: '20px',
+  fontWeight: 700,
+
+  textDecoration: 'none',
+  textAlign: 'center',
+
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+}}
+
     >
       Click here for legal industry employment data
     </a>
