@@ -3913,18 +3913,30 @@ onChange={(e) => setILicensedState(e.target.value)}
                             </Button>
                             <a
                               href={buildMailto(c)}
-                              style={{
-                                display: 'inline-block',
-                                padding: '10px 14px',
-                                borderRadius: 10,
-                                border: '1px solid #243041',
-                                background: '#2563EB',
-                                color: 'white',
-                                fontWeight: 600,
-                                textDecoration: 'none',
-                                width: isMobile ? '100%' : undefined,
-                                textAlign: 'center',
-                              }}
+                             style={{
+  display: 'inline-block',
+  width: isMobile ? '100%' : undefined,
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid #1F2937',
+  background: '#0EA5E9',      // same as Compensation Insights (optional—keep if you want)
+  color: '#041014',
+
+  fontSize: 14,
+  lineHeight: '20px',
+  fontWeight: 700,
+
+  textDecoration: 'none',
+  textAlign: 'center',
+
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+}}
+
                             >
                               Email for more information
                             </a>
