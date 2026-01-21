@@ -3068,14 +3068,15 @@ onChange={(e) => setILicensedState(e.target.value)}
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
                   <div style={{ minWidth: 0 }}>
-                    <Label>Keyword</Label>
-                    <Input
-                      placeholder="description, law, title, city/state, notes"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      style={{ width: '100%' }}
-                    />
-                  </div>
+  <Label>Keyword</Label>
+  <Input
+    placeholder="description, law, title, city/state, notes"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    style={inputStyle}
+  />
+</div>
+
 
                   <div style={{ minWidth: 0, position: 'relative' }}>
   <Label>Metro Area</Label>
@@ -3531,15 +3532,19 @@ onChange={(e) => setILicensedState(e.target.value)}
 
   {/* NEW disclaimer text to the right of Clear filters */}
   <div
-    style={{
-      color: '#FFFFFF',
-      fontSize: 10,
-      whiteSpace: 'nowrap',
-      fontStyle: 'italic'
-    }}
-  >
-    Rates And Availability Are Subject To Change
-  </div>
+  style={{
+    color: '#FFFFFF',
+    fontSize: 10,
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
+    fontStyle: 'italic',
+    maxWidth: '100%',
+  }}
+>
+  Rates And Availability Are Subject To Change
+</div>
+
 
   {clientErr ? (
     <div style={{ color: '#F87171', fontSize: 12, paddingTop: 8 }}>{clientErr}</div>
@@ -4642,6 +4647,9 @@ Beacon Hill Legal
 /* ---------- shared styles ---------- */
 const selectStyle = {
   width: '100%',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+
   padding: '12px 14px',
   borderRadius: 10,
   border: '1px solid #1F2937',
@@ -4663,15 +4671,14 @@ const inputStyle = {
   MozAppearance: undefined,
 };
 
-
-
-
 const thStyle = {
   padding: '8px',
   borderBottom: '1px solid #1F2937',
+  boxSizing: 'border-box',
 };
 
 const tdStyle = {
   padding: '8px',
   borderBottom: '1px solid #1F2937',
+  boxSizing: 'border-box',
 };
