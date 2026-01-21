@@ -1530,16 +1530,19 @@ backgroundColor: user ? '#E9F3FC' : (isMobile ? '#fff' : 'transparent'),
   overflowX: 'hidden',
   boxSizing: 'border-box',
 
-  backdropFilter: isMobile ? 'none' : 'blur(1px)',
-  background: isMobile
+  // ✅ After login: do NOT darken/tint the background
+  backdropFilter: (user || isMobile) ? 'none' : 'blur(1px)',
+  background: user
     ? 'transparent'
-    : 'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)',
+    : (isMobile
+        ? 'transparent'
+        : 'linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.36) 16%, rgba(0,0,0,0.42) 100%)'),
+
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'center',
   padding: isMobile ? '20px 16px' : '40px 16px',
 };
-
 
   if (!user) {
     return (
