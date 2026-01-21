@@ -3064,18 +3064,37 @@ onChange={(e) => setILicensedState(e.target.value)}
                 </div>
               </div>
 
-              <Card style={{ marginTop: 12 }}>
+             <Card
+  style={{
+    marginTop: 12,
+    maxWidth: '100%',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
+  }}
+>
+
                 <div style={{ fontWeight: 800, marginBottom: 12 }}>Filters</div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-                  <div style={{ minWidth: 0 }}>
-  <Label>Keyword</Label>
-  <Input
-    placeholder="description, law, title, city/state, notes"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    style={inputStyle}
-  />
-</div>
+
+<div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+    gap: 14,
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+  }}
+>
+  <div style={{ minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
+    <Label>Keyword</Label>
+    <Input
+      placeholder="description, law, title, city/state, notes"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      style={inputStyle}
+    />
+  </div>
+
 
 
                   <div style={{ minWidth: 0, position: 'relative' }}>
