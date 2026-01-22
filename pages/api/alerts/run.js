@@ -86,17 +86,22 @@ export default async function handler(req, res) {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (candidateError) throw candidateError;
-
       if (!candidates || candidates.length === 0) {
-        await supabase
-          .from('saved_searches')
-          .update({ last_checked_at: now.toISOString() })
-          .eq('id', search.id);
+  const { error: updateErr1 } = await supabase
+    .from('saved_searches')
+    .update({ last_checked_at: now.toISOString() })
+    .eq('id', search.id);
 
-        processed++;
-        continue;
-      }
+  if (updateErr1) {
+    console.log('❌ FAILED updating last_checked_at', updateErr1);
+  } else {
+    console.log('✅ Updated last_checked_at', { id: search.id });
+  }
+
+  processed++;
+  continue;
+}
+
 
       /* 👤 Get user email */
       const { data: user } = await supabase
@@ -176,14 +181,21 @@ export default async function handler(req, res) {
         `,
       });
 
-      /* 🕒 Update timestamps */
-      await supabase
-        .from('saved_searches')
-        .update({
-          last_checked_at: now.toISOString(),
-          last_alert_sent_at: now.toISOString(),
-        })
-        .eq('id', search.id);
+     /* 🕒 Update timestamps */
+const { error: updateErr2 } = await supabase
+  .from('saved_searches')
+  .update({
+    last_checked_at: now.toISOString(),
+    last_alert_sent_at: now.toISOString(),
+  })
+  .eq('id', search.id);
+
+if (updateErr2) {
+  console.log('❌ FAILED updating last_checked_at/last_alert_sent_at', updateErr2);
+} else {
+  console.log('✅ Updated last_checked_at + last_alert_sent_at', { id: search.id });
+}
+
 
       processed++;
       emailsSent++;
