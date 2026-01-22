@@ -109,17 +109,25 @@ export default async function handler(req, res) {
 }
 
 
-      /* 👤 Get user email */
-      const { data: user } = await supabase
-        .from('users')
-        .select('email')
-        .eq('id', search.user_id)
-        .single();
+     /* 👤 Get user email */
+const { data: user, error: userErr } = await supabase
+  .from('profiles')
+  .select('email')
+  .eq('id', search.user_id)
+  .single();
 
-      if (!user?.email) {
-        processed++;
-        continue;
-      }
+if (userErr) {
+  console.log('❌ FAILED fetching profile email', userErr);
+  processed++;
+  continue;
+}
+
+if (!user?.email) {
+  console.log('❌ No email found on profile', { user_id: search.user_id });
+  processed++;
+  continue;
+}
+
 
       /* 🧠 Build preview */
       const preview = candidates.slice(0, 3).map((c) => {
