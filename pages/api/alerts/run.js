@@ -23,6 +23,11 @@ function hoursBetween(a, b) {
 /* ---------------- API Handler ---------------- */
 
 export default async function handler(req, res) {
+  // ✅ prevent caching (fixes 304)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   console.log('🚨 ALERT CRON HIT', {
     time: new Date().toISOString(),
     headers: req.headers,
@@ -32,6 +37,7 @@ export default async function handler(req, res) {
 
   try {
     /* 🔐 AUTH — allow Vercel Cron OR secret token */
+
 
     const userAgent = req.headers['user-agent'] || '';
     const isVercelCron = userAgent.startsWith('vercel-cron');
