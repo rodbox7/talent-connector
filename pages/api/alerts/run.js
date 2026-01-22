@@ -20,6 +20,56 @@ function hoursBetween(a, b) {
   return Math.abs(a - b) / 36e5;
 }
 
+function norm(v) {
+  return String(v || '').toLowerCase().trim();
+}
+
+function matchCandidateToFilters(c, f) {
+  if (!f) return true;
+
+  // Keyword (searches multiple fields)
+  if (f.fKeyword) {
+    const haystack = [
+      c.name,
+      c.roles,
+      c.practice_areas,
+      c.city,
+      c.state,
+    ]
+      .map(norm)
+      .join(' ');
+
+    if (!haystack.includes(norm(f.fKeyword))) return false;
+  }
+
+  // Title
+  if (f.fTitle) {
+    if (!norm(c.roles).includes(norm(f.fTitle))) return false;
+  }
+
+  // Type of Law
+  if (f.fLaw) {
+    if (!norm(c.practice_areas).includes(norm(f.fLaw))) return false;
+  }
+
+  // City (exact match)
+  if (f.fCity) {
+    if (norm(c.city) !== norm(f.fCity)) return false;
+  }
+
+  // State (exact match)
+  if (f.fState) {
+    if (norm(c.state) !== norm(f.fState)) return false;
+  }
+
+  // Contract only
+  if (f.fContractOnly) {
+    if (!c.contract) return false;
+  }
+
+  return true;
+}
+
 /* ---------------- API Handler ---------------- */
 
 export default async function handler(req, res) {
@@ -38,7 +88,6 @@ export default async function handler(req, res) {
   try {
     /* 🔐 AUTH — allow Vercel Cron OR secret token */
 
-
     const userAgent = req.headers['user-agent'] || '';
     const isVercelCron = userAgent.startsWith('vercel-cron');
 
@@ -54,12 +103,10 @@ export default async function handler(req, res) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
 
-    /* 🔎 Get enabled saved searches (REAL COLUMNS ONLY) */
+    /* 🔎 Get enabled saved searches */
     const { data: searches, error: searchError } = await supabase
       .from('saved_searches')
-      .select(
-        'id, user_id, name, filters, last_checked_at, last_alert_sent_at'
-      )
+      .select('id, user_id, name, filters, last_checked_at, last_alert_sent_at')
       .eq('alerts_enabled', true);
 
     if (searchError) throw searchError;
@@ -79,66 +126,63 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const since =
-        search.last_checked_at || '1970-01-01T00:00:00.000Z';
+      const since = search.last_checked_at || '1970-01-01T00:00:00.000Z';
 
-      /* 🔎 Find new candidates (NO FILTERING YET) */
+      /* 🔎 Find new candidates since last check */
       const { data: candidates, error: candidateError } = await supabase
         .from('v_candidates')
-        .select(
-          'id, name, roles, practice_areas, city, state, created_at'
-        )
+        .select('id, name, roles, practice_areas, city, state, created_at, contract')
         .gt('created_at', since)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(25);
 
-      if (!candidates || candidates.length === 0) {
-  const { error: updateErr1 } = await supabase
-    .from('saved_searches')
-    .update({ last_checked_at: now.toISOString() })
-    .eq('id', search.id);
+      if (candidateError) throw candidateError;
 
-  if (updateErr1) {
-    console.log('❌ FAILED updating last_checked_at', updateErr1);
-  } else {
-    console.log('✅ Updated last_checked_at', { id: search.id });
-  }
+      // Apply saved search filters
+      const f = search.filters || {};
+      const matches = (candidates || []).filter((c) => matchCandidateToFilters(c, f));
 
-  processed++;
-  continue;
-}
+      // If no matches, still update last_checked_at so we don't re-check forever
+      if (!matches || matches.length === 0) {
+        const { error: updateErr1 } = await supabase
+          .from('saved_searches')
+          .update({ last_checked_at: now.toISOString() })
+          .eq('id', search.id);
 
+        if (updateErr1) {
+          console.log('❌ FAILED updating last_checked_at', updateErr1);
+        } else {
+          console.log('✅ Updated last_checked_at', { id: search.id });
+        }
 
-     /* 👤 Get user email */
-const { data: user, error: userErr } = await supabase
-  .from('profiles')
-  .select('email')
-  .eq('id', search.user_id)
-  .single();
+        processed++;
+        continue;
+      }
 
-if (userErr) {
-  console.log('❌ FAILED fetching profile email', userErr);
-  processed++;
-  continue;
-}
+      /* 👤 Get user email */
+      const { data: user, error: userErr } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', search.user_id)
+        .single();
 
-if (!user?.email) {
-  console.log('❌ No email found on profile', { user_id: search.user_id });
-  processed++;
-  continue;
-}
+      if (userErr) {
+        console.log('❌ FAILED fetching profile email', userErr);
+        processed++;
+        continue;
+      }
 
+      if (!user?.email) {
+        console.log('❌ No email found on profile', { user_id: search.user_id });
+        processed++;
+        continue;
+      }
 
       /* 🧠 Build preview */
-      const preview = candidates.slice(0, 3).map((c) => {
+      const preview = matches.slice(0, 3).map((c) => {
         const displayName = c.name || 'Candidate';
-        const role =
-          c.roles ||
-          c.practice_areas ||
-          'Role N/A';
-
-        const location =
-          [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
+        const role = c.roles || c.practice_areas || 'Role N/A';
+        const location = [c.city, c.state].filter(Boolean).join(', ') || 'Location N/A';
 
         return `
           <li style="margin-bottom: 6px;">
@@ -153,13 +197,13 @@ if (!user?.email) {
       await resend.emails.send({
         from: 'Talent Connector <alerts@bhltalentconnector.com>',
         to: user.email,
-        subject: `${candidates.length} new candidates for "${search.name}"`,
+        subject: `${matches.length} new candidates for "${search.name}"`,
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
             <h2>New Talent Alert</h2>
 
             <p>
-              <strong>${candidates.length}</strong> new candidates match your saved search:
+              <strong>${matches.length}</strong> new candidates match your saved search:
             </p>
 
             <p><strong>${search.name}</strong></p>
@@ -195,21 +239,20 @@ if (!user?.email) {
         `,
       });
 
-     /* 🕒 Update timestamps */
-const { error: updateErr2 } = await supabase
-  .from('saved_searches')
-  .update({
-    last_checked_at: now.toISOString(),
-    last_alert_sent_at: now.toISOString(),
-  })
-  .eq('id', search.id);
+      /* 🕒 Update timestamps */
+      const { error: updateErr2 } = await supabase
+        .from('saved_searches')
+        .update({
+          last_checked_at: now.toISOString(),
+          last_alert_sent_at: now.toISOString(),
+        })
+        .eq('id', search.id);
 
-if (updateErr2) {
-  console.log('❌ FAILED updating last_checked_at/last_alert_sent_at', updateErr2);
-} else {
-  console.log('✅ Updated last_checked_at + last_alert_sent_at', { id: search.id });
-}
-
+      if (updateErr2) {
+        console.log('❌ FAILED updating last_checked_at/last_alert_sent_at', updateErr2);
+      } else {
+        console.log('✅ Updated last_checked_at + last_alert_sent_at', { id: search.id });
+      }
 
       processed++;
       emailsSent++;
