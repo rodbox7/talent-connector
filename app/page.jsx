@@ -4028,16 +4028,14 @@ onChange={(e) => setILicensedState(e.target.value)}
               marginBottom: 10,
             }}
           >
-            <div
-  style={{
-    fontWeight: 800,
-    letterSpacing: 0.3,
-    color: isMobile ? '#0EA5E9' : '#E5E7EB',
-  }}
->
-  Talent Connector – Powered by Beacon Hill Legal <span style={{ color: '#93C5FD' }}>—</span>{' '}
-  <span style={{ color: '#9CA3AF' }}>CLIENT workspace</span>
+          <div style={{ fontWeight: 800, letterSpacing: 0.3 }}>
+  <span style={{ color: '#2563EB' }}>
+    Talent Connector – Powered by Beacon Hill Legal
+  </span>{' '}
+  <span style={{ color: '#475569' }}>— ADMIN workspace</span>
 </div>
+
+
 
             <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937' }}>
               Log out
@@ -4369,31 +4367,57 @@ Beacon Hill Legal
       </div>
 
       {/* Invite */}
-      <Card style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 12,
-          }}
-        >
+<Card style={{ marginTop: 12, padding: '14px 16px' }}>
+  <div style={{ fontWeight: 800, marginBottom: 8 }}>Invite user</div>
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+      gap: 12,
+      width: '100%',
+      maxWidth: '100%',
+      alignItems: 'stretch',
+    }}
+  >
+
           <div>
             <Label>Email</Label>
             <Input
-              type="email"
-              placeholder="name@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+  type="email"
+  placeholder="name@company.com"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  style={{
+  width: '100%',
+  minWidth: 0,
+  height: 40,
+  padding: '8px 12px',
+  fontSize: 14,
+  boxSizing: 'border-box',
+}}
+
+/>
+
+
           </div>
           <div>
             <Label>Role</Label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              style={selectStyle}
-            >
+          <select
+  value={role}
+  onChange={(e) => setRole(e.target.value)}
+  style={{
+  ...selectStyle,
+  width: '100%',
+  minWidth: 0,
+  height: 40,
+  padding: '8px 12px',
+  fontSize: 14,
+  boxSizing: 'border-box',
+}}
+
+>
+
+
               <option value="client">Client</option>
               <option value="recruiter">Recruiter</option>
               <option value="admin">Admin</option>
@@ -4401,7 +4425,21 @@ Beacon Hill Legal
           </div>
           <div>
             <Label>Organization (optional)</Label>
-            <Input value={org} onChange={(e) => setOrg(e.target.value)} />
+            <Input
+  value={org}
+  onChange={(e) => setOrg(e.target.value)}
+  style={{
+  width: '100%',
+  minWidth: 0,
+  height: 40,
+  padding: '8px 12px',
+  fontSize: 14,
+  boxSizing: 'border-box',
+}}
+
+/>
+
+
           </div>
           <div>
             <Label>Sales contact (optional)</Label>
@@ -4410,6 +4448,15 @@ Beacon Hill Legal
               placeholder="sales@youragency.com"
               value={amEmail}
               onChange={(e) => setAmEmail(e.target.value)}
+            style={{
+  width: '100%',
+  minWidth: 0,
+  height: 40,
+  padding: '8px 12px',
+  fontSize: 14,
+  boxSizing: 'border-box',
+}}
+
             />
           </div>
         </div>
@@ -4492,7 +4539,7 @@ Beacon Hill Legal
       ) : null}
 
       {/* Directory */}
-      <Card style={{ marginTop: 12 }}>
+     <Card style={{ marginTop: 12, padding: '14px 16px' }}>
         <div
           style={{
             display: 'flex',
