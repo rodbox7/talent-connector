@@ -705,7 +705,17 @@ const container = {
           </div>
 
           {/* Filters */}
-          <Card style={{ marginTop: 12, overflow: 'hidden' }}>
+          <Card
+  style={{
+    marginTop: 12,
+    overflow: 'hidden',
+
+    // Match client workspace filter panel
+    background: '#2F363D',
+    border: '1px solid #374151',
+  }}
+>
+
             <div style={{ fontWeight: 900, marginBottom: 12, color: '#E5E7EB' }}>Filters</div>
 
             <div
