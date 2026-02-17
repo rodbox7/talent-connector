@@ -1,8 +1,11 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 
 /* ---------- Constants ---------- */
+
 const NYC =
   'https://upload.wikimedia.org/wikipedia/commons/f/fe/New-York-City-night-skyline-September-2014.jpg';
 
@@ -3070,15 +3073,24 @@ onChange={(e) => setILicensedState(e.target.value)}
                   <Tag style={{ fontSize: 16, padding: '6px 12px' }}>
                     New today: <strong>{cCountToday}</strong>
                   </Tag>
-                  <Button
-                    onClick={async () => {
-                      if (!showInsights) setShowInsights(true);
-                      await loadInsights();
-                    }}
-                    style={{ background: '#0EA5E9', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}
-                  >
-                    Compensation Insights
-                  </Button>
+                  <Link href="/compensation" style={{ textDecoration: 'none', width: isMobile ? '100%' : undefined }}>
+  <button
+    type="button"
+    style={{
+      background: '#0EA5E9',
+      border: '1px solid #1F2937',
+      color: '#041014',
+      borderRadius: 12,
+      padding: '10px 12px',
+      cursor: 'pointer',
+      fontWeight: 900,
+      width: isMobile ? '100%' : undefined,
+    }}
+  >
+    Compensation Insights
+  </button>
+</Link>
+
                   <Button onClick={logout} style={{ background: '#0B1220', border: '1px solid #1F2937', width: isMobile ? '100%' : undefined }}>
                     Log out
                   </Button>
