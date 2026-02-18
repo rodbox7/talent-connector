@@ -142,9 +142,13 @@ const [userEmails, setUserEmails] = useState({});
   /* --------- Load Top Insights (90 days) ---------- */
 useEffect(() => {
   (async () => {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
     const { data, error } = await supabase
-      .from('v_search_logs_90d')
-      .select('title, type_of_law, metro, created_at')
+      .from('search_logs')
+      .select('title, type_of_law, metro, created_at, user_email')
+      .gte('created_at', since)
+      .neq('user_email', 'jdavid@beaconhillstaffing.com')
       .limit(10000);
 
     if (error) {
@@ -158,14 +162,17 @@ useEffect(() => {
   })();
 }, []);
 
+
 /* --------- Load FULL Recent Search Activity (raw logs) ---------- */
 useEffect(() => {
   (async () => {
     const { data, error } = await supabase
-      .from('search_logs')
-      .select('id, user_email, title, type_of_law, metro, created_at')
-      .order('created_at', { ascending: false })
-      .limit(200);
+  .from('search_logs')
+  .select('id, user_email, title, type_of_law, metro, created_at')
+  .neq('user_email', 'jdavid@beaconhillstaffing.com')
+  .order('created_at', { ascending: false })
+  .limit(200);
+
 
     if (error) {
       console.error('Supabase error (search logs):', error);
