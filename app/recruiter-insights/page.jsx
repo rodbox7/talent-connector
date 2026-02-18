@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
 import {
   Chart as ChartJS,
@@ -122,15 +123,39 @@ export default function RecruiterInsightsPage() {
       ← Back to Recruiter Home
     </a>
 
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
-        Recruiter Insights
-      </h1>
-      <span style={{ opacity: 0.75, fontSize: 13 }}>
-        Candidates entered • {rangeLabel}
-        {range === 'MTD' ? ` (${monthLabel})` : ''}
-      </span>
-    </div>
+   <div
+  style={{
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+  }}
+>
+  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+    <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
+      Recruiter Insights
+    </h1>
+    <span style={{ opacity: 0.75, fontSize: 13 }}>
+      Candidates entered • {rangeLabel}
+      {range === 'MTD' ? ` (${monthLabel})` : ''}
+    </span>
+  </div>
+
+  <Link
+    href="/search-insights"
+    style={{
+      color: '#93C5FD',
+      fontSize: 13,
+      fontWeight: 800,
+      textDecoration: 'none',
+      whiteSpace: 'nowrap',
+    }}
+  >
+    View Search Insights →
+  </Link>
+</div>
+
 
     {/* RANGE TOGGLE */}
 
