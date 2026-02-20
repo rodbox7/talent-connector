@@ -36,9 +36,8 @@ export default function CompensationPage() {
 
   const [iHourlyOnly, setIHourlyOnly] = useState(false);
 
-  // Year range (actual years)
-  const [iYearStart, setIYearStart] = useState(''); // e.g. "2022"
-  const [iYearEnd, setIYearEnd] = useState(''); // e.g. "2025"
+  // Year (single)
+  const [iYear, setIYear] = useState(''); // e.g. "2024"
 
   // ---------- Data ----------
   const [rawRows, setRawRows] = useState([]);
@@ -168,6 +167,35 @@ export default function CompensationPage() {
     return rows;
   }
 
+  function aggByYear(items, valueKey) {
+  const acc = new Map(); // year -> [values]
+
+  for (const it of items) {
+    const y = Number(it._year);
+    const v = Number(it[valueKey]);
+
+    if (!Number.isFinite(y) || y < 1900 || y > 3000) continue;
+    if (!Number.isFinite(v) || v <= 0) continue;
+
+    const cur = acc.get(y) || [];
+    cur.push(v);
+    acc.set(y, cur);
+  }
+
+  const rows = [];
+
+  for (const [year, values] of acc.entries()) {
+    rows.push({
+      year,
+      n: values.length,
+      avg: Math.round(values.reduce((a, c) => a + c, 0) / values.length),
+    });
+  }
+
+  rows.sort((a, b) => a.year - b.year); // oldest → newest
+  return rows;
+}
+
   function BarChart({ title, rows, money = true, minN = 3 }) {
     const safeRows = (rows || []).filter((r) => r.n == null || r.n >= minN);
     const top = [...safeRows].sort((a, b) => (b.avg || 0) - (a.avg || 0)).slice(0, 12);
@@ -228,6 +256,52 @@ export default function CompensationPage() {
     );
   }
 
+  function ColumnChart({ title, rows, money = true, minN = 10 }) {
+  const safe = (rows || []).filter((r) => (r.n ?? 0) >= minN);
+  const max = Math.max(...safe.map((r) => r.avg || 0), 1);
+
+  return (
+    <Card style={{ marginTop: 12 }}>
+      <div style={{ fontWeight: 900, marginBottom: 10, color: '#E5E7EB' }}>{title}</div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${Math.max(safe.length, 1)}, minmax(0, 1fr))`,
+          gap: 10,
+          alignItems: 'end',
+          height: 240,
+          paddingTop: 8,
+        }}
+      >
+        {safe.length ? (
+          safe.map((r) => (
+            <div key={r.year} style={{ display: 'grid', gap: 6, alignItems: 'end' }}>
+              <div
+                title={`${r.year} • n=${r.n} • ${money ? '$' : ''}${(r.avg || 0).toLocaleString()}`}
+                style={{
+                  height: `${Math.max(6, Math.round(((r.avg || 0) / max) * 200))}px`,
+                  borderRadius: 10,
+                  border: '1px solid #1F2937',
+                  background: 'linear-gradient(180deg, #3B82F6, #06B6D4)',
+                }}
+              />
+              <div style={{ textAlign: 'center', color: '#9CA3AF', fontSize: 11 }}>{r.year}</div>
+              <div style={{ textAlign: 'center', color: '#E5E7EB', fontSize: 11, fontWeight: 800 }}>
+                {money ? `$${(r.avg || 0).toLocaleString()}` : (r.avg || 0).toLocaleString()}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div style={{ gridColumn: '1 / -1', color: '#9CA3AF' }}>Not enough data.</div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 8, color: '#6B7280', fontSize: 11 }}>Showing years with ≥ {minN} observations.</div>
+    </Card>
+  );
+}
+
   // ---------- Date helpers ----------
   // Normalize ANY date-ish value into "YYYY-MM-DD" (safe for string comparisons / display)
   function ymd(d) {
@@ -277,6 +351,49 @@ export default function CompensationPage() {
     return Number(m[1]);
   }
 
+  function getObservedDateRaw(r) {
+  const candidates = [
+    'observed_date',
+    'observedDate',
+    'ObservedDate',
+    'Observed_Date',
+    'observed_dt',
+    'observedAt',
+    'Observed Date',
+    'observed date',
+  ];
+
+  for (const k of candidates) {
+    if (r && r[k] != null && String(r[k]).trim() !== '') return r[k];
+  }
+
+  if (r && typeof r === 'object') {
+    for (const k of Object.keys(r)) {
+      const lk = k.toLowerCase();
+      if (lk.includes('observ') && lk.includes('date')) {
+        const v = r[k];
+        if (v != null && String(v).trim() !== '') return v;
+      }
+    }
+  }
+
+  return '';
+}
+
+function yearFromAnyDate(d) {
+  if (!d) return NaN;
+  if (d instanceof Date) return Number.isNaN(d.getTime()) ? NaN : d.getFullYear();
+
+  const s = String(d).trim();
+  if (!s) return NaN;
+
+  const m = s.match(/^(\d{4})/);
+  if (m) return Number(m[1]);
+
+  const dt = new Date(s);
+  return Number.isNaN(dt.getTime()) ? NaN : dt.getFullYear();
+}
+
   // ---------- Pull ALL rows (pagination) ----------
   async function fetchAllCompRows() {
     const pageSize = 1000;
@@ -286,7 +403,10 @@ export default function CompensationPage() {
     while (true) {
       const to = from + pageSize - 1;
 
-      const { data, error } = await supabase.from('comp_observations_raw').select('*').range(from, to);
+      const { data, error } = await supabase
+      .from('comp_observations')
+      .select('*')
+      .range(from, to);
       if (error) throw error;
 
       const chunk = data || [];
@@ -300,6 +420,36 @@ export default function CompensationPage() {
     return all;
   }
 
+  async function fetchAllRawGroups() {
+    const pageSize = 1000;
+    let from = 0;
+    const set = new Set();
+
+    while (true) {
+      const to = from + pageSize - 1;
+
+    const { data, error } = await supabase
+      .from('comp_observations_raw')
+      .select('FolderGroup')
+      .range(from, to);
+
+    if (error) throw error;
+
+    const chunk = data || [];
+
+    for (const r of chunk) {
+      const g = String(r.FolderGroup || '').trim();
+      if (g) set.add(g);
+    }
+
+    if (chunk.length < pageSize) break;
+    from += pageSize;
+    if (from > 200000) break; // safety
+  }
+
+  return Array.from(set).sort();
+}
+
   // ---------- Load once ----------
   useEffect(() => {
     (async () => {
@@ -309,66 +459,82 @@ export default function CompensationPage() {
 
         const data = await fetchAllCompRows();
 
+        // DEBUG — right here (temporary)
+        console.log('COMP rows count:', data?.length);
+        console.log('Sample row keys:', Object.keys(data?.[0] || {}));
+
+        const keys = Object.keys(data?.[0] || {});
+        console.log('Keys containing "observ":', keys.filter((k) => k.toLowerCase().includes('observ')));
+        console.log('Keys containing "date":', keys.filter((k) => k.toLowerCase().includes('date')));
+
+        console.log('Sample observedRaw from helper:', data?.[0] ? getObservedDateRaw(data[0]) : null);
+        console.log('Sample observed_date direct:', data?.[0]?.observed_date);
+        console.log('Sample imported_at:', data?.[0]?.imported_at, 'created_at:', data?.[0]?.created_at);
+
         const cleaned = (data || [])
-          .map((r) => {
-            const city = String(r.City || '').trim();
-            const st = String(r.StateCode || '').trim();
+         .map((r) => {
+  // --- normalize fields from either table schema ---
+  const city = String(r.city ?? r.City ?? '').trim();
+  const st = String(r.state ?? r.StateCode ?? '').trim();
 
-            // observed_date is the column you showed in Supabase.
-            // Add a few fallbacks just in case a view/transform renamed it.
-            const observed =
-              r.observed_date ??
-              r.observedDate ??
-              r.ObservedDate ??
-              r.Observed_Date ??
-              r.observed_dt ??
-              r.observedAt;
+  const salaryNum = Number(r.salary_annual ?? r.Salary);
+  const hourlyNum = Number(r.hourly_billable ?? r.Hourly);
 
-            const rawDate = observed || r.imported_at || r.created_at || '';
-            const dateStr = ymd(rawDate);
-            const dateMs = toMs(rawDate);
-            const dateYear = yearFromYmd(dateStr);
+  const rawCatVal = r.type_of_law ?? r.FolderGroupCategory ?? '';
+ const rawGroupVal =
+  r.title_bucket ??
+  r.FolderGroup ??
+  r.title ??
+  r.position_title ??
+  r.role ??
+  r.job_title ??
+  '';
+const normGroup = String(rawGroupVal || '').trim() || '(Unspecified)';
+  const rawLangVal = r.language ?? r.Language ?? '';
 
-            // Normalize category into: Attorney | Paralegal | Legal Support
-            const rawCat = String(r.FolderGroupCategory || '').toLowerCase().trim();
+  const observedRaw = r.observed_date ?? getObservedDateRaw(r);
+  const dateStr = ymd(observedRaw);
+  const dateMs = toMs(observedRaw);
+  const dateYear = yearFromAnyDate(observedRaw);
 
-            let normCategory = 'Legal Support';
+  // --- normalize category into: Attorney | Paralegal | Legal Support ---
+  const rawCat = String(rawCatVal || '').toLowerCase().trim();
+  let normCategory = 'Legal Support';
 
-            // Attorney bucket (broad, on purpose)
-            if (
-              rawCat.includes('attorney') ||
-              rawCat.includes('lawyer') ||
-              rawCat.includes('partner') ||
-              rawCat.includes('associate') ||
-              rawCat.includes('general counsel') ||
-              rawCat.includes('gc') ||
-              rawCat.includes('assistant general counsel') ||
-              rawCat.includes('agc') ||
-              rawCat.includes('counsel')
-            ) {
-              normCategory = 'Attorney';
-            }
-            // Paralegal bucket
-            else if (rawCat.includes('paralegal')) {
-              normCategory = 'Paralegal';
-            }
+  if (
+    rawCat.includes('attorney') ||
+    rawCat.includes('lawyer') ||
+    rawCat.includes('partner') ||
+    rawCat.includes('associate') ||
+    rawCat.includes('general counsel') ||
+    rawCat.includes('gc') ||
+    rawCat.includes('assistant general counsel') ||
+    rawCat.includes('agc') ||
+    rawCat.includes('counsel')
+  ) {
+    normCategory = 'Attorney';
+  } else if (rawCat.includes('paralegal')) {
+    normCategory = 'Paralegal';
+  }
 
-            return {
-              ...r,
-              City: city,
-              StateCode: st,
+  return {
+    ...r,
 
-              // Force clean categories
-              FolderGroupCategory: normCategory,
+    // normalize into the names the rest of your UI expects
+    City: city,
+    StateCode: st,
+    FolderGroupCategory: normCategory,
+    FolderGroup: normGroup,
+    Language: String(rawLangVal || '').trim(),
 
-              _city_label: [city, st].filter(Boolean).join(', '),
-              _salary: Number(r.Salary),
-              _hourly: Number(r.Hourly),
-              _date: dateStr,
-              _dateMs: dateMs,
-              _year: dateYear,
-            };
-          })
+    _city_label: [city, st].filter(Boolean).join(', '),
+    _salary: salaryNum,
+    _hourly: hourlyNum,
+    _date: dateStr,
+    _dateMs: dateMs,
+    _year: dateYear,
+  };
+})
           .filter((r) => {
             const cat = String(r.FolderGroupCategory || '').trim().toLowerCase();
             return cat !== 'admin' && cat !== 'administrative';
@@ -378,7 +544,29 @@ export default function CompensationPage() {
 
         const cities = Array.from(new Set(cleaned.map((r) => r._city_label).filter(Boolean))).sort();
         setCITY_OPTIONS(cities);
-        setGROUPS(Array.from(new Set(cleaned.map((r) => String(r.FolderGroup || '').trim()).filter(Boolean))).sort());
+        const groupSet = new Set();
+
+for (const r of cleaned) {
+  const candidates = [
+    r.title_bucket,
+    r.FolderGroup,
+    r.title,
+    r.Title,
+    r.position_title,
+    r.role,
+    r.job_title,
+    r.folder_group,
+    r.group,
+  ];
+
+  for (const v of candidates) {
+    const s = String(v ?? '').trim();
+    if (s) groupSet.add(s);
+  }
+}
+
+const rawGroups = await fetchAllRawGroups();
+setGROUPS(rawGroups);
         setLANGUAGE_OPTIONS(Array.from(new Set(cleaned.map((r) => String(r.Language || '').trim()).filter(Boolean))).sort());
         setSTATES(Array.from(new Set(cleaned.map((r) => String(r.StateCode || '').trim()).filter(Boolean))).sort());
 
@@ -399,14 +587,16 @@ export default function CompensationPage() {
         ).sort((a, b) => Number(b) - Number(a));
         setYEAR_OPTIONS(years);
 
+        // DEBUG (temporary)
+console.log('YEAR_OPTIONS (top 10):', years.slice(0, 10));
+
         setCityQuery('');
         setICity('');
         setCityOpen(false);
         setCityActiveIdx(0);
 
         // Default: all years
-        setIYearStart('');
-        setIYearEnd('');
+        setIYear('');
 
         buildInsights(cleaned);
       } catch (e) {
@@ -450,22 +640,21 @@ export default function CompensationPage() {
       if (!(Number.isFinite(r._hourly) && r._hourly > 0)) return false;
     }
 
-    // Year filtering (inclusive)
-    const ys = iYearStart ? Number(iYearStart) : NaN;
-    const ye = iYearEnd ? Number(iYearEnd) : NaN;
-
-    if (iYearStart || iYearEnd) {
-      const y = Number(r._year);
-      if (!Number.isFinite(y)) return false;
-      if (Number.isFinite(ys) && y < ys) return false;
-      if (Number.isFinite(ye) && y > ye) return false;
-    }
+    // Year filter (single)
+if (iYear) {
+  const y = Number(r._year);
+  if (!Number.isFinite(y)) return false;
+  if (y !== Number(iYear)) return false;
+}
 
     return true;
   }
 
   function buildInsights(all) {
     const rows = (all || []).filter((r) => passesFilters(r));
+
+    const byYearSalary = aggByYear(rows, '_salary');
+    const byYearHourly = aggByYear(rows, '_hourly');
 
     const salaryVals = rows.map((r) => r._salary).filter((v) => Number.isFinite(v) && v > 0);
     const hourlyVals = rows.map((r) => r._hourly).filter((v) => Number.isFinite(v) && v > 0);
@@ -491,16 +680,21 @@ export default function CompensationPage() {
       .map((r) => ({ ...r, city_n: cityCounts.get(r.label) || 0 }));
 
     setInsights({
-      kpi: { salary: statsFrom(salaryVals), hourly: statsFrom(hourlyVals) },
-      byCitySalary,
-      byCityHourly,
-      byGroupSalary: groupAgg(rows, 'FolderGroup', '_salary', 'avg').slice(0, 12),
-      byGroupHourly: groupAgg(rows, 'FolderGroup', '_hourly', 'avg').slice(0, 12),
-      byLanguageSalary: groupAgg(rows, 'Language', '_salary', 'avg').slice(0, 12),
-      byLanguageHourly: groupAgg(rows, 'Language', '_hourly', 'avg').slice(0, 12),
-      sampleN: rows.length,
-      cityMinOccurrences: minCityOccurrences,
-    });
+  kpi: { salary: statsFrom(salaryVals), hourly: statsFrom(hourlyVals) },
+  byCitySalary,
+  byCityHourly,
+  byGroupSalary: groupAgg(rows, 'FolderGroup', '_salary', 'avg').slice(0, 12),
+  byGroupHourly: groupAgg(rows, 'FolderGroup', '_hourly', 'avg').slice(0, 12),
+  byLanguageSalary: groupAgg(rows, 'Language', '_salary', 'avg').slice(0, 12),
+  byLanguageHourly: groupAgg(rows, 'Language', '_hourly', 'avg').slice(0, 12),
+
+  // NEW
+  byYearSalary,
+  byYearHourly,
+
+  sampleN: rows.length,
+  cityMinOccurrences: minCityOccurrences,
+});
   }
 
   async function applyFiltersNow() {
@@ -527,8 +721,7 @@ export default function CompensationPage() {
     setCityActiveIdx(0);
     setIHourlyOnly(false);
 
-    setIYearStart('');
-    setIYearEnd('');
+    setIYear('');
 
     setTimeout(() => buildInsights(rawRows), 0);
   }
@@ -547,16 +740,10 @@ export default function CompensationPage() {
     else if (iState) parts.push(iState);
     if (iHourlyOnly) parts.push('Hourly only');
 
-    if (iYearStart || iYearEnd) {
-      const a = iYearStart || '…';
-      const b = iYearEnd || '…';
-      parts.push(`${a}–${b}`);
-    } else {
-      parts.push('All years');
-    }
+    parts.push(iYear ? iYear : 'All years');
 
     return parts.filter(Boolean).join(' • ') || 'All';
-  }, [iCategory, iGroup, iLang, iCity, iState, iHourlyOnly, iYearStart, iYearEnd]);
+  }, [iCategory, iGroup, iLang, iCity, iState, iHourlyOnly, iYear]);
 
  // ---------- Background (match CLIENT workspace) ----------
 const CLIENT_BG = '#E5E7EB'; // light slate like client page
@@ -641,17 +828,7 @@ const container = {
 
   const showCityHelp = Boolean(cityQuery && !iCity);
 
-  // Keep year range sane if user picks backwards
-  useEffect(() => {
-    if (!iYearStart || !iYearEnd) return;
-    const a = Number(iYearStart);
-    const b = Number(iYearEnd);
-    if (Number.isFinite(a) && Number.isFinite(b) && a > b) {
-      // swap
-      setIYearStart(String(b));
-      setIYearEnd(String(a));
-    }
-  }, [iYearStart, iYearEnd]);
+  
 
   return (
     <div style={pageWrap}>
@@ -864,31 +1041,17 @@ const container = {
                 ) : null}
               </div>
 
-              {/* Year range */}
               <div style={{ minWidth: 0 }}>
-                <Label>Start year</Label>
-                <select value={iYearStart} onChange={(e) => setIYearStart(e.target.value)} style={selectStyle}>
-                  <option value="">Any</option>
-                  {YEAR_OPTIONS.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ minWidth: 0 }}>
-                <Label>End year</Label>
-                <select value={iYearEnd} onChange={(e) => setIYearEnd(e.target.value)} style={selectStyle}>
-                  <option value="">Any</option>
-                  {YEAR_OPTIONS.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+  <Label>Year</Label>
+  <select value={iYear} onChange={(e) => setIYear(e.target.value)} style={selectStyle}>
+    <option value="">All</option>
+    {YEAR_OPTIONS.map((y) => (
+      <option key={y} value={y}>
+        {y}
+      </option>
+    ))}
+  </select>
+</div>
               <div style={{ minWidth: 0, display: 'flex', alignItems: 'end', gap: 10 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={iHourlyOnly} onChange={(e) => setIHourlyOnly(e.target.checked)} />
@@ -969,6 +1132,11 @@ const container = {
           <BarChart title="Avg Salary by Language" rows={insights?.byLanguageSalary} money />
           <BarChart title="Avg Hourly by Language" rows={insights?.byLanguageHourly} money />
 
+          {/* Year trends */}
+          <ColumnChart title="Avg Salary by Year" rows={insights?.byYearSalary} money minN={10} />
+          <ColumnChart title="Avg Hourly by Year" rows={insights?.byYearHourly} money minN={10} />
+
+              <div style={{ height: 24 }} />
           <div style={{ height: 24 }} />
         </div>
       </div>
