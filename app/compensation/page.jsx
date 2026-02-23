@@ -420,36 +420,6 @@ function yearFromAnyDate(d) {
     return all;
   }
 
-  async function fetchAllRawGroups() {
-    const pageSize = 1000;
-    let from = 0;
-    const set = new Set();
-
-    while (true) {
-      const to = from + pageSize - 1;
-
-    const { data, error } = await supabase
-      .from('comp_observations_raw')
-      .select('FolderGroup')
-      .range(from, to);
-
-    if (error) throw error;
-
-    const chunk = data || [];
-
-    for (const r of chunk) {
-      const g = String(r.FolderGroup || '').trim();
-      if (g) set.add(g);
-    }
-
-    if (chunk.length < pageSize) break;
-    from += pageSize;
-    if (from > 200000) break; // safety
-  }
-
-  return Array.from(set).sort();
-}
-
   // ---------- Load once ----------
   useEffect(() => {
     (async () => {
@@ -458,6 +428,8 @@ function yearFromAnyDate(d) {
         setErr('');
 
         const data = await fetchAllCompRows();
+
+
 
         // DEBUG — right here (temporary)
         console.log('COMP rows count:', data?.length);
@@ -471,62 +443,40 @@ function yearFromAnyDate(d) {
         console.log('Sample observed_date direct:', data?.[0]?.observed_date);
         console.log('Sample imported_at:', data?.[0]?.imported_at, 'created_at:', data?.[0]?.created_at);
 
-        const cleaned = (data || [])
-         .map((r) => {
-  // --- normalize fields from either table schema ---
-  const city = String(r.city ?? r.City ?? '').trim();
-  const st = String(r.state ?? r.StateCode ?? '').trim();
+const cleaned = (data || []).map((r) => {
+  const normWS = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
-  const salaryNum = Number(r.salary_annual ?? r.Salary);
-  const hourlyNum = Number(r.hourly_billable ?? r.Hourly);
+  const city = normWS(r.city ?? '');
+  const st = normWS(r.state ?? '');
 
-  const rawCatVal = r.type_of_law ?? r.FolderGroupCategory ?? '';
- const rawGroupVal =
-  r.title_bucket ??
-  r.FolderGroup ??
-  r.title ??
-  r.position_title ??
-  r.role ??
-  r.job_title ??
-  '';
-const normGroup = String(rawGroupVal || '').trim() || '(Unspecified)';
-  const rawLangVal = r.language ?? r.Language ?? '';
+  const salaryNum = Number(r.salary_annual);
+  const hourlyNum = Number(r.hourly_billable);
 
-  const observedRaw = r.observed_date ?? getObservedDateRaw(r);
+  // Category comes from title_bucket (Attorney / Paralegal / Legal Support)
+const rawCat = normWS(r.title_bucket ?? '').toLowerCase();
+let normCategory = 'Legal Support';
+if (rawCat.includes('paralegal')) {
+  normCategory = 'Paralegal';
+} else if (rawCat.includes('attorney') || rawCat.includes('lawyer')) {
+  normCategory = 'Attorney';
+}
+
+// Group comes from type_of_law (Litigation, Corporate, etc.)
+const normGroup = normWS(r.type_of_law ?? '') || '(Unspecified)';
+
+  // Date
+  const observedRaw = r.observed_date ?? '';
   const dateStr = ymd(observedRaw);
   const dateMs = toMs(observedRaw);
   const dateYear = yearFromAnyDate(observedRaw);
 
-  // --- normalize category into: Attorney | Paralegal | Legal Support ---
-  const rawCat = String(rawCatVal || '').toLowerCase().trim();
-  let normCategory = 'Legal Support';
-
-  if (
-    rawCat.includes('attorney') ||
-    rawCat.includes('lawyer') ||
-    rawCat.includes('partner') ||
-    rawCat.includes('associate') ||
-    rawCat.includes('general counsel') ||
-    rawCat.includes('gc') ||
-    rawCat.includes('assistant general counsel') ||
-    rawCat.includes('agc') ||
-    rawCat.includes('counsel')
-  ) {
-    normCategory = 'Attorney';
-  } else if (rawCat.includes('paralegal')) {
-    normCategory = 'Paralegal';
-  }
-
   return {
     ...r,
-
-    // normalize into the names the rest of your UI expects
     City: city,
     StateCode: st,
     FolderGroupCategory: normCategory,
     FolderGroup: normGroup,
-    Language: String(rawLangVal || '').trim(),
-
+    Language: normWS(r.language ?? ''),
     _city_label: [city, st].filter(Boolean).join(', '),
     _salary: salaryNum,
     _hourly: hourlyNum,
@@ -542,31 +492,25 @@ const normGroup = String(rawGroupVal || '').trim() || '(Unspecified)';
 
         setRawRows(cleaned);
 
+        // ✅ Build Group dropdown options from cleaned rows
+const groupsFromCleaned = Array.from(
+  new Set(
+    cleaned
+      .map((r) => String(r.FolderGroup || '').trim())
+      .filter((g) => g && g !== '(Unspecified)' && g !== '')
+  )
+).sort((a, b) => a.localeCompare(b));
+
+console.log('groupsFromCleaned:', groupsFromCleaned);
+
+      setGROUPS(groupsFromCleaned);
+
+        console.log('Example cleaned groups:', cleaned.slice(0, 10).map((r) => r.FolderGroup));
+        console.log('GROUPS count:', GROUPS?.length);
+        console.log('GROUPS sample:', (GROUPS || []).slice(0, 10));
+
         const cities = Array.from(new Set(cleaned.map((r) => r._city_label).filter(Boolean))).sort();
         setCITY_OPTIONS(cities);
-        const groupSet = new Set();
-
-for (const r of cleaned) {
-  const candidates = [
-    r.title_bucket,
-    r.FolderGroup,
-    r.title,
-    r.Title,
-    r.position_title,
-    r.role,
-    r.job_title,
-    r.folder_group,
-    r.group,
-  ];
-
-  for (const v of candidates) {
-    const s = String(v ?? '').trim();
-    if (s) groupSet.add(s);
-  }
-}
-
-const rawGroups = await fetchAllRawGroups();
-setGROUPS(rawGroups);
         setLANGUAGE_OPTIONS(Array.from(new Set(cleaned.map((r) => String(r.Language || '').trim()).filter(Boolean))).sort());
         setSTATES(Array.from(new Set(cleaned.map((r) => String(r.StateCode || '').trim()).filter(Boolean))).sort());
 
@@ -626,29 +570,38 @@ console.log('YEAR_OPTIONS (top 10):', years.slice(0, 10));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityQuery, CITY_OPTIONS]);
 
+  // ---------- Group filter helpers ----------
+const normKey = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+
   function passesFilters(r) {
-    if (iCategory && String(r.FolderGroupCategory || '').trim() !== iCategory.trim()) return false;
-    if (iGroup && String(r.FolderGroup || '').trim() !== iGroup.trim()) return false;
-    if (iLang && String(r.Language || '').trim() !== iLang.trim()) return false;
-    if (iState && String(r.StateCode || '').trim() !== iState.trim()) return false;
+  // Category — filters on the normalized Attorney/Paralegal/Legal Support value
+  if (iCategory && normKey(r.FolderGroupCategory) !== normKey(iCategory)) return false;
 
-    if (iCity) {
-      if (String(r._city_label || '').toLowerCase() !== iCity.toLowerCase()) return false;
-    }
+  // Group — filters directly on FolderGroup, independent of category
+  if (iGroup && normKey(r.FolderGroup) !== normKey(iGroup)) return false;
 
-    if (iHourlyOnly) {
-      if (!(Number.isFinite(r._hourly) && r._hourly > 0)) return false;
-    }
+  // Language
+  if (iLang && String(r.Language || '').trim() !== iLang.trim()) return false;
 
-    // Year filter (single)
-if (iYear) {
-  const y = Number(r._year);
-  if (!Number.isFinite(y)) return false;
-  if (y !== Number(iYear)) return false;
+  // State
+  if (iState && String(r.StateCode || '').trim() !== iState.trim()) return false;
+
+  // City
+  if (iCity && String(r._city_label || '').toLowerCase() !== iCity.toLowerCase()) return false;
+
+  // Hourly only
+  if (iHourlyOnly && !(Number.isFinite(r._hourly) && r._hourly > 0)) return false;
+
+  // Year
+  if (iYear) {
+    const y = Number(r._year);
+    if (!Number.isFinite(y) || y !== Number(iYear)) return false;
+  }
+
+  return true;
 }
 
-    return true;
-  }
 
   function buildInsights(all) {
     const rows = (all || []).filter((r) => passesFilters(r));
@@ -701,8 +654,22 @@ if (iYear) {
     setLoading(true);
     setErr('');
     try {
-      buildInsights(rawRows);
-    } catch (e) {
+  if (iGroup) {
+    const matches = rawRows.filter(
+      (r) =>
+        String(r.FolderGroup || '').replace(/\s+/g, ' ').trim().toLowerCase() ===
+        String(iGroup || '').replace(/\s+/g, ' ').trim().toLowerCase()
+    ).length;
+
+    console.log('Apply Group:', iGroup, 'matches:', matches);
+    console.log(
+      'Sample matching groups (first 20 rows):',
+      rawRows.slice(0, 20).map((r) => r.FolderGroup)
+    );
+  }
+
+  buildInsights(rawRows);
+} catch (e) {
       console.error(e);
       setErr('Failed to load insights.');
     } finally {
