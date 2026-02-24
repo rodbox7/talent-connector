@@ -657,68 +657,36 @@ const normKey = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 });
   }
 
-  async function applyFiltersNow() {
-    setLoading(true);
-    setErr('');
-    try {
-  if (iGroup) {
-    const matches = rawRows.filter(
-      (r) =>
-        String(r.FolderGroup || '').replace(/\s+/g, ' ').trim().toLowerCase() ===
-        String(iGroup || '').replace(/\s+/g, ' ').trim().toLowerCase()
-    ).length;
+      // ---------- Log compensation searches (client intent) ----------
+  // ---------- Log compensation searches (no auth required) ----------
+async function logCompSearch() {
+  try {
+    const payload = {
+      // If you have an email from elsewhere in your app, put it here.
+      // Otherwise leave null and you’ll still log the filters.
+      user_email: null,
 
-    console.log('Apply Group:', iGroup, 'matches:', matches);
-    console.log(
-      'Sample matching groups (first 20 rows):',
-      rawRows.slice(0, 20).map((r) => r.FolderGroup)
-    );
-  }
+      category: iCategory || null,
+      group_name: iGroup || null,
+      language: iLang || null,
+      state: iState || null,
+      city: iCity || null,
 
-  buildInsights(rawRows);
-} catch (e) {
-      console.error(e);
-      setErr('Failed to load insights.');
-    } finally {
-      setLoading(false);
+      hourly_only: Boolean(iHourlyOnly),
+      year: iYear ? Number(iYear) : null,
+    };
+
+    const { error } = await supabase.from('compensation_search_logs').insert(payload);
+
+    if (error) {
+      console.error('compensation_search_logs insert error:', error);
+    } else {
+      console.log('compensation_search_logs insert ok');
     }
+  } catch (e) {
+    console.error('Comp search log failed:', e);
   }
-
-  function clearFilters() {
-    setICategory('');
-    setIGroup('');
-    setILang('');
-    setIState('');
-    setICity('');
-    setCityQuery('');
-    setCityOpen(false);
-    setCityActiveIdx(0);
-    setIHourlyOnly(false);
-
-    setIYear('');
-
-    setTimeout(() => buildInsights(rawRows), 0);
-  }
-
-  function moneyRange(p25, p75, suffix = '') {
-    if (!p25 || !p75) return '—';
-    return `$${Number(p25).toLocaleString()}${suffix} - $${Number(p75).toLocaleString()}${suffix}`;
-  }
-
-  const filterSummary = useMemo(() => {
-    const parts = [];
-    if (iCategory) parts.push(iCategory);
-    if (iGroup) parts.push(iGroup);
-    if (iLang) parts.push(iLang);
-    if (iCity) parts.push(iCity);
-    else if (iState) parts.push(iState);
-    if (iHourlyOnly) parts.push('Hourly only');
-
-    parts.push(iYear ? iYear : 'All years');
-
-    return parts.filter(Boolean).join(' • ') || 'All';
-  }, [iCategory, iGroup, iLang, iCity, iState, iHourlyOnly, iYear]);
-
+}
  // ---------- Background (match CLIENT workspace) ----------
 const CLIENT_BG = '#E5E7EB'; // light slate like client page
 
@@ -802,7 +770,52 @@ const container = {
 
   const showCityHelp = Boolean(cityQuery && !iCity);
 
+    function moneyRange(p25, p75, suffix = '') {
+    if (!p25 || !p75) return '—';
+    return `$${Number(p25).toLocaleString()}${suffix} - $${Number(p75).toLocaleString()}${suffix}`;
+  }
+
   
+
+    async function applyFiltersNow() {
+    setLoading(true);
+    setErr('');
+    try {
+      buildInsights(rawRows);
+      await logCompSearch();
+    } catch (e) {
+      console.error(e);
+      setErr('Failed to load insights.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function clearFilters() {
+    setICategory('');
+    setIGroup('');
+    setILang('');
+    setIState('');
+    setICity('');
+    setCityQuery('');
+    setCityOpen(false);
+    setCityActiveIdx(0);
+    setIHourlyOnly(false);
+    setIYear('');
+    setTimeout(() => buildInsights(rawRows), 0);
+  }
+
+    const filterSummary = useMemo(() => {
+    const parts = [];
+    if (iCategory) parts.push(iCategory);
+    if (iGroup) parts.push(iGroup);
+    if (iLang) parts.push(iLang);
+    if (iCity) parts.push(iCity);
+    else if (iState) parts.push(iState);
+    if (iHourlyOnly) parts.push('Hourly only');
+    parts.push(iYear ? iYear : 'All years');
+    return parts.filter(Boolean).join(' • ') || 'All';
+  }, [iCategory, iGroup, iLang, iCity, iState, iHourlyOnly, iYear]);
 
   return (
     <div style={pageWrap}>

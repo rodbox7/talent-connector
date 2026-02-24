@@ -308,19 +308,38 @@ useEffect(() => {
           boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
         }}
       >
-        {/* HEADER */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#111827' }}>
-            Beacon Hill Legal – Search Insights
-          </h1>
-          <Link href="/" style={{ textDecoration: 'none', fontWeight: 600, color: '#2563EB' }}>
-            ← Back to Search
-          </Link>
-        </div>
+ {/* HEADER */}
+<div
+  style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  }}
+>
+  <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#111827' }}>
+    Beacon Hill Legal – Search Insights
+  </h1>
 
-        <p style={{ marginTop: 4, marginBottom: 28, color: '#6B7280' }}>
-          Weekly Summary – {weekOf}
-        </p>
+  <div style={{ display: 'flex', gap: 16 }}>
+    <Link
+      href="/compensation-search-log"
+      style={{ textDecoration: 'none', fontWeight: 600, color: '#2563EB' }}
+    >
+      Compensation Searches →
+    </Link>
+
+    <Link
+      href="/"
+      style={{ textDecoration: 'none', fontWeight: 600, color: '#2563EB' }}
+    >
+      ← Back to Search
+    </Link>
+  </div>
+</div>
+
+<p style={{ marginTop: 4, marginBottom: 28, color: '#6B7280' }}>
+  Weekly Summary – {weekOf}
+</p>
 
         {/* SUMMARY CARD */}
         <div
