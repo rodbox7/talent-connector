@@ -155,6 +155,8 @@ export default function CompensationSearchLogPage() {
 
 const cell = {
   padding: 10,
-  borderBottom: '1px solid #F3F4F6',
+  borderBottom: '1px solid #E5E7EB',
   whiteSpace: 'nowrap',
+  color: '#111827',
+  fontWeight: 500,
 };

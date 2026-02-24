@@ -658,13 +658,19 @@ const normKey = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
   }
 
       // ---------- Log compensation searches (client intent) ----------
-  // ---------- Log compensation searches (no auth required) ----------
-async function logCompSearch() {
+ async function logCompSearch() {
   try {
+    // Get logged-in user (same source Search uses indirectly)
+    const { data, error: authErr } = await supabase.auth.getUser();
+
+    if (authErr) {
+      console.error('Auth error:', authErr);
+    }
+
+    const user = data?.user;
+
     const payload = {
-      // If you have an email from elsewhere in your app, put it here.
-      // Otherwise leave null and you’ll still log the filters.
-      user_email: null,
+      user_email: user?.email || null,
 
       category: iCategory || null,
       group_name: iGroup || null,
@@ -676,12 +682,12 @@ async function logCompSearch() {
       year: iYear ? Number(iYear) : null,
     };
 
-    const { error } = await supabase.from('compensation_search_logs').insert(payload);
+    const { error } = await supabase
+      .from('compensation_search_logs')
+      .insert(payload);
 
     if (error) {
       console.error('compensation_search_logs insert error:', error);
-    } else {
-      console.log('compensation_search_logs insert ok');
     }
   } catch (e) {
     console.error('Comp search log failed:', e);
