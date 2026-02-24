@@ -462,7 +462,12 @@ if (rawCat.includes('paralegal')) {
 }
 
 // Group comes from type_of_law (Litigation, Corporate, etc.)
-const normGroup = normWS(r.type_of_law ?? '') || '(Unspecified)';
+// Exclude values that are really category labels
+const CATEGORY_WORDS = ['attorney', 'paralegal', 'legal support', 'legal'];
+const rawGroup = normWS(r.type_of_law ?? '');
+const normGroup = (rawGroup && !CATEGORY_WORDS.includes(rawGroup.toLowerCase()))
+  ? rawGroup
+  : '(Unspecified)';
 
   // Date
   const observedRaw = r.observed_date ?? '';
@@ -493,11 +498,13 @@ const normGroup = normWS(r.type_of_law ?? '') || '(Unspecified)';
         setRawRows(cleaned);
 
         // ✅ Build Group dropdown options from cleaned rows
+const CATEGORY_WORDS = ['attorney', 'paralegal', 'legal support', 'legal'];
+
 const groupsFromCleaned = Array.from(
   new Set(
     cleaned
       .map((r) => String(r.FolderGroup || '').trim())
-      .filter((g) => g && g !== '(Unspecified)' && g !== '')
+      .filter((g) => g && g !== '(Unspecified)' && g !== '' && !CATEGORY_WORDS.includes(g.toLowerCase()))
   )
 ).sort((a, b) => a.localeCompare(b));
 
